@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Reveal from "./components/Reveal";
 import Counter from "./components/Counter";
 import Ticker from "./components/Ticker";
+import Marquee from "./components/Marquee";
 import Faq from "./components/Faq";
 import ApplyModal from "./components/ApplyModal";
 
@@ -66,6 +67,14 @@ export default function Waitlist() {
 
   const applyLabel = applied ? "Applied ✓" : "Apply";
 
+  // Cursor-follow glow for the pillar cards.
+  const onPillarMove = (e: React.MouseEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
+    el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
+  };
+
   return (
     <>
       {/* ===================== NAV ===================== */}
@@ -105,28 +114,21 @@ export default function Waitlist() {
                 School is a<br />
                 <span className="strike">waiting room.</span>
                 <br />
-                You weren&apos;t built
-                <br />
-                to wait.
+                You weren&apos;t built to wait.
               </Reveal>
               <Reveal as="p" className="lead hero__sub" d={2}>
-                High Agency is a selective cohort for ambitious young operators
-                who&apos;d rather{" "}
+                For young operators who&apos;d rather{" "}
                 <span className="serif-em" style={{ color: "var(--bone)" }}>
                   build the thing
                 </span>{" "}
-                than study it. Find your tribe. Ship something real. Turn
-                ambition into momentum.
+                than study it.
               </Reveal>
               <Reveal d={2}>
                 <CaptureForm label="Request Access" onApply={openModal} />
               </Reveal>
               <Reveal className="capture__note" d={3}>
                 <span>
-                  <b>By application.</b> We read every one.
-                </span>
-                <span>
-                  <b>Founding batch — free to join.</b>
+                  <b>By application</b>, free to join.
                 </span>
                 <span>Ages 13–19.</span>
               </Reveal>
@@ -182,16 +184,9 @@ export default function Waitlist() {
           </div>
         </section>
 
-        {/* proof strip */}
+        {/* proof strip, infinite marquee */}
         <div className="strip">
-          <Reveal className="wrap strip__inner">
-            <span className="strip__label">Operators building from</span>
-            <span className="strip__item">Stanford</span>
-            <span className="strip__item">MIT</span>
-            <span className="strip__item">High schools</span>
-            <span className="strip__item">Dorm rooms</span>
-            <span className="strip__item">Garages</span>
-          </Reveal>
+          <Marquee />
         </div>
 
         {/* ===================== PROBLEM ===================== */}
@@ -208,15 +203,16 @@ export default function Waitlist() {
               <Reveal as="p" className="lead" d={2}>
                 Conventional education rewards conformity and obedience. The
                 real world rewards originality, leverage and nerve. The gap
-                between them has never been wider — and AI is widening it by the
+                between them has never been wider, and AI is widening it by the
                 week.
               </Reveal>
             </div>
 
-            <Reveal className="dossier" d={1}>
+            <div className="dossier">
               <div className="stat">
                 <div className="stat__n">
-                  75<span className="u">%</span>
+                  <Counter to={75} />
+                  <span className="u">%</span>
                 </div>
                 <div className="stat__d">
                   of graduates feel unprepared to make real career decisions.
@@ -225,7 +221,8 @@ export default function Waitlist() {
               </div>
               <div className="stat">
                 <div className="stat__n">
-                  3<span className="u">/4</span>
+                  <Counter to={3} />
+                  <span className="u">/4</span>
                 </div>
                 <div className="stat__d">
                   of students say school feels meaningless.
@@ -234,7 +231,8 @@ export default function Waitlist() {
               </div>
               <div className="stat">
                 <div className="stat__n">
-                  22<span className="u">%</span>
+                  <Counter to={22} />
+                  <span className="u">%</span>
                 </div>
                 <div className="stat__d">
                   report a strong sense of purpose in what they do.
@@ -243,21 +241,22 @@ export default function Waitlist() {
               </div>
               <div className="stat">
                 <div className="stat__n">
-                  &lt;10<span className="u">%</span>
+                  &lt;<Counter to={10} />
+                  <span className="u">%</span>
                 </div>
                 <div className="stat__d">
                   of universities have integrated any AI literacy.
                 </div>
                 <span className="stat__tag">04</span>
               </div>
-            </Reveal>
+            </div>
 
             <Reveal as="p" className="problem__punch" d={2}>
               You already know this.{" "}
               <span className="serif-em ig">
                 The question is whether you&apos;ll keep waiting for permission
               </span>{" "}
-              — or go build.
+              or go build.
             </Reveal>
           </div>
         </section>
@@ -283,7 +282,7 @@ export default function Waitlist() {
             </div>
 
             <div className="pillars">
-              <Reveal as="article" className="pillar" d={1}>
+              <Reveal as="article" className="pillar" d={1} onMouseMove={onPillarMove}>
                 <div className="pillar__glow" />
                 <div className="pillar__no">SYSTEM 01</div>
                 <div className="pillar__ic">
@@ -294,7 +293,7 @@ export default function Waitlist() {
                 <h3 className="h3">Ignition</h3>
                 <p>
                   Live, expert-led workshops and mentor office hours that get
-                  you moving — and keep you moving. Learn directly from people
+                  you moving, and keep you moving. Learn directly from people
                   who&apos;ve actually done the thing, not lectured about it.
                 </p>
                 <span className="pillar__tag">
@@ -302,7 +301,7 @@ export default function Waitlist() {
                 </span>
               </Reveal>
 
-              <Reveal as="article" className="pillar" d={2}>
+              <Reveal as="article" className="pillar" d={2} onMouseMove={onPillarMove}>
                 <div className="pillar__glow" />
                 <div className="pillar__no">SYSTEM 02</div>
                 <div className="pillar__ic">
@@ -314,7 +313,7 @@ export default function Waitlist() {
                 </div>
                 <h3 className="h3">Operational Zone</h3>
                 <p>
-                  A shared skill track of real-world milestones — ship an MVP,
+                  A shared skill track of real-world milestones, ship an MVP,
                   land your first user, hit your first $100 MRR. Progress is
                   earned by doing real things and verified by a mentor, never by
                   a quiz.
@@ -324,7 +323,7 @@ export default function Waitlist() {
                 </span>
               </Reveal>
 
-              <Reveal as="article" className="pillar" d={3}>
+              <Reveal as="article" className="pillar" d={3} onMouseMove={onPillarMove}>
                 <div className="pillar__glow" />
                 <div className="pillar__no">SYSTEM 03</div>
                 <div className="pillar__ic">
@@ -336,7 +335,7 @@ export default function Waitlist() {
                 </div>
                 <h3 className="h3">Unit</h3>
                 <p>
-                  Your tribe — a tight founding team of 5–6 operators building a
+                  Your tribe, a tight founding team of 5–6 operators building a
                   real initiative alongside you. Streaks and accountability keep
                   the whole Unit moving between sessions. You don&apos;t do this
                   alone.
@@ -373,7 +372,7 @@ export default function Waitlist() {
                     <h3 className="h3">Apply &amp; get matched</h3>
                     <p>
                       Submit your profile. If you&apos;re a fit, you&apos;re
-                      placed into a Unit of operators on the same trajectory —
+                      placed into a Unit of operators on the same trajectory -
                       or you found your own.
                     </p>
                   </div>
@@ -384,7 +383,7 @@ export default function Waitlist() {
                     <h3 className="h3">Progress real milestones</h3>
                     <p>
                       Your Unit moves through a shared track of practical
-                      milestones in the real world. A mentor verifies each one —
+                      milestones in the real world. A mentor verifies each one -
                       once, for the whole team.
                     </p>
                   </div>
@@ -478,7 +477,7 @@ export default function Waitlist() {
               <Reveal as="p" className="lead" d={2}>
                 The fastest way to compress a decade into a season is to build
                 next to someone who&apos;s already walked the road. High Agency
-                is led by operators with real range — and real receipts.
+                is led by operators with real range, and real receipts.
               </Reveal>
               <Reveal className="creds" d={2}>
                 <div className="cred">
@@ -497,7 +496,7 @@ export default function Waitlist() {
                 <div className="cred">
                   <span className="cred__k">Research</span>
                   <span className="cred__v">
-                    Published research background — rigor, not just hustle.
+                    Published research background, rigor, not just hustle.
                   </span>
                 </div>
                 <div className="cred">
@@ -525,14 +524,14 @@ export default function Waitlist() {
                 Real Units. Real output.
               </Reveal>
               <Reveal as="p" className="lead" d={2}>
-                We&apos;re early — and that&apos;s the point. The founding batch
+                We&apos;re early, and that&apos;s the point. The founding batch
                 writes the origin story. Here&apos;s what&apos;s already on the
                 board.
               </Reveal>
             </div>
 
-            <div className="proof">
-              <Reveal as="article" className="cohort" d={1}>
+            <div className="proof proof--bento">
+              <Reveal as="article" className="cohort cohort--feature" d={1}>
                 <div className="cohort__img">
                   <span className="cohort__badge">Shipped</span>
                 </div>
@@ -540,7 +539,7 @@ export default function Waitlist() {
                   <h3>Canary OS</h3>
                   <p>
                     A six-person high-school Unit built an ML scam-detection
-                    model — a real, working product, not a class project.
+                    model, a real, working product, not a class project.
                   </p>
                   <div className="cohort__foot">
                     <span>High-school Unit</span>
@@ -555,7 +554,7 @@ export default function Waitlist() {
                 <div className="cohort__body">
                   <h3>The Frontier Units</h3>
                   <p>
-                    Units forming with students from Stanford and MIT —
+                    Units forming with students from Stanford and MIT -
                     operators already optimizing for leverage over grades.
                   </p>
                   <div className="cohort__foot">
@@ -571,7 +570,7 @@ export default function Waitlist() {
                 <div className="cohort__body">
                   <h3>Your Unit</h3>
                   <p>
-                    The next seat is unclaimed. Apply to join a forming Unit —
+                    The next seat is unclaimed. Apply to join a forming Unit -
                     or found your own and recruit your team.
                   </p>
                   <div className="cohort__foot">
@@ -587,7 +586,7 @@ export default function Waitlist() {
                 <span className="serif-em">
                   &quot;We&apos;re not selling a finished thing.
                 </span>{" "}
-                We&apos;re inviting you to build the thing — and the proof — with
+                We&apos;re inviting you to build the thing, and the proof, with
                 us. Early is the advantage.&quot;
               </p>
               <button className="btn btn--ghost" onClick={() => openModal()}>
@@ -611,7 +610,7 @@ export default function Waitlist() {
               </div>
               <h2 className="h2">Unit vs. Unit.</h2>
               <p className="lead">
-                Soon, cohorts compete on what actually matters — shipped
+                Soon, cohorts compete on what actually matters, shipped
                 outcomes, revenue, real traction. Live leaderboards. Demo days.
                 Winning Units earn the rooms most people never get into.
               </p>
@@ -682,7 +681,7 @@ export default function Waitlist() {
             </Reveal>
             <Reveal as="p" className="lead" d={2}>
               Stop rehearsing for a life that isn&apos;t coming. Apply to the
-              founding batch and turn what you&apos;ve got into momentum —
+              founding batch and turn what you&apos;ve got into momentum -
               alongside people who move at your speed.
             </Reveal>
             <Reveal d={2}>

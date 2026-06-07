@@ -7,7 +7,7 @@ import {
   type Firestore,
 } from "firebase/firestore";
 
-// Firebase web config is public by design — gating happens via Firestore
+// Firebase web config is public by design, gating happens via Firestore
 // security rules, not by hiding these keys. Values can be overridden per
 // environment with NEXT_PUBLIC_FIREBASE_* vars; the literals are the default.
 const firebaseConfig = {

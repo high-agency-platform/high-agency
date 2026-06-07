@@ -222,12 +222,12 @@ export default function ApplyModal({
           <div className="modal__step active">
             <h3>Two questions.</h3>
             <p className="modal__sub">
-              This is what your future Unit reads. Be real — drive reads louder
+              This is what your future Unit reads. Be real, drive reads louder
               than polish.
             </p>
             <div className="field">
               <label htmlFor="m-build">
-                What are you building — or what do you want to build?
+                What are you building, or what do you want to build?
               </label>
               <textarea
                 id="m-build"
@@ -248,7 +248,7 @@ export default function ApplyModal({
               />
             </div>
             <div className={`modal__err${err ? " show" : ""}`}>
-              Give us a sentence on each — that&apos;s all we need.
+              Give us a sentence on each, that&apos;s all we need.
             </div>
             {submitErr && (
               <div className="modal__err show">{submitErr}</div>
@@ -273,7 +273,7 @@ export default function ApplyModal({
           </div>
         )}
 
-        {/* step 3 — success */}
+        {/* step 3, success */}
         {step === 3 && (
           <div className="modal__step active">
             <div className="success">
@@ -292,7 +292,7 @@ export default function ApplyModal({
               <h3>Application logged.</h3>
               <p className="modal__sub" style={{ marginBottom: 0 }}>
                 You&apos;re in the queue for Founding Batch 01. We read every
-                application by hand — if there&apos;s a fit, you&apos;ll hear
+                application by hand, if there&apos;s a fit, you&apos;ll hear
                 from us about your Unit.
               </p>
               <div className="success__id">
@@ -301,7 +301,7 @@ export default function ApplyModal({
               <div className="success__q">
                 Position in queue{" "}
                 <span className="n">
-                  {result ? `#${result.queuePos}` : "—"}
+                  {result ? `#${result.queuePos}` : "-"}
                 </span>
               </div>
               <div className="modal__actions" style={{ marginTop: 30 }}>
