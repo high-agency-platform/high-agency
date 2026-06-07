@@ -110,8 +110,7 @@ export default function Waitlist() {
                 Founding Batch 01 · By application only
               </Reveal>
               <Reveal as="h1" className="display" d={1}>
-                School is a<br />
-                <span className="strike">waiting room.</span>
+                School is a <span className="strike">waiting room.</span>
                 <br />
                 You weren&apos;t built to wait.
               </Reveal>
