@@ -150,7 +150,9 @@ export default function ApplyModal({
       <div className="modal__scrim" onClick={onClose} />
       <div className="modal__card" ref={cardRef}>
         <button className="modal__close" onClick={onClose} aria-label="Close">
-          ✕
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
         </button>
         <div className="modal__progress">
           <span className={step >= 1 ? "on" : ""} />
@@ -162,10 +164,7 @@ export default function ApplyModal({
         {step === 1 && (
           <div className="modal__step active">
             <h3 id="modalTitle">Request access.</h3>
-            <p className="modal__sub">
-              Founding Batch 01 is by application. Takes 60 seconds. We read
-              every one.
-            </p>
+            <p className="modal__sub">Founding Batch 01. Takes 60 seconds.</p>
             <div className="field">
               <label htmlFor="m-name">First name</label>
               <input
@@ -211,7 +210,7 @@ export default function ApplyModal({
             </div>
             <div className="modal__actions">
               <button className="btn btn--primary modal__next" onClick={next1}>
-                Continue <span className="arr">→</span>
+                Continue
               </button>
             </div>
           </div>
@@ -221,28 +220,21 @@ export default function ApplyModal({
         {step === 2 && (
           <div className="modal__step active">
             <h3>Two questions.</h3>
-            <p className="modal__sub">
-              This is what your future Unit reads. Be real, drive reads louder
-              than polish.
-            </p>
+            <p className="modal__sub">Be real. Drive reads louder than polish.</p>
             <div className="field">
-              <label htmlFor="m-build">
-                What are you building, or what do you want to build?
-              </label>
+              <label htmlFor="m-build">What are you building?</label>
               <textarea
                 id="m-build"
-                placeholder="A product, a project, a company, a skill… or raw ambition with no idea yet. All valid."
+                placeholder="A product, a project, or raw ambition. All valid."
                 value={building}
                 onChange={(e) => setBuilding(e.target.value)}
               />
             </div>
             <div className="field">
-              <label htmlFor="m-bold">
-                What&apos;s the most ambitious thing you&apos;ve done so far?
-              </label>
+              <label htmlFor="m-bold">Boldest thing you&apos;ve done?</label>
               <textarea
                 id="m-bold"
-                placeholder="Shipped something, ran something, taught yourself something, cold-emailed someone… show us your nerve."
+                placeholder="Shipped, ran, taught, or cold-emailed something."
                 value={boldest}
                 onChange={(e) => setBoldest(e.target.value)}
               />
@@ -259,15 +251,14 @@ export default function ApplyModal({
                 onClick={() => setStep(1)}
                 disabled={busy}
               >
-                ←
+                Back
               </button>
               <button
                 className="btn btn--primary modal__next"
                 onClick={doSubmit}
                 disabled={busy}
               >
-                {busy ? "Submitting…" : "Submit application"}{" "}
-                <span className="arr">→</span>
+                {busy ? "Submitting…" : "Submit application"}
               </button>
             </div>
           </div>
@@ -291,9 +282,7 @@ export default function ApplyModal({
               </div>
               <h3>Application logged.</h3>
               <p className="modal__sub" style={{ marginBottom: 0 }}>
-                You&apos;re in the queue for Founding Batch 01. We read every
-                application by hand, if there&apos;s a fit, you&apos;ll hear
-                from us about your Unit.
+                You&apos;re in the queue. If it&apos;s a fit, we&apos;ll reach out.
               </p>
               <div className="success__id">
                 OPERATOR ID · <b>{result?.opId ?? "HA-000"}</b>

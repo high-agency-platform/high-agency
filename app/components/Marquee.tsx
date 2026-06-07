@@ -1,28 +1,20 @@
-"use client";
-
 const ITEMS = [
-  "Stanford", "MIT", "High schools", "Dorm rooms", "Garages",
-  "Hackathons", "Discord servers", "Bedrooms",
+  "Stanford", "MIT", "High schools", "Dorm rooms",
+  "Garages", "Hackathons", "Bedrooms",
 ];
 
-/** Infinite horizontal marquee of origin labels. Track is duplicated so the
- *  CSS translateX(-50%) loop is seamless. */
+/** Static, flat proof strip of where operators build from.
+ *  No animation — see /design-system.md (no ambient motion). */
 export default function Marquee() {
   return (
-    <div className="marquee" aria-hidden="true">
-      <div className="marquee__track">
-        {[0, 1].map((dup) => (
-          <div className="marquee__group" key={dup}>
-            <span className="marquee__label">Operators building from</span>
-            {ITEMS.map((item) => (
-              <span className="marquee__item" key={item}>
-                {item}
-                <span className="marquee__sep">/</span>
-              </span>
-            ))}
-          </div>
-        ))}
-      </div>
+    <div className="wrap strip__inner">
+      <span className="strip__label">Operators building from</span>
+      {ITEMS.map((item, i) => (
+        <span className="strip__item" key={item}>
+          {item}
+          {i < ITEMS.length - 1 && <span className="strip__sep"> · </span>}
+        </span>
+      ))}
     </div>
   );
 }

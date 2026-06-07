@@ -10,11 +10,9 @@ import ApplyModal from "./components/ApplyModal";
 function CaptureForm({
   label,
   onApply,
-  centered = false,
 }: {
   label: string;
   onApply: (email: string) => void;
-  centered?: boolean;
 }) {
   const [email, setEmail] = useState("");
   return (
@@ -24,10 +22,8 @@ function CaptureForm({
         e.preventDefault();
         onApply(email.trim());
       }}
-      style={centered ? { justifyContent: "center" } : undefined}
     >
       <div className="capture__field">
-        <span className="pre mono">↳</span>
         <input
           type="email"
           name="email"
@@ -39,7 +35,7 @@ function CaptureForm({
         />
       </div>
       <button type="submit" className="btn btn--primary">
-        {label} <span className="arr">→</span>
+        {label}
       </button>
     </form>
   );
@@ -64,15 +60,7 @@ export default function Waitlist() {
     setModalOpen(true);
   }, []);
 
-  const applyLabel = applied ? "Applied ✓" : "Apply";
-
-  // Cursor-follow glow for the pillar cards.
-  const onPillarMove = (e: React.MouseEvent<HTMLElement>) => {
-    const el = e.currentTarget;
-    const r = el.getBoundingClientRect();
-    el.style.setProperty("--mx", `${((e.clientX - r.left) / r.width) * 100}%`);
-    el.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
-  };
+  const applyLabel = applied ? "Applied" : "Apply";
 
   return (
     <>
@@ -85,9 +73,8 @@ export default function Waitlist() {
           </a>
           <nav className="nav__right">
             <div className="nav__links">
-              <a href="#problem">The Problem</a>
-              <a href="#system">The System</a>
-              <a href="#proof">Proof</a>
+              <a href="#problem">Problem</a>
+              <a href="#system">What you join</a>
               <a href="#faq">FAQ</a>
             </div>
             <button
@@ -107,7 +94,7 @@ export default function Waitlist() {
             <div className="hero__copy">
               <Reveal className="eyebrow hero__tag">
                 <span className="dot" />
-                Founding Batch 01 · By application only
+                Founding Batch 01
               </Reveal>
               <Reveal as="h1" className="display" d={1}>
                 School is a <span className="strike">waiting room.</span>
@@ -115,20 +102,14 @@ export default function Waitlist() {
                 You weren&apos;t built to wait.
               </Reveal>
               <Reveal as="p" className="lead hero__sub" d={2}>
-                For young operators who&apos;d rather{" "}
-                <span className="serif-em" style={{ color: "var(--bone)" }}>
-                  build the thing
-                </span>{" "}
-                than study it.
+                For operators who&apos;d rather <span className="em">build</span>{" "}
+                than study.
               </Reveal>
               <Reveal d={2}>
                 <CaptureForm label="Request Access" onApply={openModal} />
               </Reveal>
               <Reveal className="capture__note" d={3}>
-                <span>
-                  <b>By application</b>, free to join.
-                </span>
-                <span>Ages 13–19.</span>
+                <span><b>By application</b> · Free · Ages 13–19</span>
               </Reveal>
             </div>
           </div>
@@ -148,13 +129,10 @@ export default function Waitlist() {
                 The diagnosis
               </Reveal>
               <Reveal as="h2" className="h2" d={1}>
-                The system is optimized for the wrong outcome.
+                School optimizes for the wrong thing.
               </Reveal>
               <Reveal as="p" className="lead" d={2}>
-                Conventional education rewards conformity and obedience. The
-                real world rewards originality, leverage and nerve. The gap
-                between them has never been wider, and AI is widening it by the
-                week.
+                It rewards conformity. The world rewards nerve.
               </Reveal>
             </div>
 
@@ -164,9 +142,7 @@ export default function Waitlist() {
                   <Counter to={75} />
                   <span className="u">%</span>
                 </div>
-                <div className="stat__d">
-                  of graduates feel unprepared to make real career decisions.
-                </div>
+                <div className="stat__d">feel unprepared for real decisions.</div>
                 <span className="stat__tag">01</span>
               </div>
               <div className="stat">
@@ -174,9 +150,7 @@ export default function Waitlist() {
                   <Counter to={3} />
                   <span className="u">/4</span>
                 </div>
-                <div className="stat__d">
-                  of students say school feels meaningless.
-                </div>
+                <div className="stat__d">say school feels meaningless.</div>
                 <span className="stat__tag">02</span>
               </div>
               <div className="stat">
@@ -184,9 +158,7 @@ export default function Waitlist() {
                   <Counter to={22} />
                   <span className="u">%</span>
                 </div>
-                <div className="stat__d">
-                  report a strong sense of purpose in what they do.
-                </div>
+                <div className="stat__d">feel a real sense of purpose.</div>
                 <span className="stat__tag">03</span>
               </div>
               <div className="stat">
@@ -194,19 +166,14 @@ export default function Waitlist() {
                   &lt;<Counter to={10} />
                   <span className="u">%</span>
                 </div>
-                <div className="stat__d">
-                  of universities have integrated any AI literacy.
-                </div>
+                <div className="stat__d">of unis teach any AI literacy.</div>
                 <span className="stat__tag">04</span>
               </div>
             </div>
 
             <Reveal as="p" className="problem__punch" d={2}>
               You already know this.{" "}
-              <span className="serif-em ig">
-                The question is whether you&apos;ll keep waiting for permission
-              </span>{" "}
-              or go build.
+              <span className="accent">Stop waiting for permission.</span>
             </Reveal>
           </div>
         </section>
@@ -217,43 +184,37 @@ export default function Waitlist() {
         <section className="section" id="system">
           <div className="wrap">
             <div className="shead">
-              <Reveal className="eyebrow eyebrow--ignite">
+              <Reveal className="eyebrow eyebrow--accent">
                 <span className="dot" />
                 What you join
               </Reveal>
               <Reveal as="h2" className="h2" d={1}>
-                Not school. Not tutoring.
-                <br />A launchpad.
-              </Reveal>
-              <Reveal as="p" className="lead" d={2}>
-                Three systems, working together to convert raw ambition into
-                shipped reality.
+                Not school. A launchpad.
               </Reveal>
             </div>
 
             <div className="pillars">
-              <Reveal as="article" className="pillar" d={1} onMouseMove={onPillarMove}>
-                <div className="pillar__glow" />
-                <div className="pillar__no">SYSTEM 01</div>
+              <Reveal as="article" className="pillar" d={1}>
+                <div className="pillar__no">01</div>
                 <div className="pillar__ic">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <path d="M12 2C9 6 7 8 7 13a5 5 0 0 0 10 0c0-2-1-3.5-2-5-.5 1.5-1.5 2-2.5 2 .5-3-.5-6-.5-8Z" />
                   </svg>
                 </div>
                 <h3 className="h3">Ignition</h3>
-                <p>
-                  Live, expert-led workshops and mentor office hours that get
-                  you moving, and keep you moving. Learn directly from people
-                  who&apos;ve actually done the thing, not lectured about it.
-                </p>
+                <p>Live workshops + office hours with operators who&apos;ve done it.</p>
+                <div className="pillar__ex">
+                  <span className="chip">Cold outreach</span>
+                  <span className="chip">Pricing</span>
+                  <span className="chip">Demo day</span>
+                </div>
                 <span className="pillar__tag">
-                  Mentorship layer · <b>Premium, later</b>
+                  Mentorship · <b>Premium later</b>
                 </span>
               </Reveal>
 
-              <Reveal as="article" className="pillar" d={2} onMouseMove={onPillarMove}>
-                <div className="pillar__glow" />
-                <div className="pillar__no">SYSTEM 02</div>
+              <Reveal as="article" className="pillar" d={2}>
+                <div className="pillar__no">02</div>
                 <div className="pillar__ic">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <circle cx="12" cy="12" r="9" />
@@ -262,20 +223,19 @@ export default function Waitlist() {
                   </svg>
                 </div>
                 <h3 className="h3">Operational Zone</h3>
-                <p>
-                  A shared skill track of real-world milestones, ship an MVP,
-                  land your first user, hit your first $100 MRR. Progress is
-                  earned by doing real things and verified by a mentor, never by
-                  a quiz.
-                </p>
+                <p>Real milestones, verified by a mentor — never a quiz.</p>
+                <div className="pillar__ex">
+                  <span className="chip chip--on">Ship MVP</span>
+                  <span className="chip">First user</span>
+                  <span className="chip">$100 MRR</span>
+                </div>
                 <span className="pillar__tag">
-                  The skill track · <b>Free</b>
+                  Skill track · <b>Free</b>
                 </span>
               </Reveal>
 
-              <Reveal as="article" className="pillar" d={3} onMouseMove={onPillarMove}>
-                <div className="pillar__glow" />
-                <div className="pillar__no">SYSTEM 03</div>
+              <Reveal as="article" className="pillar" d={3}>
+                <div className="pillar__no">03</div>
                 <div className="pillar__ic">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <circle cx="8" cy="9" r="3" />
@@ -284,14 +244,13 @@ export default function Waitlist() {
                   </svg>
                 </div>
                 <h3 className="h3">Unit</h3>
-                <p>
-                  Your tribe, a tight founding team of 5–6 operators building a
-                  real initiative alongside you. Streaks and accountability keep
-                  the whole Unit moving between sessions. You don&apos;t do this
-                  alone.
-                </p>
+                <p>A founding team of 5–6, building one real thing together.</p>
+                <div className="pillar__ex">
+                  <span className="chip">5–6 operators</span>
+                  <span className="chip">Streaks</span>
+                </div>
                 <span className="pillar__tag">
-                  Your cohort · <b>Free</b>
+                  Cohort · <b>Free</b>
                 </span>
               </Reveal>
             </div>
@@ -320,33 +279,21 @@ export default function Waitlist() {
                   <div className="step__n">01</div>
                   <div>
                     <h3 className="h3">Apply &amp; get matched</h3>
-                    <p>
-                      Submit your profile. If you&apos;re a fit, you&apos;re
-                      placed into a Unit of operators on the same trajectory -
-                      or you found your own.
-                    </p>
+                    <p>Apply, then get placed in a Unit.</p>
                   </div>
                 </div>
                 <div className="step">
                   <div className="step__n">02</div>
                   <div>
-                    <h3 className="h3">Progress real milestones</h3>
-                    <p>
-                      Your Unit moves through a shared track of practical
-                      milestones in the real world. A mentor verifies each one -
-                      once, for the whole team.
-                    </p>
+                    <h3 className="h3">Hit real milestones</h3>
+                    <p>Verified by a mentor, not a quiz.</p>
                   </div>
                 </div>
                 <div className="step">
                   <div className="step__n">03</div>
                   <div>
                     <h3 className="h3">Ship something real</h3>
-                    <p>
-                      Build streaks. Bank wins. Walk away with a launched
-                      product, first revenue, and a network of people who get
-                      it.
-                    </p>
+                    <p>Leave with a launched product and first revenue.</p>
                   </div>
                 </div>
               </Reveal>
@@ -420,171 +367,30 @@ export default function Waitlist() {
                 Who you learn from
               </Reveal>
               <Reveal as="h2" className="h2" d={1}>
-                Mentors who&apos;ve actually done it.
+                Mentors who&apos;ve done it.
               </Reveal>
               <Reveal as="p" className="lead" d={2}>
-                The fastest way to compress a decade into a season is to build
-                next to someone who&apos;s already walked the road. High Agency
-                is led by operators with real range, and real receipts.
+                Build next to someone who&apos;s already walked the road.
               </Reveal>
               <Reveal className="creds" d={2}>
                 <div className="cred">
                   <span className="cred__k">Enterprise</span>
-                  <span className="cred__v">
-                    Guides Fortune 500 companies through tax &amp; compliance at
-                    scale.
-                  </span>
+                  <span className="cred__v">Advised Fortune 500s at scale.</span>
                 </div>
                 <div className="cred">
                   <span className="cred__k">Frontier</span>
-                  <span className="cred__v">
-                    Worked on space startups pushing real technical limits.
-                  </span>
+                  <span className="cred__v">Worked on space startups.</span>
                 </div>
                 <div className="cred">
                   <span className="cred__k">Research</span>
-                  <span className="cred__v">
-                    Published research background, rigor, not just hustle.
-                  </span>
+                  <span className="cred__v">Published research background.</span>
                 </div>
                 <div className="cred">
                   <span className="cred__k">Mission</span>
-                  <span className="cred__v">
-                    Teaches young operators what school structurally can&apos;t.
-                  </span>
+                  <span className="cred__v">Teaches what school can&apos;t.</span>
                 </div>
               </Reveal>
             </div>
-          </div>
-        </section>
-
-        <div className="divider" />
-
-        {/* ===================== PROOF ===================== */}
-        <section className="section" id="proof">
-          <div className="wrap">
-            <div className="shead">
-              <Reveal className="eyebrow eyebrow--ignite">
-                <span className="dot" />
-                Already in motion
-              </Reveal>
-              <Reveal as="h2" className="h2" d={1}>
-                Real Units. Real output.
-              </Reveal>
-              <Reveal as="p" className="lead" d={2}>
-                We&apos;re early, and that&apos;s the point. The founding batch
-                writes the origin story. Here&apos;s what&apos;s already on the
-                board.
-              </Reveal>
-            </div>
-
-            <div className="proof proof--bento">
-              <Reveal as="article" className="cohort cohort--feature" d={1}>
-                <div className="cohort__img">
-                  <span className="cohort__badge">Shipped</span>
-                </div>
-                <div className="cohort__body">
-                  <h3>Canary OS</h3>
-                  <p>
-                    A six-person high-school Unit built an ML scam-detection
-                    model, a real, working product, not a class project.
-                  </p>
-                  <div className="cohort__foot">
-                    <span>High-school Unit</span>
-                    <span>6 operators</span>
-                  </div>
-                </div>
-              </Reveal>
-              <Reveal as="article" className="cohort" d={2}>
-                <div className="cohort__img">
-                  <span className="cohort__badge">Forming</span>
-                </div>
-                <div className="cohort__body">
-                  <h3>The Frontier Units</h3>
-                  <p>
-                    Units forming with students from Stanford and MIT -
-                    operators already optimizing for leverage over grades.
-                  </p>
-                  <div className="cohort__foot">
-                    <span>Stanford · MIT</span>
-                    <span>Recruiting</span>
-                  </div>
-                </div>
-              </Reveal>
-              <Reveal as="article" className="cohort" d={3}>
-                <div className="cohort__img">
-                  <span className="cohort__badge">Open</span>
-                </div>
-                <div className="cohort__body">
-                  <h3>Your Unit</h3>
-                  <p>
-                    The next seat is unclaimed. Apply to join a forming Unit -
-                    or found your own and recruit your team.
-                  </p>
-                  <div className="cohort__foot">
-                    <span>Founding batch 01</span>
-                    <span>By application</span>
-                  </div>
-                </div>
-              </Reveal>
-            </div>
-
-            <Reveal className="honest">
-              <p>
-                <span className="serif-em">
-                  &quot;We&apos;re not selling a finished thing.
-                </span>{" "}
-                We&apos;re inviting you to build the thing, and the proof, with
-                us. Early is the advantage.&quot;
-              </p>
-              <button className="btn btn--ghost" onClick={() => openModal()}>
-                Claim a seat <span className="arr">→</span>
-              </button>
-            </Reveal>
-          </div>
-        </section>
-
-        {/* ===================== COMPETITION TEASER ===================== */}
-        <section className="section">
-          <div className="wrap">
-            <Reveal className="compete">
-              <span className="compete__roadmap">On the roadmap</span>
-              <div
-                className="eyebrow eyebrow--ignite"
-                style={{ marginBottom: 20 }}
-              >
-                <span className="dot" />
-                What&apos;s coming
-              </div>
-              <h2 className="h2">Unit vs. Unit.</h2>
-              <p className="lead">
-                Soon, cohorts compete on what actually matters, shipped
-                outcomes, revenue, real traction. Live leaderboards. Demo days.
-                Winning Units earn the rooms most people never get into.
-              </p>
-              <div className="board">
-                <div className="board__row lead-row">
-                  <span className="board__rank">01</span>
-                  <span className="board__team">Canary OS</span>
-                  <span className="board__score">▲ 1,240 pts</span>
-                </div>
-                <div className="board__row">
-                  <span className="board__rank">02</span>
-                  <span className="board__team board__blur">████ Unit</span>
-                  <span className="board__score board__blur">▲ 1,090</span>
-                </div>
-                <div className="board__row">
-                  <span className="board__rank">03</span>
-                  <span className="board__team board__blur">█████ Unit</span>
-                  <span className="board__score board__blur">▲ 980</span>
-                </div>
-                <div className="board__row">
-                  <span className="board__rank">04</span>
-                  <span className="board__team board__blur">███ Unit</span>
-                  <span className="board__score board__blur">▲ 875</span>
-                </div>
-              </div>
-            </Reveal>
           </div>
         </section>
 
@@ -592,11 +398,8 @@ export default function Waitlist() {
 
         {/* ===================== FAQ ===================== */}
         <section className="section" id="faq">
-          <div className="wrap">
-            <div
-              className="shead"
-              style={{ textAlign: "center", marginLeft: "auto", marginRight: "auto" }}
-            >
+          <div className="wrap faq-grid">
+            <div className="faq-grid__head">
               <Reveal className="eyebrow" style={{ marginBottom: 18 }}>
                 <span className="dot" />
                 Before you apply
@@ -613,40 +416,25 @@ export default function Waitlist() {
 
         {/* ===================== FINAL CTA ===================== */}
         <section className="section final">
-          <div className="final__glow" />
           <div className="wrap">
-            <Reveal
-              className="eyebrow eyebrow--ignite"
-              style={{ justifyContent: "center" }}
-            >
-              <span className="dot" />
-              Founding Batch 01 · Applications open
-            </Reveal>
-            <Reveal as="h2" d={1}>
-              Ambition is the
-              <br />
-              only prerequisite.
-            </Reveal>
-            <Reveal as="p" className="lead" d={2}>
-              Stop rehearsing for a life that isn&apos;t coming. Apply to the
-              founding batch and turn what you&apos;ve got into momentum -
-              alongside people who move at your speed.
-            </Reveal>
-            <Reveal d={2}>
-              <CaptureForm label="Apply Now" onApply={openModal} centered />
-            </Reveal>
-            <Reveal
-              className="capture__note"
-              d={3}
-              style={{ justifyContent: "center" }}
-            >
-              <span>
-                <b>By application.</b> We read every one.
-              </span>
-              <span>
-                <b>Free to join.</b>
-              </span>
-            </Reveal>
+            <div className="final__inner">
+              <Reveal className="eyebrow eyebrow--accent">
+                <span className="dot" />
+                Applications open
+              </Reveal>
+              <Reveal as="h2" d={1}>
+                Ambition is the only prerequisite.
+              </Reveal>
+              <Reveal as="p" className="lead" d={2}>
+                Stop rehearsing. Start building.
+              </Reveal>
+              <Reveal d={2}>
+                <CaptureForm label="Apply Now" onApply={openModal} />
+              </Reveal>
+              <Reveal className="capture__note" d={3}>
+                <span><b>By application</b> · Free</span>
+              </Reveal>
+            </div>
           </div>
         </section>
 
@@ -659,8 +447,7 @@ export default function Waitlist() {
             </a>
             <div className="footer__links">
               <a href="#problem">Problem</a>
-              <a href="#system">System</a>
-              <a href="#proof">Proof</a>
+              <a href="#system">What you join</a>
               <a href="#faq">FAQ</a>
               <a
                 href="#"
@@ -672,9 +459,7 @@ export default function Waitlist() {
                 Apply
               </a>
             </div>
-            <small>
-              © 2026 High Agency · Not school. Not tutoring. A launchpad.
-            </small>
+            <small>© 2026 High Agency · A launchpad.</small>
           </div>
         </footer>
       </main>
