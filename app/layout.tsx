@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Bricolage_Grotesque, Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 
-const inter = Inter({
+// Display — editorial grotesk for oversized headlines (masthead scale).
+const display = Bricolage_Grotesque({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-display",
+  display: "swap",
+});
+
+// Text — neutral neo-grotesk for body, UI, and labels.
+const text = Hanken_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-text",
   display: "swap",
 });
 
@@ -37,8 +45,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={inter.variable}>
-      <body>{children}</body>
+    <html
+      lang="en"
+      className={`${display.variable} ${text.variable}`}
+      data-scroll-behavior="smooth"
+    >
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }

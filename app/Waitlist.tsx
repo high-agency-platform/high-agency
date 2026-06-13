@@ -76,6 +76,7 @@ export default function Waitlist() {
               <a href="#problem">Problem</a>
               <a href="#system">What you join</a>
               <a href="#faq">FAQ</a>
+              <a href="/login">Log in</a>
             </div>
             <button
               className="btn btn--primary nav__cta"

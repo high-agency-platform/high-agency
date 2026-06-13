@@ -7,6 +7,7 @@ import {
   serverTimestamp,
   type Firestore,
 } from "firebase/firestore";
+import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
 
 // Applicants notionally ahead of #1, so early queue numbers don't read
 // "#1, #2" while the founding batch fills. Set to 0 for a true raw count.
@@ -37,12 +38,21 @@ const firebaseConfig = {
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
+let auth: Auth | undefined;
 
-function getDb(): Firestore {
+export function getDb(): Firestore {
   if (!app) app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   if (!db) db = getFirestore(app);
   return db;
 }
+
+export function getFirebaseAuth(): Auth {
+  if (!app) app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+  if (!auth) auth = getAuth(app);
+  return auth;
+}
+
+export const googleProvider = new GoogleAuthProvider();
 
 export const WAITLIST_COLLECTION = "applications";
 
