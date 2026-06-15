@@ -2,15 +2,51 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signInWithPopup } from "firebase/auth";
+import {
+  signInWithPopup,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from "firebase/auth";
 import { getFirebaseAuth, googleProvider } from "../../lib/firebase";
 import { useAuth } from "../../components/AuthProvider";
+
+type Mode = "signin" | "create";
+
+/** Friendly copy for the Firebase auth error codes email/password can throw. */
+function authErrorMessage(code: string): string {
+  switch (code) {
+    case "auth/invalid-email":
+      return "That doesn't look like a valid email.";
+    case "auth/missing-password":
+      return "Enter your password.";
+    case "auth/weak-password":
+      return "Password must be at least 6 characters.";
+    case "auth/email-already-in-use":
+      return "That email already has an account — switch to sign in.";
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found":
+      return "Wrong email or password.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Wait a moment, then try again.";
+    default:
+      return "Sign-in failed. Try again.";
+  }
+}
 
 export default function LoginPage() {
   const { user, profile } = useAuth();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  // Email/password path — a direct identity API call with no off-localhost
+  // redirect, so it works inside sandboxed previews where the Google popup
+  // (which must hand off to canary-os.firebaseapp.com) is blocked. It's also
+  // the email fallback the PRD calls for when SSO isn't available.
+  const [mode, setMode] = useState<Mode>("signin");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
   // Already signed in → route past login. Profile decides the destination.
   useEffect(() => {
@@ -19,7 +55,8 @@ export default function LoginPage() {
     }
   }, [user, profile, router]);
 
-  async function signIn() {
+  async function signInGoogle() {
+    if (busy) return;
     setBusy(true);
     setError("");
     try {
@@ -30,6 +67,29 @@ export default function LoginPage() {
       if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
         setError("Sign-in failed. Try again.");
       }
+      setBusy(false);
+    }
+  }
+
+  async function signInEmail(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    if (!email.trim() || !password) {
+      setError("Email and password are both required.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const auth = getFirebaseAuth();
+      if (mode === "create") {
+        await createUserWithEmailAndPassword(auth, email.trim(), password);
+      } else {
+        await signInWithEmailAndPassword(auth, email.trim(), password);
+      }
+      // redirect handled by the effect above once profile resolves
+    } catch (err) {
+      setError(authErrorMessage((err as { code?: string }).code ?? ""));
       setBusy(false);
     }
   }
@@ -46,10 +106,68 @@ export default function LoginPage() {
         <p className="lead">
           Join a cohort of operators, set real milestones, and ship together.
         </p>
+
         <div className="auth-hero__cta">
-          <button className="btn btn--primary" onClick={signIn} disabled={busy}>
-            {busy ? "Signing in…" : "Continue with Google"}
+          <button
+            className="btn btn--primary btn--block"
+            onClick={signInGoogle}
+            disabled={busy}
+          >
+            Continue with Google
           </button>
+
+          <div className="auth-or">
+            <span>or use email</span>
+          </div>
+
+          <form className="auth-email" onSubmit={signInEmail}>
+            <div className="field">
+              <label htmlFor="auth-email">Email</label>
+              <input
+                id="auth-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@email.com"
+                maxLength={254}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="auth-password">Password</label>
+              <input
+                id="auth-password"
+                type="password"
+                autoComplete={mode === "create" ? "new-password" : "current-password"}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder={mode === "create" ? "At least 6 characters" : "Your password"}
+                maxLength={128}
+              />
+            </div>
+            <button
+              className="btn btn--primary btn--block"
+              type="submit"
+              disabled={busy}
+            >
+              {busy ? "Working…" : mode === "create" ? "Create account" : "Sign in"}
+            </button>
+          </form>
+
+          <p className="auth-switch">
+            {mode === "create" ? "Already have an account?" : "New here?"}{" "}
+            <button
+              type="button"
+              className="link-btn"
+              onClick={() => {
+                setMode((m) => (m === "create" ? "signin" : "create"));
+                setError("");
+              }}
+            >
+              {mode === "create" ? "Sign in instead" : "Create one"}
+            </button>
+          </p>
+
           {error && <p className="form-err">{error}</p>}
         </div>
       </div>

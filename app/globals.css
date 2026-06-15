@@ -556,6 +556,21 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 600; line-height: 1.0; 
 .auth-hero .eyebrow { margin-bottom: var(--space-gap); }
 .auth-hero h1 { margin-bottom: var(--space-gap); }
 .auth-hero .lead { margin-bottom: var(--space-cta); }
+.auth-hero__cta { max-width: 380px; }
+.auth-or {
+  display: flex; align-items: center; gap: 12px;
+  margin: var(--space-gap) 0;
+  font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--text-faint);
+}
+.auth-or::before, .auth-or::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.auth-email .field:last-of-type { margin-bottom: var(--space-gap); }
+.auth-switch { font-size: 14px; color: var(--text-muted); margin-top: 16px; }
+.link-btn {
+  background: none; border: none; padding: 0; font: inherit;
+  color: var(--accent); cursor: pointer;
+}
+.link-btn:hover { color: var(--accent-hover); text-decoration: underline; }
 
 /* ---------- Onboarding ---------- */
 .onboard { padding-top: clamp(48px, 7vw, 96px); padding-bottom: clamp(64px, 9vw, 120px); }
