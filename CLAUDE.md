@@ -152,10 +152,15 @@ Types live in [`app/lib/types.ts`](app/lib/types.ts); data access in
 
 ## Conventions
 
-- **UI:** [`design-system.md`](design-system.md) is the visual source of truth — read it
-  before touching UI. Hard "anti-slop" rules: flat solid colors only (no gradients, glass,
-  glows), Inter only, no emoji/glyph icons or icons-inside-buttons, left-aligned/asymmetric
-  layout, body text ≥16px, colors via CSS variables in `app/globals.css` (never hardcode hex).
+- **UI:** [`design-system.md`](design-system.md) ("Operator OS", **light-mode only**) is the
+  visual source of truth — read it before touching UI; a living reference renders at
+  `/styleguide`. Warm paper canvas with a gentle abstract wash; white cards that **float** on
+  soft warm shadows by default. Two accents with one job each: **ember** = action, **lime/green**
+  = earned/verified (lime as fill, deep green `--signal-text` for verified text). The primary
+  CTA is a tactile **3D push button** (base edge + travel-on-click). **Fraunces** display /
+  **Schibsted Grotesk** body / **Geist Mono** for data. Gradients only as same-hue tonal depth
+  on small functional surfaces. Left-aligned, asymmetric, body ≥16px, monochrome-outline icons,
+  colors via CSS variables in `app/globals.css` (never hardcode hex).
 - **Privacy is structural, not incidental.** Never put minor PII (email, DOB, full name,
   exact city) on the public `Profile` or anywhere client-readable; it lives only in
   `privateProfiles/{uid}`. Any new community/cross-cohort surface needs moderation/reporting.
