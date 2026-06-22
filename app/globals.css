@@ -838,3 +838,29 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 600; line-height: 1.0; 
   .capture .btn { width: 100%; }
   .cred { grid-template-columns: 1fr; gap: 4px; }
 }
+
+/* ── Admin console ─────────────────────────────────────────────────── */
+.admin-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 32px; }
+.admin-tab {
+  font-family: var(--font); font-size: 14px; font-weight: 600; color: var(--text-faint);
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 12px 18px; cursor: pointer; margin-bottom: -1px;
+}
+.admin-tab:hover { color: var(--text); }
+.admin-tab--on { color: var(--text); border-bottom-color: var(--accent); }
+
+.admin-list { display: flex; flex-direction: column; gap: 12px; }
+.admin-row { display: flex; align-items: center; gap: 16px; justify-content: space-between; }
+.admin-row__body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.admin-row__title { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.admin-row__title b { font-size: 15px; }
+.admin-row__meta { font-size: 13px; color: var(--text-muted); }
+.admin-row__btn { padding: 9px 16px; font-size: 13px; }
+.chip--mute { color: var(--text-faint); border-color: var(--border-strong); }
+
+.admin-check { display: flex; align-items: center; gap: 10px; margin-top: 8px; font-size: 14px; color: var(--text-muted); cursor: pointer; }
+.admin-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+
+@media (max-width: 600px) {
+  .admin-row { flex-direction: column; align-items: stretch; }
+}

@@ -445,6 +445,21 @@ export async function getUpcomingWorkshops(): Promise<Workshop[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Workshop);
 }
 
+/** Finished sessions that have a recording posted — the on-demand shelf
+ *  the Learn page promises. Newest first. */
+export async function getPastWorkshops(): Promise<Workshop[]> {
+  const q = query(
+    collection(getDb(), "workshops"),
+    where("startsAt", "<", Timestamp.now()),
+    orderBy("startsAt", "desc"),
+    limit(24)
+  );
+  const snap = await getDocs(q);
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }) as Workshop)
+    .filter((w) => w.recordingUrl);
+}
+
 export async function enrollWorkshop(uid: string, workshopId: string): Promise<void> {
   await updateDoc(doc(getDb(), "profiles", uid), {
     enrolledWorkshops: arrayUnion(workshopId),
@@ -462,4 +477,70 @@ export async function markAttended(profile: Profile, workshopId: string): Promis
     updatedAt: serverTimestamp(),
   });
   await touchStreak(profile);
+}
+
+/* ---------------- Admin: workshop authoring (mentors) ---------------- */
+
+/** Everything a mentor edits — id and Firestore-owned fields excluded.
+ *  startsAt is a JS Date in the form, stored as a Timestamp. */
+export type WorkshopInput = Omit<Workshop, "id" | "startsAt"> & { startsAt: Date };
+
+/** Live view of the whole catalog (past + upcoming) for the admin panel. */
+export function watchAllWorkshops(cb: (workshops: Workshop[]) => void): Unsubscribe {
+  const q = query(collection(getDb(), "workshops"), orderBy("startsAt", "desc"));
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Workshop));
+  });
+}
+
+function workshopDoc(input: WorkshopInput) {
+  return {
+    title: input.title,
+    mentorName: input.mentorName,
+    description: input.description,
+    kind: input.kind,
+    startsAt: Timestamp.fromDate(input.startsAt),
+    durationMins: input.durationMins,
+    meetLink: input.meetLink,
+    open: input.open,
+    levelGate: input.levelGate,
+    milestoneId: input.milestoneId,
+    recordingUrl: input.recordingUrl,
+  };
+}
+
+export async function createWorkshop(input: WorkshopInput): Promise<string> {
+  const ref = await addDoc(collection(getDb(), "workshops"), workshopDoc(input));
+  return ref.id;
+}
+
+export async function updateWorkshop(id: string, input: WorkshopInput): Promise<void> {
+  await setDoc(doc(getDb(), "workshops", id), workshopDoc(input));
+}
+
+export async function deleteWorkshop(id: string): Promise<void> {
+  await deleteDoc(doc(getDb(), "workshops", id));
+}
+
+/* ---------------- Admin: member consent (mentors) ---------------- */
+
+/** Operators awaiting parental consent — the mentor's approval queue.
+ *  Single-field equality query (no composite index); sorted client-side. */
+export function watchPendingConsent(cb: (profiles: Profile[]) => void): Unsubscribe {
+  const q = query(
+    collection(getDb(), "profiles"),
+    where("consentStatus", "==", "pending")
+  );
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => normalizeProfile(d.id, d.data())));
+  });
+}
+
+/** Mentor grants parental consent — flips a pending minor to granted,
+ *  unlocking community access. Allowed by rules' isConsentGrant(). */
+export async function grantConsent(uid: string): Promise<void> {
+  await updateDoc(doc(getDb(), "profiles", uid), {
+    consentStatus: "granted",
+    updatedAt: serverTimestamp(),
+  });
 }

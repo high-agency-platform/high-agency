@@ -3,7 +3,12 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../components/AuthProvider";
-import { getUpcomingWorkshops, enrollWorkshop, markAttended } from "../../lib/db";
+import {
+  getUpcomingWorkshops,
+  getPastWorkshops,
+  enrollWorkshop,
+  markAttended,
+} from "../../lib/db";
 import { TRACK } from "../../lib/milestones";
 import type { Workshop } from "../../lib/types";
 import { WorkshopList } from "../../components/WorkshopList";
@@ -13,6 +18,7 @@ export default function LearnPage() {
   const router = useRouter();
 
   const [workshops, setWorkshops] = useState<Workshop[] | null>(null);
+  const [recordings, setRecordings] = useState<Workshop[]>([]);
 
   useEffect(() => {
     if (user === null) router.replace("/login");
@@ -22,6 +28,7 @@ export default function LearnPage() {
   useEffect(() => {
     if (!user) return;
     getUpcomingWorkshops().then(setWorkshops).catch(() => setWorkshops([]));
+    getPastWorkshops().then(setRecordings).catch(() => setRecordings([]));
   }, [user]);
 
   if (!user || !profile) return null;
@@ -60,6 +67,44 @@ export default function LearnPage() {
           )}
         </div>
       </section>
+
+      {recordings.length > 0 && (
+        <section className="page__block">
+          <h2 className="h3 page__subhead">Recordings</h2>
+          <p className="dash__empty page__note">
+            Missed one live? Catch up on demand.
+          </p>
+          <div className="panel">
+            <div className="wlist">
+              {recordings.map((w) => (
+                <div key={w.id} className="wrow">
+                  <div className="wrow__when">
+                    {w.startsAt.toDate().toLocaleDateString(undefined, {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </div>
+                  <div className="wrow__body">
+                    <span className="wrow__title">{w.title}</span>
+                    <span className="wrow__mentor">
+                      {w.kind === "office_hours" ? "Office hours" : "Workshop"} ·{" "}
+                      {w.mentorName}
+                    </span>
+                  </div>
+                  <a
+                    className="btn btn--ghost wrow__join"
+                    href={w.recordingUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Watch
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="page__block">
         <h2 className="h3 page__subhead">The season map</h2>

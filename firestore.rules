@@ -166,6 +166,15 @@ service cloud.firestore {
              request.resource.data.xp <= resource.data.xp + 300;
     }
 
+    // Mentors (trusted staff) grant parental consent in-app — the only
+    // other cross-user profile write. Scoped to flipping consentStatus to
+    // 'granted'; role and plan grants stay in admin CLI tooling.
+    function isConsentGrant() {
+      return isMentor() &&
+             request.resource.data.diff(resource.data).affectedKeys().hasOnly(['consentStatus', 'updatedAt']) &&
+             request.resource.data.consentStatus == 'granted';
+    }
+
     match /profiles/{userId} {
       allow read: if isAuthenticated();
       // Clients always start as free-tier operators; admin tooling
@@ -175,7 +184,8 @@ service cloud.firestore {
                        request.resource.data.plan == 'free';
       allow update: if (isOwner(userId) && isValidProfile(request.resource.data) &&
                         areImmutableFieldsUnchanged(['uid', 'createdAt', 'role', 'plan'])) ||
-                       isXpAward();
+                       isXpAward() ||
+                       isConsentGrant();
       allow delete: if false;
     }
 
@@ -363,12 +373,33 @@ service cloud.firestore {
     }
 
     // ===============================================================
-    // Workshops — staff-seeded catalog, read-only for clients
+    // Workshops — mentors author the catalog from the admin panel;
+    // every signed-in operator reads it.
     // ===============================================================
+
+    function isValidWorkshop(data) {
+      return hasOnlyAllowedFields(['title', 'mentorName', 'description', 'kind',
+               'startsAt', 'durationMins', 'meetLink', 'open', 'levelGate',
+               'milestoneId', 'recordingUrl']) &&
+             hasRequiredFields(['title', 'mentorName', 'kind', 'startsAt',
+               'durationMins', 'open', 'levelGate', 'milestoneId']) &&
+             validString(data.title, 1, 120) &&
+             validString(data.mentorName, 1, 80) &&
+             (!('description' in data) || validString(data.description, 0, 1000)) &&
+             data.kind in ['workshop', 'office_hours'] &&
+             data.startsAt is timestamp &&
+             data.durationMins is number && data.durationMins > 0 && data.durationMins <= 600 &&
+             (!('meetLink' in data) || validString(data.meetLink, 0, 500)) &&
+             data.open is bool &&
+             data.levelGate is number && data.levelGate >= 0 && data.levelGate <= 5 &&
+             data.milestoneId is number && data.milestoneId >= 0 && data.milestoneId <= 7 &&
+             (!('recordingUrl' in data) || validString(data.recordingUrl, 0, 500));
+    }
 
     match /workshops/{id} {
       allow read: if isAuthenticated();
-      allow write: if false;
+      allow create, update: if isMentor() && isValidWorkshop(request.resource.data);
+      allow delete: if isMentor();
     }
   }
 }
