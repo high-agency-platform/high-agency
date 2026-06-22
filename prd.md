@@ -190,7 +190,7 @@ Parent persona is intentionally deferred to Phase 3 (see Phasing). Josh wants a 
 
 **Integrations:** Google Meet (workshop and cohort call delivery), Google Calendar (invites/reminders), HubSpot (existing marketing site, CRM, and email), Stripe (paid-tier billing), and a transactional email/notification provider. Entitlement state is the source of truth for gating and must be consistent across all surfaces.
 
-**Stack:** Assumed Next.js / React / TypeScript front end, Python / Flask services, Firestore for data, Vertex AI for scenario-node feedback if/where automated. React Native deferred to a later mobile phase. Flag if any of these are already decided otherwise.
+**Stack:** Next.js (App Router) / React / TypeScript, deployed on Vercel. Firestore for data and Firebase Auth (Google SSO + email/password) for identity. There is **no separate Python/Flask backend** — v1 data access runs through the Firebase client SDK gated by Firestore security rules, and sensitive or trusted-server logic (entitlement decisions, milestone-verification XP payouts, attendance, anything that must not be client-trusted) migrates into **Next.js server actions / route handlers** over time rather than a standalone service. Automated scenario-node feedback, if/when it ships in Phase 2, runs through a server action calling a hosted model API — not a standing Python service. React Native deferred to a later mobile phase.
 
 ---
 
