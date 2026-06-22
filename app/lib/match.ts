@@ -1,8 +1,9 @@
 import type { Cohort, Profile } from "./types";
 
-/** v1 matching: tag overlap + three filters/boosts (timezone, age-band
- *  proximity by way of stage, hours). No embeddings yet — deliberate.
- *  Returns a score plus the "why matched" chips shown on the card. */
+/** v1 matching: domain-tag overlap + interests-wanted overlap + a
+ *  timezone-band boost + an open-with-room nudge. No embeddings yet —
+ *  deliberate. Returns a score plus the "why matched" chips shown on the
+ *  card. (Weekly hours are captured per-application, not used to rank.) */
 
 export interface Match {
   cohort: Cohort;

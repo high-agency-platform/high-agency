@@ -38,8 +38,11 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
   const [logs, setLogs] = useState<BuildLog[]>([]);
   const [apps, setApps] = useState<CohortApplication[]>([]);
 
-  // Applicant profile viewer (founder reviewing an application)
+  // Applicant profile viewer (founder reviewing an application). The
+  // application carries the squad-specific weekly hours, so we keep it
+  // alongside the public profile while the modal is open.
   const [viewing, setViewing] = useState<Profile | null>(null);
+  const [viewingApp, setViewingApp] = useState<CohortApplication | null>(null);
   const [declining, setDeclining] = useState<string | null>(null);
 
   // Milestone the operator is submitting evidence for
@@ -488,12 +491,16 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
                       <div className="app-row__body">
                         <button
                           className="app-row__name"
-                          onClick={() =>
-                            getProfile(a.applicantUid).then(setViewing).catch(() => {})
-                          }
+                          onClick={() => {
+                            setViewingApp(a);
+                            getProfile(a.applicantUid).then(setViewing).catch(() => {});
+                          }}
                         >
                           {a.applicantName}
                         </button>
+                        <span className="app-row__hours kicker">
+                          {a.hours} hrs/week
+                        </span>
                         {a.pitch && <p className="app-row__pitch">{a.pitch}</p>}
                       </div>
                       {isFounder &&
@@ -544,16 +551,29 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
       {/* ---- Applicant profile viewer ---- */}
       {viewing && (
         <div className="modal open" role="dialog" aria-modal="true">
-          <div className="modal__scrim" onClick={() => setViewing(null)} />
+          <div
+            className="modal__scrim"
+            onClick={() => {
+              setViewing(null);
+              setViewingApp(null);
+            }}
+          />
           <div className="modal__card">
-            <button className="modal__close" onClick={() => setViewing(null)}>
+            <button
+              className="modal__close"
+              onClick={() => {
+                setViewing(null);
+                setViewingApp(null);
+              }}
+            >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
             <h3>{viewing.name}</h3>
             <p className="modal__sub">
-              {viewing.ageBand} · {viewing.country} · {viewing.hours} hrs/week ·{" "}
+              {viewing.ageBand} · {viewing.country}
+              {viewingApp ? ` · ${viewingApp.hours} hrs/week` : ""} ·{" "}
               {viewing.stage}
             </p>
             {viewing.headline && <p className="profile-view__headline">{viewing.headline}</p>}
@@ -573,7 +593,7 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
               </div>
             )}
             <div className="field">
-              <label>Skills</label>
+              <label>Interests</label>
               <div className="chip-row">
                 {viewing.skills.map((s) => (
                   <span key={s} className="chip">

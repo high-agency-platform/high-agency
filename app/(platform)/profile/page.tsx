@@ -6,16 +6,14 @@ import { useAuth } from "../../components/AuthProvider";
 import { saveProfile } from "../../lib/db";
 import { levelOf, localDay } from "../../lib/gamify";
 import { DOMAINS, SKILLS } from "../../lib/types";
-import type { VentureStage, WeeklyHours } from "../../lib/types";
+import type { VentureStage } from "../../lib/types";
 
 const STAGES: { id: VentureStage; label: string }[] = [
-  { id: "idea", label: "Idea" },
-  { id: "building", label: "Building" },
+  { id: "idea", label: "Just an idea" },
+  { id: "building", label: "Building it" },
   { id: "launched", label: "Launched" },
-  { id: "revenue", label: "Revenue" },
+  { id: "revenue", label: "Has revenue" },
 ];
-
-const HOURS: WeeklyHours[] = ["<3", "3-5", "5-10", "10+"];
 
 export default function ProfilePage() {
   const { user, profile } = useAuth();
@@ -28,7 +26,6 @@ export default function ProfilePage() {
   const [skills, setSkills] = useState<string[]>([]);
   const [proofUrl, setProofUrl] = useState("");
   const [proofNote, setProofNote] = useState("");
-  const [hours, setHours] = useState<WeeklyHours>("3-5");
   const [bio, setBio] = useState("");
   const [github, setGithub] = useState("");
   const [linkedin, setLinkedin] = useState("");
@@ -53,7 +50,6 @@ export default function ProfilePage() {
       setSkills(profile.skills ?? []);
       setProofUrl(profile.proofUrl ?? "");
       setProofNote(profile.proofNote ?? "");
-      setHours(profile.hours ?? "3-5");
       setBio(profile.bio ?? "");
       setGithub(profile.links?.github ?? "");
       setLinkedin(profile.links?.linkedin ?? "");
@@ -93,7 +89,6 @@ export default function ProfilePage() {
           skills,
           proofUrl: proofUrl.trim(),
           proofNote: proofNote.trim(),
-          hours,
           bio: bio.trim(),
           links: { github: github.trim(), linkedin: linkedin.trim(), site: site.trim() },
           consentStatus: profile.consentStatus,
@@ -193,7 +188,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="field">
-          <label>Skills</label>
+          <label>Interests</label>
           <div className="chip-row">
             {SKILLS.map((s) => (
               <button
@@ -223,22 +218,6 @@ export default function ProfilePage() {
             placeholder="One sentence on why it matters"
             maxLength={200}
           />
-        </div>
-
-        <div className="field">
-          <label>Weekly hours</label>
-          <div className="chip-row">
-            {HOURS.map((h) => (
-              <button
-                key={h}
-                type="button"
-                className={`pick ${hours === h ? "sel" : ""}`}
-                onClick={() => setHours(h)}
-              >
-                {h === "<3" ? "Under 3" : h}
-              </button>
-            ))}
-          </div>
         </div>
 
         <div className="field">

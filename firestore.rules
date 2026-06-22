@@ -124,7 +124,7 @@ service cloud.firestore {
                'createdAt', 'updatedAt']) &&
              hasRequiredFields(['uid', 'name', 'ageBand', 'country', 'timezone',
                'headline', 'building', 'stage', 'domains', 'skills',
-               'hours', 'consentStatus', 'plan', 'role',
+               'consentStatus', 'plan', 'role',
                'xp', 'streak', 'streakFreezes', 'lastActiveDay',
                'pendingApplications', 'updatedAt']) &&
              data.uid == request.auth.uid &&
@@ -133,13 +133,15 @@ service cloud.firestore {
              validString(data.country, 1, 60) &&
              validString(data.timezone, 1, 60) &&
              validString(data.headline, 0, 90) &&
-             validString(data.building, 1, 300) &&
+             validString(data.building, 0, 300) &&
              data.stage in ['idea', 'building', 'launched', 'revenue'] &&
              validStringList(data.domains, 9) && data.domains.size() >= 1 &&
              validStringList(data.skills, 7) && data.skills.size() >= 1 &&
              (!('proofUrl' in data) || validString(data.proofUrl, 0, 300)) &&
              (!('proofNote' in data) || validString(data.proofNote, 0, 200)) &&
-             data.hours in ['<3', '3-5', '5-10', '10+'] &&
+             // Weekly hours moved to per-application; kept optional here so
+             // legacy profile docs that still carry it continue to validate.
+             (!('hours' in data) || data.hours in ['<3', '3-5', '5-10', '10+']) &&
              (!('bio' in data) || validString(data.bio, 0, 300)) &&
              (!('links' in data) || (data.links is map && data.links.keys().hasOnly(['github', 'linkedin', 'site']))) &&
              data.consentStatus in ['none', 'pending', 'granted'] &&
@@ -270,10 +272,11 @@ service cloud.firestore {
       // ---------------- Applications ----------------
 
       function isValidApplication(data) {
-        return hasOnlyAllowedFields(['applicantUid', 'applicantName', 'pitch', 'status', 'declineReason', 'createdAt']) &&
-               hasRequiredFields(['applicantUid', 'applicantName', 'pitch', 'status', 'createdAt']) &&
+        return hasOnlyAllowedFields(['applicantUid', 'applicantName', 'pitch', 'hours', 'status', 'declineReason', 'createdAt']) &&
+               hasRequiredFields(['applicantUid', 'applicantName', 'pitch', 'hours', 'status', 'createdAt']) &&
                validString(data.applicantName, 1, 80) &&
-               validString(data.pitch, 0, 300);
+               validString(data.pitch, 0, 300) &&
+               data.hours in ['<3', '3-5', '5-10', '10+'];
       }
 
       match /applications/{applicantId} {

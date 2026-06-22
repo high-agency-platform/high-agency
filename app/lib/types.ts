@@ -65,7 +65,10 @@ export interface Profile {
   proofUrl: string;
   /** One sentence about the proof. */
   proofNote: string;
-  hours: WeeklyHours;
+  /** Deprecated on the profile: weekly commitment is now captured
+   *  per-application (it varies by what a squad is building). Kept
+   *  optional so legacy profile docs still validate and read. */
+  hours?: WeeklyHours;
   /** Personality, not résumé (<=300 chars). */
   bio: string;
   links: { github: string; linkedin: string; site: string };
@@ -171,6 +174,9 @@ export interface CohortApplication {
   applicantName: string;
   /** "Why this cohort, and what do you bring?" (<=300 chars). */
   pitch: string;
+  /** Weekly hours the applicant can commit *to this squad* — captured at
+   *  apply time because commitment varies with what's being built. */
+  hours: WeeklyHours;
   status: ApplicationStatus;
   declineReason: DeclineReason | null;
   createdAt?: Timestamp;

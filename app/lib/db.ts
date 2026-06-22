@@ -30,6 +30,7 @@ import type {
   MilestoneSubmission,
   BuildLog,
   Workshop,
+  WeeklyHours,
 } from "./types";
 import { COHORT_MIN_TO_ACTIVATE } from "./types";
 import { XP, localDay, isoWeek, touchStreak } from "./gamify";
@@ -219,7 +220,8 @@ export async function markRitual(cohort: Cohort, profile: Profile): Promise<void
 export async function applyToCohort(
   cohortId: string,
   applicant: Profile,
-  pitch: string
+  pitch: string,
+  hours: WeeklyHours
 ): Promise<void> {
   if (applicant.pendingApplications.length >= MAX_PENDING_APPLICATIONS) {
     throw new Error("max-pending");
@@ -229,6 +231,7 @@ export async function applyToCohort(
     applicantUid: applicant.uid,
     applicantName: applicant.name,
     pitch,
+    hours,
     status: "pending",
     declineReason: null,
     createdAt: serverTimestamp(),

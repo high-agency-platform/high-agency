@@ -14,7 +14,9 @@ import {
 } from "../../lib/db";
 import { rankCohorts } from "../../lib/match";
 import { DOMAINS, SKILLS, DECLINE_LABELS } from "../../lib/types";
-import type { Cohort, CohortApplication } from "../../lib/types";
+import type { Cohort, CohortApplication, WeeklyHours } from "../../lib/types";
+
+const HOURS: WeeklyHours[] = ["<3", "3-5", "5-10", "10+"];
 
 export default function CohortsPage() {
   const { user, profile } = useAuth();
@@ -26,6 +28,7 @@ export default function CohortsPage() {
 
   const [applyId, setApplyId] = useState<string | null>(null);
   const [pitch, setPitch] = useState("");
+  const [applyHours, setApplyHours] = useState<WeeklyHours | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [creating, setCreating] = useState(false);
@@ -94,23 +97,25 @@ export default function CohortsPage() {
   const atCap = pendingCount >= MAX_PENDING_APPLICATIONS;
 
   async function submitApplication(cohortId: string) {
-    if (!profile) return;
+    if (!profile || !applyHours) return;
     setBusy(true);
     setError("");
     try {
-      await applyToCohort(cohortId, profile, pitch.trim());
+      await applyToCohort(cohortId, profile, pitch.trim(), applyHours);
       setApplied((p) => ({
         ...p,
         [cohortId]: {
           applicantUid: profile.uid,
           applicantName: profile.name,
           pitch,
+          hours: applyHours,
           status: "pending",
           declineReason: null,
         },
       }));
       setApplyId(null);
       setPitch("");
+      setApplyHours(null);
     } catch (e) {
       setError(
         e instanceof Error && e.message === "max-pending"
@@ -379,6 +384,7 @@ export default function CohortsPage() {
                         onClick={() => {
                           setApplyId(c.id);
                           setPitch("");
+                          setApplyHours(null);
                           setError("");
                         }}
                       >
@@ -397,6 +403,23 @@ export default function CohortsPage() {
                         placeholder="Why this squad, and what do you bring?"
                         maxLength={300}
                       />
+                      <div className="apply-inline__hours">
+                        <span className="kicker">
+                          Hours you can commit to this squad
+                        </span>
+                        <div className="chip-row">
+                          {HOURS.map((h) => (
+                            <button
+                              key={h}
+                              type="button"
+                              className={`pick ${applyHours === h ? "sel" : ""}`}
+                              onClick={() => setApplyHours(h)}
+                            >
+                              {h === "<3" ? "Under 3" : h}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                       {error && <p className="form-err">{error}</p>}
                       <div className="row-actions">
                         <button className="btn btn--ghost" onClick={() => setApplyId(null)}>
@@ -405,7 +428,7 @@ export default function CohortsPage() {
                         <button
                           className="btn btn--primary"
                           onClick={() => submitApplication(c.id)}
-                          disabled={busy || !pitch.trim()}
+                          disabled={busy || !pitch.trim() || !applyHours}
                         >
                           {busy ? "Sending…" : "Send application"}
                         </button>

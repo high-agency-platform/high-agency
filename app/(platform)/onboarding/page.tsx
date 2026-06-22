@@ -6,16 +6,32 @@ import { useAuth } from "../../components/AuthProvider";
 import { saveProfile, savePrivateProfile } from "../../lib/db";
 import { localDay } from "../../lib/gamify";
 import { DOMAINS, SKILLS } from "../../lib/types";
-import type { AgeBand, VentureStage, WeeklyHours } from "../../lib/types";
+import { COUNTRIES } from "../../lib/countries";
+import type { AgeBand, VentureStage } from "../../lib/types";
 
 const STAGES: { id: VentureStage; label: string }[] = [
-  { id: "idea", label: "Idea" },
-  { id: "building", label: "Building" },
+  { id: "idea", label: "Just an idea" },
+  { id: "building", label: "Building it" },
   { id: "launched", label: "Launched" },
-  { id: "revenue", label: "Revenue" },
+  { id: "revenue", label: "Has revenue" },
 ];
 
-const HOURS: WeeklyHours[] = ["<3", "3-5", "5-10", "10+"];
+// Rotating placeholders make it obvious you don't need a polished venture —
+// or any venture at all — to belong here.
+const HEADLINE_PLACEHOLDERS = [
+  "Looking to build the next big thing in ed-tech",
+  "Would love to start something in climate",
+  "Curious how AI can help students learn",
+  "Not sure yet — here to find my thing",
+  "Building an AI study planner with 500 users",
+];
+
+const BUILDING_PLACEHOLDERS = [
+  "Don't have a project yet? Tell us what you'd love to explore.",
+  "A spark, a rough idea, or just a direction — all welcome.",
+  "The problem, the thing, where it's at — a few lines.",
+  "Even \"I want to start something but don't know what\" works here.",
+];
 
 function ageFrom(dob: string): number {
   const d = new Date(dob + "T00:00:00");
@@ -52,7 +68,6 @@ export default function OnboardingPage() {
   const [skills, setSkills] = useState<string[]>([]);
   const [proofUrl, setProofUrl] = useState("");
   const [proofNote, setProofNote] = useState("");
-  const [hours, setHours] = useState<WeeklyHours | null>(null);
   const [bio, setBio] = useState("");
   const [github, setGithub] = useState("");
   const [linkedin, setLinkedin] = useState("");
@@ -60,6 +75,8 @@ export default function OnboardingPage() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Index into the rotating placeholder copy for the headline/building fields.
+  const [phIdx, setPhIdx] = useState(0);
   // Set before saving so the "already onboarded" redirect below doesn't
   // race the post-submit redirect into cohort discovery.
   const submitted = useRef(false);
@@ -78,6 +95,21 @@ export default function OnboardingPage() {
       setLastName((n) => n || rest.join(" "));
     }
   }, [user]);
+
+  // Cycle the example placeholders so the prompt reads as "any of these is
+  // fine", not "you must already have a launched product". Honors
+  // prefers-reduced-motion by holding on the first example.
+  useEffect(() => {
+    if (step !== 2) return;
+    if (
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+    const t = setInterval(() => setPhIdx((i) => i + 1), 3800);
+    return () => clearInterval(t);
+  }, [step]);
 
   const age = useMemo(() => (dob ? ageFrom(dob) : null), [dob]);
   const isMinor = age !== null && age < 18;
@@ -105,12 +137,12 @@ export default function OnboardingPage() {
 
   async function submit() {
     if (!user || age === null) return;
-    if (!headline.trim() || !building.trim() || !stage || !hours) {
-      setError("Headline, what you're building, stage, and weekly hours are required.");
+    if (!stage) {
+      setError("Pick where you're at — even just an idea counts.");
       return;
     }
     if (domains.length === 0 || skills.length === 0) {
-      setError("Pick at least one domain and one skill.");
+      setError("Pick at least one domain and one interest so squads can find you.");
       return;
     }
     setBusy(true);
@@ -148,7 +180,6 @@ export default function OnboardingPage() {
           skills,
           proofUrl: proofUrl.trim(),
           proofNote: proofNote.trim(),
-          hours,
           bio: bio.trim(),
           links: { github: github.trim(), linkedin: linkedin.trim(), site: site.trim() },
           consentStatus: isMinor ? "pending" : "granted",
@@ -185,12 +216,12 @@ export default function OnboardingPage() {
           <span className="dot" /> {step === 1 ? "Step 1 of 2 — the basics" : "Step 2 of 2 — operator profile"}
         </span>
         <h1 className="h2">
-          {step === 1 ? "Who are you?" : "What are you building?"}
+          {step === 1 ? "Who are you?" : "What do you want to build?"}
         </h1>
         <p className="lead onboard__lead">
           {step === 1
             ? "Two minutes. We show your age as a band and your name as “First L.” — never more."
-            : "This is the profile squads see when you apply. Every field feeds matching."}
+            : "No project yet — or no idea what you'll build? That's the whole point. This profile just helps squads find you; you'll figure out the rest together. Everything here is editable later."}
         </p>
 
         <div className="onboard__progress" aria-hidden="true">
@@ -239,13 +270,20 @@ export default function OnboardingPage() {
             <div className="field-row">
               <div className="field">
                 <label htmlFor="ob-country">Country</label>
-                <input
+                <select
                   id="ob-country"
                   value={country}
                   onChange={(e) => setCountry(e.target.value)}
-                  placeholder="Canada"
-                  maxLength={60}
-                />
+                >
+                  <option value="" disabled>
+                    Select your country
+                  </option>
+                  {COUNTRIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
               </div>
               <div className="field">
                 <label htmlFor="ob-city">City (optional, private)</label>
@@ -286,25 +324,27 @@ export default function OnboardingPage() {
         ) : (
           <>
             <div className="field">
-              <label htmlFor="ob-headline">Headline — your one-line hook</label>
+              <label htmlFor="ob-headline">
+                Headline — your one-line hook (optional)
+              </label>
               <input
                 id="ob-headline"
                 value={headline}
                 onChange={(e) => setHeadline(e.target.value)}
-                placeholder="Building an AI study planner with 500 users"
+                placeholder={HEADLINE_PLACEHOLDERS[phIdx % HEADLINE_PLACEHOLDERS.length]}
                 maxLength={80}
               />
             </div>
 
             <div className="field">
               <label htmlFor="ob-building">
-                What are you building / want to build?
+                What do you want to build? (optional)
               </label>
               <textarea
                 id="ob-building"
                 value={building}
                 onChange={(e) => setBuilding(e.target.value)}
-                placeholder="The problem, the thing, where it's at — a few lines."
+                placeholder={BUILDING_PLACEHOLDERS[phIdx % BUILDING_PLACEHOLDERS.length]}
                 maxLength={300}
               />
               <div className="chip-row">
@@ -319,10 +359,14 @@ export default function OnboardingPage() {
                   </button>
                 ))}
               </div>
+              <small className="field__hint">
+                Where are you at? Brand new and just exploring? “Just an idea”
+                is exactly right — most operators start there.
+              </small>
             </div>
 
             <div className="field">
-              <label>Domains</label>
+              <label>Domains — areas you&apos;re drawn to</label>
               <div className="chip-row">
                 {DOMAINS.map((d) => (
                   <button
@@ -338,7 +382,7 @@ export default function OnboardingPage() {
             </div>
 
             <div className="field">
-              <label>Skills — what can you do for a squad?</label>
+              <label>Interests — what are you into?</label>
               <div className="chip-row">
                 {SKILLS.map((s) => (
                   <button
@@ -370,22 +414,6 @@ export default function OnboardingPage() {
                 placeholder="One sentence on why it matters"
                 maxLength={200}
               />
-            </div>
-
-            <div className="field">
-              <label>Weekly hours you can actually commit</label>
-              <div className="chip-row">
-                {HOURS.map((h) => (
-                  <button
-                    key={h}
-                    type="button"
-                    className={`pick ${hours === h ? "sel" : ""}`}
-                    onClick={() => setHours(h)}
-                  >
-                    {h === "<3" ? "Under 3" : h}
-                  </button>
-                ))}
-              </div>
             </div>
 
             <div className="field">
