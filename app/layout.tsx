@@ -1,18 +1,27 @@
 import type { Metadata } from "next";
-import { Bricolage_Grotesque, Hanken_Grotesk } from "next/font/google";
+import { Fraunces, Schibsted_Grotesk, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// Display — editorial grotesk for oversized headlines (masthead scale).
-const display = Bricolage_Grotesque({
+// Display — Fraunces: a distinctive high-contrast serif for oversized,
+// characterful headlines (masthead scale). Unique brand voice, very readable.
+const display = Fraunces({
   subsets: ["latin"],
   variable: "--font-display",
   display: "swap",
+  axes: ["opsz", "SOFT"],
 });
 
-// Text — neutral neo-grotesk for body, UI, and labels.
-const text = Hanken_Grotesk({
+// Text — Schibsted Grotesk: a clean, modern grotesque for body, UI, labels.
+const text = Schibsted_Grotesk({
   subsets: ["latin"],
   variable: "--font-text",
+  display: "swap",
+});
+
+// Mono — instrumentation: XP, levels, streaks, milestone codes, timers.
+const mono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
   display: "swap",
 });
 
@@ -47,7 +56,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${display.variable} ${text.variable}`}
+      className={`${display.variable} ${text.variable} ${mono.variable}`}
       data-scroll-behavior="smooth"
     >
       <body suppressHydrationWarning>{children}</body>
