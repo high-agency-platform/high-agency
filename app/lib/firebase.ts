@@ -19,21 +19,21 @@ const QUEUE_BASE = 46;
 const firebaseConfig = {
   apiKey:
     process.env.NEXT_PUBLIC_FIREBASE_API_KEY ??
-    "AIzaSyDq6kG7N-UpYJxfQX6xNjRdsfmJcPByksw",
+    "AIzaSyAtO9pwIutE9v-nXOTs_wjzqSTLltNRA3k",
   authDomain:
     process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ??
-    "canary-os.firebaseapp.com",
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "canary-os",
+    "highagency-62e67.firebaseapp.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "highagency-62e67",
   storageBucket:
     process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ??
-    "canary-os.firebasestorage.app",
+    "highagency-62e67.firebasestorage.app",
   messagingSenderId:
-    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "234056429065",
+    process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "273177671346",
   appId:
     process.env.NEXT_PUBLIC_FIREBASE_APP_ID ??
-    "1:234056429065:web:d58397feb5e4f7cbdc92d8",
+    "1:273177671346:web:f1045e955d48c9ea4dfbab",
   measurementId:
-    process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ?? "G-RLHTDXDB72",
+    process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID ?? "G-5ED8XF61EQ",
 };
 
 let app: FirebaseApp | undefined;
