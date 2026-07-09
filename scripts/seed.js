@@ -4,7 +4,7 @@
 // Idempotent: fixed document ids, PATCH = upsert. Run: node scripts/seed.js
 const { getAccessToken } = require("./fb-token");
 
-const PROJECT = "canary-os";
+const PROJECT = "highagency-62e67";
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
 const s = (v) => ({ stringValue: v });

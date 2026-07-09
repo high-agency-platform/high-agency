@@ -65,8 +65,8 @@
 
   /* ---- Elevation — soft, warm, layered (cards float) ---- */
   --shadow-sm: 0 1px 2px rgba(60, 48, 30, 0.05), 0 2px 5px rgba(60, 48, 30, 0.05);
-  --shadow-md: 0 2px 4px rgba(60, 48, 30, 0.04), 0 8px 18px rgba(60, 48, 30, 0.07), 0 16px 32px rgba(60, 48, 30, 0.05);
-  --shadow-lg: 0 4px 8px rgba(60, 48, 30, 0.05), 0 18px 36px rgba(60, 48, 30, 0.10), 0 36px 64px rgba(60, 48, 30, 0.08);
+  --shadow-md: 0 1px 2px rgba(60, 48, 30, 0.04), 0 4px 12px rgba(60, 48, 30, 0.05), 0 10px 22px rgba(60, 48, 30, 0.035);
+  --shadow-lg: 0 2px 5px rgba(60, 48, 30, 0.05), 0 10px 24px rgba(60, 48, 30, 0.07), 0 22px 44px rgba(60, 48, 30, 0.05);
   --shadow-ember: 0 8px 22px rgba(255, 90, 30, 0.26);
 
   /* ---- Type ---- */
@@ -377,19 +377,17 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 600; line-height: 1.02;
 .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-gap); }
 .pillar {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
-  padding: clamp(26px, 3vw, 34px); box-shadow: var(--shadow-md);
-  transition: border-color var(--t-med), transform var(--t-med) var(--ease-out), box-shadow var(--t-med);
+  padding: clamp(28px, 3vw, 38px); box-shadow: var(--shadow-md);
+  transition: border-color var(--t-med), box-shadow var(--t-med);
 }
-.pillar:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); }
-.pillar__no { font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0.06em; color: var(--accent); }
-.pillar__ic { width: 46px; height: 46px; margin: 16px 0 20px; border: 1px solid var(--border); border-radius: 13px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); }
+/* Quiet "settle" on hover — hairline warms and the float deepens a touch,
+   no jump. Replaces the old translateY(-5px) lift. */
+.pillar:hover { border-color: var(--border-strong); box-shadow: var(--shadow-lg); }
+.pillar__ic { width: 44px; height: 44px; margin: 0 0 22px; border: 1px solid var(--border); border-radius: 13px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); }
 .pillar h3 { margin-bottom: 10px; }
-.pillar p { color: var(--text-muted); font-size: 15px; line-height: 1.55; }
-.pillar__ex { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.pillar p { color: var(--text-muted); font-size: 15px; line-height: 1.6; }
 .chip { font-size: 12px; font-weight: 500; letter-spacing: 0; color: var(--text-muted); border: 1px solid var(--border-strong); border-radius: var(--radius-pill); padding: 6px 13px; background: var(--surface); }
 .chip--on { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
-.pillar__tag { margin-top: 18px; display: block; font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-faint); border-top: 1px solid var(--border); padding-top: 16px; }
-.pillar__tag b { color: var(--text); font-weight: 600; }
 
 /* ============================================================
    HOW IT WORKS — asymmetric (copy + track)
@@ -753,9 +751,9 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 600; line-height: 1.02;
   display: flex; flex-direction: column; gap: 14px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card);
   padding: clamp(24px, 3vw, 34px); box-shadow: var(--shadow-md);
-  transition: border-color var(--t-med), transform var(--t-med) var(--ease-out), box-shadow var(--t-med);
+  transition: border-color var(--t-med), box-shadow var(--t-med);
 }
-.ccard:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); }
+.ccard:hover { border-color: var(--border-strong); box-shadow: var(--shadow-lg); }
 .ccard--mine { border-color: var(--accent-line); box-shadow: 0 0 0 1px var(--accent-line), var(--shadow-md); }
 .ccard--mine:hover { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent-line), var(--shadow-lg); }
 .ccard__top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }

@@ -3,7 +3,7 @@
 // email/password accounts). Run: node scripts/cleanup-test.js <cohortId>
 const { getAccessToken } = require("./fb-token");
 
-const PROJECT = "canary-os";
+const PROJECT = "highagency-62e67";
 const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`;
 
 const TEST_EMAILS = [

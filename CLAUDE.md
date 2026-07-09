@@ -26,13 +26,22 @@ an open question that supersedes the PRD.
 ## Current status — Phase 1 MVP, free founding batch
 
 - **Where we are:** building the Phase 1 MVP for a **free founding batch of ~50 students**.
-  The public waitlist site (`/`) is live; the platform (`app/(platform)/...`) is in active
-  build.
+  Both the public waitlist site (`/`) and the authenticated platform (`app/(platform)/...`)
+  are substantially built and wired to live Firebase — nearly every screen reads/writes real
+  Firestore data (no mock-UI screens), all against the `highagency-62e67` Firebase project.
+- **Deployment — waitlist-only, live.** The site is deployed on **Vercel** (project
+  `high-agency`, production alias `highagencyio.vercel.app`; custom domain `high-agency.io`
+  pending GoDaddy DNS). **Production is intentionally a marketing/waitlist page only** — the
+  authenticated platform (`/login` + everything under `app/(platform)/`) is gated OFF in
+  production and ON in local `next dev`, via the `PLATFORM_ENABLED` flag
+  ([`app/lib/flags.ts`](app/lib/flags.ts)) enforced by [`proxy.ts`](proxy.ts). The platform is
+  built but not yet exposed to real users; flip it on later by setting
+  `NEXT_PUBLIC_PLATFORM_ENABLED=true` in the Vercel project.
 - **Scale target:** low hundreds of concurrent users for v1; architecture shouldn't
   preclude low thousands without a rewrite.
-- **This is a small team.** Most of the current platform code landed in commit `28b5d62`
-  and reflects considered product decisions — some of which **deliberately diverge from
-  `prd.md`** (see Open questions). Read the code as intentional unless flagged otherwise.
+- **This is a small team.** The platform reflects considered product decisions — some of which
+  **deliberately diverge from `prd.md`** (see Open questions). Read the code as intentional
+  unless flagged otherwise.
 
 ## ⚠️ Monetization is deferred until after the MVP ships
 
@@ -58,10 +67,14 @@ not buy"). Don't conflate level gates with paywalls.
 ## Stack & architecture
 
 - **Next.js 16.2.7** (App Router) · **React 19** · **TypeScript 5** · **Tailwind CSS v4**
-  (via `@tailwindcss/postcss`). Deployed on **Vercel**.
+  (via `@tailwindcss/postcss`). Deployed on **Vercel** (waitlist-only in production — see the
+  `PLATFORM_ENABLED` gate in Current status).
 - **Firebase 12** (client SDK): **Firestore** for data, **Firebase Auth** (Google SSO +
-  email/password) for identity. Firebase project id is **`canary-os`** (reused infra — the
-  brand is "High Agency"; don't be thrown by the project name).
+  email/password) for identity. Firebase project id is **`highagency-62e67`** (display name
+  "HighAgency", project number `273177671346`, support email `info@high-agency.io`). The app
+  config (`app/lib/firebase.ts`), `.firebaserc`, `firebase.json`, and every `scripts/*` all
+  target this one project. (An older `canary-os` project was reused infra during early dev and
+  has been fully retired from the config — if you see `canary-os` anywhere, it's stale.)
 - **No separate backend service. No Python/Flask. No Vertex AI service.** The PRD's old
   Python assumption is dropped (and `prd.md` is updated to match).
 - **Firestore security rules *are* the backend.** All v1 data access goes through the
@@ -74,9 +87,12 @@ not buy"). Don't conflate level gates with paywalls.
   **migrate into Next.js server actions / route handlers** over time rather than staying
   client-trusted. Several v1 mechanics are explicitly "client-trusted v1" (see Gotchas) and
   are the natural first candidates to move server-side.
-- **Admin operations run as local Node scripts**, not in-app. They authenticate with the
-  firebase-tools CLI OAuth token (IAM bypasses security rules) — see `scripts/`. There is
-  no in-app admin panel.
+- **Admin is split between an in-app panel and local Node scripts.** A **mentor-only in-app
+  admin panel** at `/admin` (`app/(platform)/admin/page.tsx`) now handles workshop CRUD and the
+  parental-consent queue (gated on `role == "mentor"`, enforced by `firestore.rules`). **Break-
+  glass / bootstrap operations still run as local Node scripts** (`scripts/`) — they authenticate
+  with the firebase-tools CLI OAuth token (IAM bypasses security rules), which is how the *first*
+  mentor gets promoted (`admin-set.js <uid> mentor`) and how seed/cleanup run.
 
 ## Domain model (the vocabulary)
 
@@ -126,16 +142,20 @@ Types live in [`app/lib/types.ts`](app/lib/types.ts); data access in
 - `app/(platform)/` — the authenticated **product**, wrapped by
   [`app/(platform)/layout.tsx`](app/(platform)/layout.tsx) (AuthProvider + sidebar Shell;
   `/login` and `/onboarding` render "bare"). Routes: `/login`, `/onboarding`, `/dashboard`,
-  `/cohorts`, `/cohorts/[id]`, `/profile`, `/learn`.
+  `/cohorts`, `/cohorts/[id]`, `/profile`, `/learn`, and `/admin` (mentor-only).
+- `app/styleguide/page.tsx` — the living design-system reference (top-level route, `noindex`).
 - `app/components/AuthProvider.tsx` — client auth context (`useAuth()` → `{ user, profile,
   logout }`); `user`/`profile` are `undefined` while resolving, `null` when absent.
 - `app/lib/` — `types.ts`, `firebase.ts` (config + waitlist), `db.ts` (all Firestore CRUD +
   live `watch*` subscriptions), `gamify.ts` (XP/levels/streaks/entitlements), `milestones.ts`
-  (the track), `match.ts` (cohort matching).
+  (the track), `match.ts` (cohort matching), `flags.ts` (`PLATFORM_ENABLED` build-time flag).
+- `proxy.ts` (repo root) — Next 16 `proxy` (the renamed `middleware`). When `PLATFORM_ENABLED`
+  is false (production), it redirects every platform route back to the waitlist at `/`.
 - `scripts/` — local admin/dev tooling (Node, REST + firebase CLI OAuth):
-  `seed.js` (squads, profiles, workshops), `seed-courses.js` (Learn modules),
-  `admin-set.js` (`<uid> consent|mentor|pro`), `cleanup-test.js`, `test-applicant.js`
-  (exercises the security rules as a real client), `fb-token.js` (token helper).
+  `seed.js` (squads, profiles, workshops, build logs — the Learn page's content is these
+  workshops), `admin-set.js` (`<uid> consent|mentor|pro`), `cleanup-test.js`,
+  `test-applicant.js` (exercises the security rules as a real client), `fb-token.js` (token
+  helper). There is no `seed-courses.js`.
 - `firestore.rules` — the enforcement backend. `design-system.md` — visual SoT (read before
   any UI). `prd.md` — product spec. `High Agency Waitlist (standalone).html` — a standalone
   export of the waitlist (reference artifact).
@@ -176,10 +196,9 @@ npm run dev      # next dev (localhost:3000)
 npm run build    # next build
 npm run lint     # eslint
 
-# Local admin / data tooling (need `firebase login` first):
-node scripts/seed.js                     # seed squads, profiles, workshops
-node scripts/seed-courses.js             # seed Learn modules
-node scripts/admin-set.js <uid> consent  # grant parental consent (also: mentor | pro)
+# Local admin / data tooling (need `firebase login` as info@high-agency.io first):
+node scripts/seed.js                     # seed squads, profiles, workshops, build logs
+node scripts/admin-set.js <uid> mentor   # promote first mentor (also: consent | pro)
 node scripts/cleanup-test.js <cohortId>  # remove smoke-test artifacts
 ```
 
@@ -188,8 +207,17 @@ helpers.
 
 ## Gotchas
 
-- **`canary-os`** is the Firebase project id and `canaryos88@gmail.com` the support email —
-  reused infra for the "High Agency" brand. Expected, not a misconfiguration.
+- **Firebase project is `highagency-62e67`, support email `info@high-agency.io`.** The account
+  that owns it is `info@high-agency.io` — `firebase login` as that identity before running any
+  `scripts/*`. The old `canary-os` project is retired; treat any lingering `canary-os` reference
+  as a stale bug to fix, not as expected infra.
+- **App and tooling now target the same project** (`highagency-62e67`). This was *not* true
+  historically — a mid-June config change left `.firebaserc`/scripts on `canary-os` while the app
+  moved to `highagency-62e67`; that split has been reconciled. If you re-point the app to a new
+  project, re-point `.firebaserc`, `firebase.json`, and every `scripts/*` in the same change.
+- **Nothing is deployed.** `firestore.rules` lives in the repo but confirm it's actually
+  **deployed** to `highagency-62e67` (`firebase deploy --only firestore:rules`) before trusting
+  the live security posture — a repo rules file is not a deployed rules file.
 - **Firebase web config keys are public by design** (committed in `app/lib/firebase.ts`);
   security comes from Firestore rules, not from hiding keys. Don't "fix" this by removing
   them. They're overridable via `NEXT_PUBLIC_FIREBASE_*` env vars.

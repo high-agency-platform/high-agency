@@ -3,7 +3,7 @@
 // verifies the rules allow the legit client flow. Usage:
 //   node scripts/test-applicant.js <cohortId>
 const KEY = "AIzaSyDq6kG7N-UpYJxfQX6xNjRdsfmJcPByksw";
-const BASE = "https://firestore.googleapis.com/v1/projects/canary-os/databases/(default)/documents";
+const BASE = "https://firestore.googleapis.com/v1/projects/highagency-62e67/databases/(default)/documents";
 
 async function main() {
   const cohortId = process.argv[2];

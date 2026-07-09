@@ -7,7 +7,8 @@ import {
 } from "../lib/firebase";
 
 const STORAGE_KEY = "ha_application";
-const AGE_BANDS = ["13–15", "16–17", "18–19", "20+"];
+// Founding Batch 01 targets high-school operators — collect exact age 12–18.
+const AGES = ["12", "13", "14", "15", "16", "17", "18"];
 
 const validEmail = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
 
@@ -191,22 +192,24 @@ export default function ApplyModal({
               />
             </div>
             <div className="field">
-              <label>Age band</label>
-              <div className="choices">
-                {AGE_BANDS.map((band) => (
-                  <div
-                    key={band}
-                    className={`choice${age === band ? " sel" : ""}`}
-                    onClick={() => setAge(band)}
-                  >
-                    <span className="tick" />
-                    {band}
-                  </div>
+              <label htmlFor="m-age">Age</label>
+              <select
+                id="m-age"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+              >
+                <option value="" disabled>
+                  Select your age
+                </option>
+                {AGES.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
             <div className={`modal__err${err ? " show" : ""}`}>
-              Fill in your name, a valid email, and your age band to continue.
+              Fill in your name, a valid email, and your age to continue.
             </div>
             <div className="modal__actions">
               <button className="btn btn--primary modal__next" onClick={next1}>

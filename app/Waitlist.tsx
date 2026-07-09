@@ -6,6 +6,7 @@ import Counter from "./components/Counter";
 import Marquee from "./components/Marquee";
 import Faq from "./components/Faq";
 import ApplyModal from "./components/ApplyModal";
+import { PLATFORM_ENABLED } from "./lib/flags";
 
 function CaptureForm({
   label,
@@ -76,7 +77,7 @@ export default function Waitlist() {
               <a href="#problem">Problem</a>
               <a href="#system">What you join</a>
               <a href="#faq">FAQ</a>
-              <a href="/login">Log in</a>
+              {PLATFORM_ENABLED && <a href="/login">Log in</a>}
             </div>
             <button
               className="btn btn--primary nav__cta"
@@ -196,7 +197,6 @@ export default function Waitlist() {
 
             <div className="pillars">
               <Reveal as="article" className="pillar" d={1}>
-                <div className="pillar__no">01</div>
                 <div className="pillar__ic">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <path d="M12 2C9 6 7 8 7 13a5 5 0 0 0 10 0c0-2-1-3.5-2-5-.5 1.5-1.5 2-2.5 2 .5-3-.5-6-.5-8Z" />
@@ -204,18 +204,9 @@ export default function Waitlist() {
                 </div>
                 <h3 className="h3">Ignition</h3>
                 <p>Live workshops + office hours with operators who&apos;ve done it.</p>
-                <div className="pillar__ex">
-                  <span className="chip">Cold outreach</span>
-                  <span className="chip">Pricing</span>
-                  <span className="chip">Demo day</span>
-                </div>
-                <span className="pillar__tag">
-                  Mentorship · <b>Premium later</b>
-                </span>
               </Reveal>
 
               <Reveal as="article" className="pillar" d={2}>
-                <div className="pillar__no">02</div>
                 <div className="pillar__ic">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <circle cx="12" cy="12" r="9" />
@@ -225,18 +216,9 @@ export default function Waitlist() {
                 </div>
                 <h3 className="h3">Operational Zone</h3>
                 <p>Real milestones, verified by a mentor — never a quiz.</p>
-                <div className="pillar__ex">
-                  <span className="chip chip--on">Ship MVP</span>
-                  <span className="chip">First user</span>
-                  <span className="chip">$100 MRR</span>
-                </div>
-                <span className="pillar__tag">
-                  Skill track · <b>Free</b>
-                </span>
               </Reveal>
 
               <Reveal as="article" className="pillar" d={3}>
-                <div className="pillar__no">03</div>
                 <div className="pillar__ic">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
                     <circle cx="8" cy="9" r="3" />
@@ -246,13 +228,6 @@ export default function Waitlist() {
                 </div>
                 <h3 className="h3">Unit</h3>
                 <p>A founding team of 5–6, building one real thing together.</p>
-                <div className="pillar__ex">
-                  <span className="chip">5–6 operators</span>
-                  <span className="chip">Streaks</span>
-                </div>
-                <span className="pillar__tag">
-                  Cohort · <b>Free</b>
-                </span>
               </Reveal>
             </div>
           </div>

@@ -23,7 +23,8 @@ workshop, not a dark terminal.**
   grid plus soft ember/lime light pooling in the corners. Atmosphere behind everything,
   never a focal point.
 - **White cards that float.** Surfaces carry a soft, warm, layered shadow *by default*
-  (askjo-style), lifting higher on hover. Depth comes from light, not borders.
+  (askjo-style). On hover they *settle* — the hairline warms and the float deepens a touch,
+  with no jump. Depth comes from light, not borders.
 - **Two ownable accents, two jobs.** **Ember** is energy and action. **Lime/green** is
   proof — XP, levels, streaks, verified milestones.
 - **A 3D "push" CTA.** The primary button rests on a solid darker-ember base edge, lifts on
@@ -195,7 +196,8 @@ Placeholder `--text-faint`. Nested composer/inline fields use `--surface-3`.
 
 ### Cards / panels (`.panel`, `.pillar`, `.ccard`, `.dossier`, `.season-map`)
 White `--surface`, hairline `--border`, `--radius-card`, **`--shadow-md` by default** —
-they float. Interactive cards lift `translateY(-5px)` → `--shadow-lg` on hover. **Owned/mine**
+they float. On hover, cards *settle* rather than jump: the hairline warms to
+`--border-strong` and the shadow deepens to `--shadow-lg` with **no `transform`**. **Owned/mine**
 surfaces wear an `--accent-line` ring; **earned** surfaces wear `--signal-line`.
 
 ### Glass (`.glass`, nav, `.side` rail, modals)
@@ -237,7 +239,7 @@ context, never a glow. Never filled, multicolor, or emoji.
 ## 7. Pre-ship checklist
 
 - [ ] Light only. Warm paper canvas with the gentle wash showing through gutters.
-- [ ] Cards are white and **float** (soft warm shadow by default; lift on hover).
+- [ ] Cards are white and **float** (soft warm shadow by default; settle — not lift — on hover).
 - [ ] Only the two accents, scarce. Ember = action, lime/green = earned. Never mixed up.
 - [ ] Lime as **fill**; deep green (`--signal-text`) for earned/verified **text + icons**.
 - [ ] Primary/verify buttons use the 3D push (base edge + travel-on-click).

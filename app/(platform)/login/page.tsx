@@ -42,7 +42,7 @@ export default function LoginPage() {
 
   // Email/password path — a direct identity API call with no off-localhost
   // redirect, so it works inside sandboxed previews where the Google popup
-  // (which must hand off to canary-os.firebaseapp.com) is blocked. It's also
+  // (which must hand off to highagency-62e67.firebaseapp.com) is blocked. It's also
   // the email fallback the PRD calls for when SSO isn't available.
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
