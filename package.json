@@ -6,22 +6,30 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:rules": "firebase emulators:exec --only firestore --project highagency-rules-test \"node --test tests/rules.test.mjs\"",
+    "test:consent": "firebase emulators:exec --only firestore --project highagency-62e67 \"tsx --test tests/consent.test.mts\"",
+    "test": "npm run test:rules && npm run test:consent"
   },
   "dependencies": {
     "firebase": "^12.14.0",
+    "firebase-admin": "^14.1.0",
     "next": "16.2.7",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "resend": "^6.17.2"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
+    "firebase-tools": "^13.35.1",
     "tailwindcss": "^4",
+    "tsx": "^4.23.0",
     "typescript": "^5"
   }
 }

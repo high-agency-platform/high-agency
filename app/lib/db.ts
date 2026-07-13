@@ -20,7 +20,7 @@ import {
   Timestamp,
   type Unsubscribe,
 } from "firebase/firestore";
-import { getDb } from "./firebase";
+import { getDb, getFirebaseAuth } from "./firebase";
 import type {
   Profile,
   PrivateProfile,
@@ -540,10 +540,38 @@ export function watchPendingConsent(cb: (profiles: Profile[]) => void): Unsubscr
 }
 
 /** Mentor grants parental consent — flips a pending minor to granted,
- *  unlocking community access. Allowed by rules' isConsentGrant(). */
+ *  unlocking community access. Allowed by rules' isConsentGrant(). This is the
+ *  manual override / audit fallback; the primary path is the parent-approval
+ *  link ([[requestConsentEmail]] → email → /consent/[token]). */
 export async function grantConsent(uid: string): Promise<void> {
   await updateDoc(doc(getDb(), "profiles", uid), {
     consentStatus: "granted",
     updatedAt: serverTimestamp(),
   });
+}
+
+/** Ask the server to (re)send the parental-consent email. Called with no uid
+ *  by a minor for themselves at onboarding, or with a target uid by a mentor
+ *  resending from the admin queue. The server verifies the caller's ID token,
+ *  mints a single-use token, and dispatches the email (or logs the link in dev
+ *  when no RESEND_API_KEY is set). Throws if not signed in. */
+export async function requestConsentEmail(
+  uid?: string
+): Promise<{ ok: boolean; delivery?: "sent" | "logged"; error?: string }> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error("not-signed-in");
+  const idToken = await user.getIdToken();
+  const res = await fetch("/api/consent/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(uid ? { uid } : {}),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    delivery?: "sent" | "logged";
+    error?: string;
+  };
+  return { ok: res.ok, ...data };
 }

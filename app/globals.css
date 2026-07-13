@@ -737,6 +737,20 @@ h1, h2, h3 { font-family: var(--font-head); font-weight: 600; line-height: 1.02;
 .onboard .field { margin-bottom: var(--space-gap); }
 .onboard__submit { margin-top: var(--space-gap); min-width: 220px; }
 
+/* ---------- Parental consent (public, no auth) ---------- */
+.consent { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: clamp(32px, 6vw, 72px) var(--gutter); }
+.consent__inner { width: 100%; max-width: 560px; }
+.consent__brand { display: inline-flex; margin-bottom: var(--space-gap); }
+.consent__card { display: flex; flex-direction: column; }
+.consent__card .eyebrow { margin-bottom: 16px; }
+.consent__card .h2 { margin-bottom: 16px; }
+.consent__lead { margin-bottom: var(--space-gap); }
+.consent__list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: var(--space-cta); }
+.consent__list li { position: relative; padding-left: 26px; color: var(--text-muted); font-size: 15px; line-height: 1.5; }
+.consent__list li::before { content: ""; position: absolute; left: 4px; top: 8px; width: 8px; height: 8px; border-radius: var(--radius-pill); background: var(--signal); box-shadow: 0 0 0 4px var(--signal-soft); }
+.consent__btn { min-width: 240px; align-self: flex-start; }
+.consent__fine { margin-top: var(--space-gap); font-size: 13px; color: var(--text-faint); line-height: 1.5; }
+
 /* ---------- Dashboard ---------- */
 .dash { padding-top: clamp(40px, 6vw, 72px); padding-bottom: clamp(64px, 9vw, 120px); }
 .dash__section { margin-bottom: clamp(48px, 7vw, 80px); }

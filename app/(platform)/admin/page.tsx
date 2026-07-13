@@ -10,6 +10,7 @@ import {
   deleteWorkshop,
   watchPendingConsent,
   grantConsent,
+  requestConsentEmail,
   type WorkshopInput,
 } from "../../lib/db";
 import { TRACK } from "../../lib/milestones";
@@ -97,6 +98,16 @@ function fmtWhen(w: Workshop): string {
       month: "short",
       day: "numeric",
     }) +
+    " · " +
+    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  );
+}
+
+/** Compact "when the consent email went out" label for the queue. */
+function fmtSent(ts: { toDate: () => Date }): string {
+  const d = ts.toDate();
+  return (
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
     " · " +
     d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
   );
@@ -274,6 +285,8 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null); // null=none, ""=new
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
+  // Per-operator resend feedback in the consent queue, keyed by uid.
+  const [resendState, setResendState] = useState<Record<string, string>>({});
   // Captured once on mount — used to tag past sessions without an impure
   // Date.now() call during render.
   const [now] = useState(() => Date.now());
@@ -355,6 +368,25 @@ export default function AdminPage() {
   async function remove(id: string) {
     if (!confirm("Delete this workshop? This can't be undone.")) return;
     await deleteWorkshop(id).catch(() => {});
+  }
+
+  async function resendConsent(uid: string) {
+    setResendState((s) => ({ ...s, [uid]: "Sending…" }));
+    try {
+      const res = await requestConsentEmail(uid);
+      setResendState((s) => ({
+        ...s,
+        [uid]: res.ok
+          ? res.delivery === "logged"
+            ? "Link logged to server (no email provider set)"
+            : "Email sent"
+          : res.error === "no-parent-email"
+            ? "No parent email on file"
+            : "Couldn't send — try again",
+      }));
+    } catch {
+      setResendState((s) => ({ ...s, [uid]: "Couldn't send — try again" }));
+    }
   }
 
   return (
@@ -475,8 +507,10 @@ export default function AdminPage() {
         <section className="page__block">
           <h2 className="h3 page__subhead">Awaiting parental consent</h2>
           <p className="dash__empty page__note">
-            Minors stay limited until you confirm a parent or guardian approved.
-            Verify out-of-band, then grant.
+            Minors stay limited until a parent approves. Approval normally happens
+            via the emailed link; use <b>Resend email</b> if a parent lost it, or
+            <b> Grant consent</b> as a manual override once you&apos;ve confirmed
+            out-of-band.
           </p>
           {pending === null ? (
             <p className="dash__empty">Loading…</p>
@@ -494,13 +528,28 @@ export default function AdminPage() {
                     <span className="admin-row__meta">
                       {p.country} · {p.headline || p.building}
                     </span>
+                    <span className="admin-row__meta">
+                      {resendState[p.uid]
+                        ? resendState[p.uid]
+                        : p.consentEmailSentAt
+                          ? `Consent email sent ${fmtSent(p.consentEmailSentAt)}`
+                          : "No consent email sent yet"}
+                    </span>
                   </div>
-                  <button
-                    className="btn btn--primary admin-row__btn"
-                    onClick={() => grantConsent(p.uid).catch(() => {})}
-                  >
-                    Grant consent
-                  </button>
+                  <div className="row-actions">
+                    <button
+                      className="btn btn--ghost admin-row__btn"
+                      onClick={() => resendConsent(p.uid)}
+                    >
+                      Resend email
+                    </button>
+                    <button
+                      className="btn btn--primary admin-row__btn"
+                      onClick={() => grantConsent(p.uid).catch(() => {})}
+                    >
+                      Grant consent
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

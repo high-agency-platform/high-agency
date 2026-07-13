@@ -88,6 +88,17 @@ service cloud.firestore {
         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'mentor';
     }
 
+    // Parental-consent gate for community writes. A minor whose parent hasn't
+    // approved yet has consentStatus == 'pending' and is blocked from all
+    // community writes (cohorts, applications, submissions, logs, rituals).
+    // Missing profile / missing field (legacy or adult) reads as allowed —
+    // only an explicit 'pending' blocks. Grants are server- or mentor-driven,
+    // never a self-write (consentStatus is immutable on the owner update path).
+    function consentAllows(uid) {
+      return !exists(/databases/$(database)/documents/profiles/$(uid)) ||
+        get(/databases/$(database)/documents/profiles/$(uid)).data.get('consentStatus', 'granted') != 'pending';
+    }
+
     // ===============================================================
     // Legacy waitlist (unchanged: create-only, PII never readable)
     // ===============================================================
@@ -117,7 +128,7 @@ service cloud.firestore {
       return hasOnlyAllowedFields(['uid', 'name', 'ageBand', 'country', 'timezone',
                'headline', 'building', 'stage', 'domains', 'skills',
                'proofUrl', 'proofNote', 'hours', 'bio', 'links',
-               'consentStatus', 'plan', 'role',
+               'consentStatus', 'consentEmailSentAt', 'plan', 'role',
                'xp', 'streak', 'streakFreezes', 'lastActiveDay',
                'lastBuildLogDay', 'lastRitualWeek',
                'enrolledWorkshops', 'attendedWorkshops', 'pendingApplications',
@@ -145,6 +156,7 @@ service cloud.firestore {
              (!('bio' in data) || validString(data.bio, 0, 300)) &&
              (!('links' in data) || (data.links is map && data.links.keys().hasOnly(['github', 'linkedin', 'site']))) &&
              data.consentStatus in ['none', 'pending', 'granted'] &&
+             (!('consentEmailSentAt' in data) || data.consentEmailSentAt is timestamp) &&
              data.plan in ['free', 'pro'] &&
              data.role in ['operator', 'mentor'] &&
              data.xp is number && data.xp >= 0 && data.xp <= 10000000 &&
@@ -184,8 +196,13 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isValidProfile(request.resource.data) &&
                        request.resource.data.role == 'operator' &&
                        request.resource.data.plan == 'free';
+      // consentStatus + consentEmailSentAt are immutable on a self-update: a
+      // pending minor must NOT be able to grant their own consent. Consent is
+      // flipped only by a mentor (isConsentGrant) or the server (Admin SDK,
+      // which bypasses rules) via the parent-approval link.
       allow update: if (isOwner(userId) && isValidProfile(request.resource.data) &&
-                        areImmutableFieldsUnchanged(['uid', 'createdAt', 'role', 'plan'])) ||
+                        areImmutableFieldsUnchanged(['uid', 'createdAt', 'role', 'plan',
+                          'consentStatus', 'consentEmailSentAt'])) ||
                        isXpAward() ||
                        isConsentGrant();
       allow delete: if false;
@@ -251,6 +268,7 @@ service cloud.firestore {
       // Creator must be founder, peer-lead, and sole initial member;
       // new cohorts start forming with no streak.
       allow create: if isAuthenticated() &&
+                       consentAllows(request.auth.uid) &&
                        isValidCohort(request.resource.data) &&
                        request.resource.data.founderUid == request.auth.uid &&
                        request.resource.data.peerLeadUid == request.auth.uid &&
@@ -260,12 +278,13 @@ service cloud.firestore {
 
       // Founder manages the doc; founder must stay a member and the
       // peer-lead must be a member. Members may only tick the ritual.
-      allow update: if (isCohortFounder(cohortId) &&
+      allow update: if consentAllows(request.auth.uid) &&
+                       ((isCohortFounder(cohortId) &&
                         isValidCohort(request.resource.data) &&
                         areImmutableFieldsUnchanged(['founderUid', 'founderName', 'createdAt']) &&
                         request.resource.data.founderUid in request.resource.data.memberUids &&
                         request.resource.data.peerLeadUid in request.resource.data.memberUids) ||
-                       (isCohortMember(cohortId) && isRitualUpdate());
+                       (isCohortMember(cohortId) && isRitualUpdate()));
 
       allow delete: if false;
 
@@ -285,6 +304,7 @@ service cloud.firestore {
         // Apply as yourself, always starting pending; members can't
         // apply to their own cohort.
         allow create: if isOwner(applicantId) &&
+                         consentAllows(request.auth.uid) &&
                          isValidApplication(request.resource.data) &&
                          request.resource.data.applicantUid == applicantId &&
                          request.resource.data.status == 'pending' &&
@@ -334,6 +354,7 @@ service cloud.firestore {
         allow read: if isCohortMember(cohortId) || isMentor();
 
         allow create: if isCohortMember(cohortId) &&
+                         consentAllows(request.auth.uid) &&
                          isValidSubmission(request.resource.data) &&
                          request.resource.data.uid == request.auth.uid &&
                          subId == string(request.resource.data.milestoneId) + '_' + request.auth.uid &&
@@ -363,6 +384,7 @@ service cloud.firestore {
         allow read: if isCohortMember(cohortId) || isMentor();
 
         allow create: if isCohortMember(cohortId) &&
+                         consentAllows(request.auth.uid) &&
                          hasOnlyAllowedFields(['uid', 'name', 'text', 'day', 'createdAt']) &&
                          hasRequiredFields(['uid', 'name', 'text', 'day', 'createdAt']) &&
                          request.resource.data.uid == request.auth.uid &&
@@ -403,6 +425,17 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create, update: if isMentor() && isValidWorkshop(request.resource.data);
       allow delete: if isMentor();
+    }
+
+    // ===============================================================
+    // Consent tokens — server-only. Minted, read, and consumed exclusively
+    // by the Admin SDK (Route Handlers under app/api/consent/**), which
+    // bypasses these rules. No client may ever read or write them: the token
+    // hash must never be exposed, and grants must stay server-authoritative.
+    // ===============================================================
+
+    match /consentTokens/{tokenHash} {
+      allow read, write: if false;
     }
   }
 }

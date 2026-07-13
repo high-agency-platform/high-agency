@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../components/AuthProvider";
-import { saveProfile, savePrivateProfile } from "../../lib/db";
+import { saveProfile, savePrivateProfile, requestConsentEmail } from "../../lib/db";
 import { localDay } from "../../lib/gamify";
 import { DOMAINS, SKILLS } from "../../lib/types";
 import { COUNTRIES } from "../../lib/countries";
@@ -197,6 +197,16 @@ export default function OnboardingPage() {
         },
         true
       );
+      // Minors: kick off the parental-consent email now that the profile
+      // exists with consentStatus "pending". Non-blocking — if it fails, a
+      // mentor can resend from the admin queue, so we never trap onboarding.
+      if (isMinor) {
+        try {
+          await requestConsentEmail();
+        } catch {
+          /* ignore — resend path exists */
+        }
+      }
       // Never land on an empty dashboard — straight into discovery
       // with matches pre-loaded.
       router.replace("/cohorts");

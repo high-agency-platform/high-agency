@@ -75,6 +75,9 @@ export interface Profile {
 
   /** Minors start "pending" until a parent confirms; adults are "granted". */
   consentStatus: ConsentStatus;
+  /** When the parental-consent email was last dispatched (server-set, admin
+   *  SDK). Gives mentors context in the consent queue; absent until sent. */
+  consentEmailSentAt?: Timestamp;
   /** Entitlement flag — wired now, everything is free during batch 1. */
   plan: Plan;
   role: Role;
