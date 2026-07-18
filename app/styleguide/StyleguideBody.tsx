@@ -7,7 +7,6 @@ import {
   Avatar,
   AvStack,
   Bar,
-  BoltIcon,
   CheckIcon,
   FlameIcon,
   LevelRing,
@@ -95,13 +94,10 @@ export function StyleguideBody() {
         <span className="micro">04 · hud — the always-on game state</span>
         <div className="sg__row">
           <span className="hud__stat hud__stat--fire">
-            <FlameIcon filled size={15} /> 12
+            <FlameIcon size={15} /> 12
           </span>
           <span className="hud__stat">
             <FlameIcon size={15} /> 12
-          </span>
-          <span className="hud__stat hud__stat--xp">
-            <BoltIcon size={13} /> 480
           </span>
           <LevelRing xp={480} />
           <span className="badge badge--level">L2 Builder</span>

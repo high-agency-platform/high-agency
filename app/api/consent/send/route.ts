@@ -19,6 +19,11 @@ import { sendConsentEmail } from "../../../lib/consentEmail";
 
 export const runtime = "nodejs";
 
+/** Minimum gap between consent emails for a given operator. Enforced here on
+ *  the server (the client countdown is only a hint) so a lost first email can
+ *  be re-sent, but the endpoint can't be used to spam a parent's inbox. */
+const RESEND_COOLDOWN_MS = 60_000;
+
 function bearerToken(req: NextRequest): string | null {
   const header = req.headers.get("authorization") ?? "";
   const match = header.match(/^Bearer\s+(.+)$/i);
@@ -59,6 +64,21 @@ export async function POST(req: NextRequest) {
   if (profile.consentStatus !== "pending") {
     // Adults / already-granted operators are never emailed.
     return NextResponse.json({ error: "not-pending" }, { status: 409 });
+  }
+
+  // Rate-limit resends per operator. `consentEmailSentAt` is server-written on
+  // every successful send below, so this bounds both self-resends and mentor
+  // resends targeting the same operator.
+  const lastSent = profile.consentEmailSentAt;
+  const lastSentMs =
+    lastSent && typeof lastSent.toMillis === "function" ? lastSent.toMillis() : 0;
+  const elapsed = Date.now() - lastSentMs;
+  if (lastSentMs && elapsed < RESEND_COOLDOWN_MS) {
+    const retryAfter = Math.ceil((RESEND_COOLDOWN_MS - elapsed) / 1000);
+    return NextResponse.json(
+      { error: "rate-limited", retryAfter },
+      { status: 429, headers: { "Retry-After": String(retryAfter) } }
+    );
   }
 
   const privateSnap = await db.collection("privateProfiles").doc(targetUid).get();

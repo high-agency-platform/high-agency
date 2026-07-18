@@ -208,13 +208,15 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 /* ============================================================
    GAME GLYPHS + IDENTITY
    ============================================================ */
-.flame { color: var(--text-faint); display: inline-flex; }
-.flame--on { color: var(--accent); }
+.flame { color: var(--accent); display: inline-flex; }
 
 .av {
   width: 36px; height: 36px; flex: 0 0 auto;
   display: inline-flex; align-items: center; justify-content: center;
-  background: var(--accent-soft); border: 2px solid var(--accent-line); border-radius: var(--radius-pill);
+  /* Opaque: soft ember composited over surface, so a disc stacked on top
+     never lets the one underneath show through. */
+  background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--surface);
+  border: 2px solid var(--accent-line); border-radius: var(--radius-pill);
   font-size: 15px; font-weight: 800; color: var(--accent);
   text-transform: uppercase;
 }
@@ -230,6 +232,59 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   background: var(--surface-2); border: 2px solid var(--border-strong);
   font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--text-muted);
   box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* Squad roster — the compact avatar stack, but every disc is pressable:
+   hover/focus a disc → peek card (headline + level); click → full profile.
+   Past 4 members the stack scrolls horizontally (right-edge fade as the
+   hint) so the tile stays compact. */
+.avroster { display: inline-flex; align-items: center; flex: 0 0 auto; padding: 3px 0; }
+.avroster__a {
+  display: inline-flex; flex: 0 0 auto;
+  margin-left: -10px; padding: 0;
+  border-radius: var(--radius-pill);
+  transition: transform var(--t-fast) var(--ease-out);
+  position: relative;
+}
+.avroster__a:first-child { margin-left: 0; }
+.avroster__a .av { box-shadow: 0 0 0 2px var(--surface); }
+.avroster__a:hover, .avroster__a:focus-visible { transform: translateY(-2px); z-index: 2; }
+.avroster--scroll {
+  max-width: 128px; overflow-x: auto;
+  scrollbar-width: none;
+  mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent);
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 16px), transparent);
+}
+.avroster--scroll::-webkit-scrollbar { display: none; }
+
+/* The floating peek card — fixed-positioned above the hovered disc so it
+   can escape the scroll clip. Pointer-transparent; click goes to the disc. */
+.peek {
+  position: fixed; z-index: 60; transform: translate(-50%, -100%);
+  width: max-content; max-width: 260px;
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 12px 14px;
+  background: var(--surface); border: 2px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+  pointer-events: none;
+  animation: fade var(--t-fast) ease;
+}
+.peek__name {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 14px; font-weight: 800;
+}
+.peek__lvl {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 700;
+  color: var(--accent); background: var(--accent-soft);
+  border: 2px solid var(--accent-line); border-radius: var(--radius-pill);
+  padding: 0 7px;
+}
+.peek__line { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+.peek__hint {
+  margin-top: 3px;
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent);
 }
 
 .badge {
@@ -288,23 +343,35 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   box-shadow: inset 0 0 0 2px var(--border);
 }
 .bar i {
+  position: relative;
   display: block; height: 100%; border-radius: var(--radius-pill);
   background: linear-gradient(180deg, var(--signal-hi), var(--signal));
-  box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.45);
-  transition: width 0.6s var(--ease-out);
+  transition: width 0.45s var(--ease-out);
   min-width: 0;
 }
+/* Duolingo-style glossy shine: a rounded highlight pill riding the top of the
+   fill, inset from its edges so the cap stays crisp. Hidden until there's
+   enough fill to seat it, so an empty bar shows no orphaned sliver. */
+.bar i::after {
+  content: "";
+  position: absolute;
+  top: 22%; left: 6px; right: 6px; height: 28%;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+}
+.bar i[style*="width: 0%"]::after { display: none; }
 .bar--ember i { background: linear-gradient(180deg, var(--accent-hover), var(--accent-press)); }
-.bar--xs { height: 8px; box-shadow: inset 0 0 0 1px var(--border); }
+.bar--xs { height: 16px; box-shadow: inset 0 0 0 2px var(--border); }
 
-/* Level ring (SVG) */
-.ring { display: inline-grid; place-items: center; position: relative; }
-.ring svg { display: block; transform: rotate(-90deg); }
-.ring__track { stroke: var(--surface-2); }
-.ring__fill { stroke: var(--signal-press); stroke-linecap: round; transition: stroke-dashoffset 0.6s var(--ease-out); }
-.ring__n {
+/* Level ring (SVG) — "lvlring", not "ring": Tailwind owns the `ring` utility */
+.lvlring { display: inline-grid; place-items: center; position: relative; }
+.lvlring svg { display: block; transform: rotate(-90deg); }
+.lvlring__track { stroke: var(--surface-2); }
+.lvlring__fill { stroke: var(--signal-press); stroke-linecap: round; transition: stroke-dashoffset 0.6s var(--ease-out); }
+.lvlring__n {
   position: absolute; font-family: var(--font-mono); font-weight: 700;
-  font-size: 13px; color: var(--text);
+  font-size: 12px; letter-spacing: -0.02em; color: var(--text);
 }
 
 /* Quest path — the milestone spine */
@@ -455,7 +522,7 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   box-shadow: 0 3px 0 var(--accent-press);
 }
 
-/* HUD — flame · XP · level ring */
+/* HUD — flame · level ring (XP shows only as ring fill) */
 .hud { display: flex; align-items: center; gap: 8px; }
 .hud--col { flex-direction: column; gap: 10px; max-width: 100%; }
 .hud--col .hud__stat { font-size: 12px; padding: 4px 8px; max-width: 100%; }
@@ -517,6 +584,9 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 .notice svg { flex: 0 0 auto; color: var(--accent); }
 .notice small { display: block; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.notice__action { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex: 0 0 auto; }
+.notice__action .btn { white-space: nowrap; }
+.notice__action .notice__note { font-size: 12px; font-weight: 500; color: var(--text-muted); text-align: right; max-width: 200px; }
 
 /* ============================================================
    FEED (build log) + composer
@@ -554,6 +624,50 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .ses__act { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
 .ses__done { font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--signal-text); white-space: nowrap; }
 .ses__lock { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-faint); white-space: nowrap; }
+
+/* Week calendar — vertical 7-day strip (dashboard "This week").
+   Sessions are pieces pinned to their day; empty days stay slim + dotted. */
+.wcal { display: flex; flex-direction: column; }
+.wcal__day {
+  display: grid; grid-template-columns: 48px 1fr; gap: 12px; align-items: center;
+  min-height: 40px; padding: 6px 0;
+  border-top: 2px solid var(--border);
+}
+.wcal__day:first-child { border-top: none; padding-top: 0; }
+.wcal__day:last-child { padding-bottom: 0; }
+.wcal__label {
+  align-self: center; width: 48px; padding: 4px 0;
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  font-family: var(--font-mono);
+}
+.wcal__dow { font-size: 9.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-faint); }
+.wcal__num { font-size: 17px; font-weight: 700; line-height: 1.1; color: var(--text-muted); }
+.wcal__day--today .wcal__label {
+  border: 2px solid var(--accent-line); border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+}
+.wcal__day--today .wcal__dow, .wcal__day--today .wcal__num { color: var(--accent); }
+.wcal__evs { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.wcal__ev {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface-3);
+  border: 2px solid var(--border-strong); border-radius: var(--radius-sm);
+  box-shadow: 0 3px 0 var(--border-strong);
+}
+.wcal__ev--in {
+  background: var(--signal-soft);
+  border-color: var(--signal-line);
+  box-shadow: 0 3px 0 var(--signal-line);
+}
+.wcal__time { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
+.wcal__title {
+  flex: 1; min-width: 0;
+  font-size: 14.5px; font-weight: 700; letter-spacing: -0.01em;
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.wcal__act { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; }
+.wcal__nil { display: block; height: 0; border-top: 2px dotted var(--border); margin-right: 4px; }
 
 /* ============================================================
    SQUAD CARDS
@@ -895,6 +1009,8 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   .cred { grid-template-columns: 1fr; gap: 4px; }
   .ses { flex-wrap: wrap; }
   .ses__act { width: 100%; justify-content: flex-end; }
+  .wcal__ev { flex-wrap: wrap; }
+  .wcal__act { width: 100%; justify-content: flex-end; }
   .admin-row { flex-direction: column; align-items: stretch; }
 }
 

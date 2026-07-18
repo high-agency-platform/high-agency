@@ -113,6 +113,10 @@ export default function OnboardingPage() {
 
   const age = useMemo(() => (dob ? ageFrom(dob) : null), [dob]);
   const isMinor = age !== null && age < 18;
+  // The stage picker ("Where's it at?") only makes sense once there's a
+  // venture to place — asking it of someone with no project is nonsensical
+  // and shouldn't gate them out of finding a squad.
+  const hasBuilding = building.trim().length > 0;
 
   function toggle(list: string[], set: (v: string[]) => void, item: string) {
     set(list.includes(item) ? list.filter((x) => x !== item) : [...list, item]);
@@ -137,6 +141,10 @@ export default function OnboardingPage() {
 
   async function submit() {
     if (!user || age === null) return;
+    if (hasBuilding && !stage) {
+      setError("Pick where you're at — even just an idea counts.");
+      return;
+    }
     if (domains.length === 0 || skills.length === 0) {
       setError("Pick at least one domain and one interest so squads can find you.");
       return;
@@ -171,7 +179,9 @@ export default function OnboardingPage() {
           timezone,
           headline: headline.trim(),
           building: building.trim(),
-          stage: stage ?? "idea",
+          // No venture described → default to "idea" so the required field
+          // stays valid without forcing an unanswerable question.
+          stage: hasBuilding && stage ? stage : "idea",
           domains,
           skills,
           proofUrl: proofUrl.trim(),
@@ -345,7 +355,7 @@ export default function OnboardingPage() {
             />
           </div>
 
-          {building.trim().length > 0 && (
+          {hasBuilding && (
             <div className="field">
               <label>Where&apos;s it at?</label>
               <div className="chip-row">

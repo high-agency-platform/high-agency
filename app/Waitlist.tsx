@@ -310,7 +310,7 @@ export default function Waitlist() {
               </div>
               <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
                 <span className="hud__stat hud__stat--fire">
-                  <FlameIcon filled size={14} /> 12
+                  <FlameIcon size={14} /> 12
                 </span>
                 <span className="hud__stat hud__stat--xp">
                   <ZapIcon size={13} /> 480

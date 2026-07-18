@@ -557,7 +557,13 @@ export async function grantConsent(uid: string): Promise<void> {
  *  when no RESEND_API_KEY is set). Throws if not signed in. */
 export async function requestConsentEmail(
   uid?: string
-): Promise<{ ok: boolean; delivery?: "sent" | "logged"; error?: string }> {
+): Promise<{
+  ok: boolean;
+  delivery?: "sent" | "logged";
+  error?: string;
+  /** Seconds until a resend is allowed again (present on a rate-limited 429). */
+  retryAfter?: number;
+}> {
   const user = getFirebaseAuth().currentUser;
   if (!user) throw new Error("not-signed-in");
   const idToken = await user.getIdToken();
@@ -572,6 +578,7 @@ export async function requestConsentEmail(
   const data = (await res.json().catch(() => ({}))) as {
     delivery?: "sent" | "logged";
     error?: string;
+    retryAfter?: number;
   };
   return { ok: res.ok, ...data };
 }

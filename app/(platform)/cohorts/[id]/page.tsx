@@ -20,6 +20,7 @@ import { TRACK, squadThreshold } from "../../../lib/milestones";
 import { isoWeek } from "../../../lib/gamify";
 import { DECLINE_LABELS } from "../../../lib/types";
 import { Avatar, AvStack, CheckIcon, FlameIcon } from "../../../components/ui";
+import { ProfileModal } from "../../../components/ProfileModal";
 import type {
   Cohort,
   CohortApplication,
@@ -182,7 +183,7 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
             {cohort.name}
             {cohort.weeklyStreak > 0 && (
               <span className="hud__stat hud__stat--fire">
-                <FlameIcon filled size={14} />
+                <FlameIcon size={14} />
                 {cohort.weeklyStreak}w
               </span>
             )}
@@ -548,75 +549,14 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
 
       {/* ---- Applicant profile viewer ---- */}
       {viewing && (
-        <div className="modal open" role="dialog" aria-modal="true">
-          <div
-            className="modal__scrim"
-            onClick={() => {
-              setViewing(null);
-              setViewingApp(null);
-            }}
-          />
-          <div className="modal__card">
-            <button
-              className="modal__close"
-              onClick={() => {
-                setViewing(null);
-                setViewingApp(null);
-              }}
-              aria-label="Close"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-                <path d="M18 6L6 18M6 6l12 12" />
-              </svg>
-            </button>
-            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-              <Avatar name={viewing.name} size="lg" />
-              <div>
-                <h3 style={{ marginBottom: 0 }}>{viewing.name}</h3>
-                <span className="micro">
-                  {viewing.ageBand} · {viewing.country}
-                  {viewingApp ? ` · ${viewingApp.hours}h/wk` : ""} · {viewing.stage}
-                </span>
-              </div>
-            </div>
-            {viewing.headline && (
-              <p style={{ fontWeight: 700, marginBottom: 14 }}>{viewing.headline}</p>
-            )}
-            {viewing.building && (
-              <div className="field">
-                <label>Building</label>
-                <p className="muted" style={{ fontSize: 15 }}>{viewing.building}</p>
-              </div>
-            )}
-            {viewing.proofUrl && (
-              <div className="field">
-                <label>Proof</label>
-                <p style={{ fontSize: 15 }}>
-                  <a href={viewing.proofUrl} target="_blank" rel="noreferrer" className="link-btn">
-                    {viewing.proofUrl}
-                  </a>
-                  {viewing.proofNote && <span className="muted"> — {viewing.proofNote}</span>}
-                </p>
-              </div>
-            )}
-            <div className="field">
-              <label>Into</label>
-              <div className="chip-row">
-                {viewing.skills.map((s) => (
-                  <span key={s} className="chip">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </div>
-            {viewing.bio && (
-              <div className="field">
-                <label>Bio</label>
-                <p className="muted" style={{ fontSize: 15 }}>{viewing.bio}</p>
-              </div>
-            )}
-          </div>
-        </div>
+        <ProfileModal
+          profile={viewing}
+          hours={viewingApp?.hours}
+          onClose={() => {
+            setViewing(null);
+            setViewingApp(null);
+          }}
+        />
       )}
     </div>
   );

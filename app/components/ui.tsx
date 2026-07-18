@@ -8,10 +8,17 @@ import { levelOf, levelProgress, localDay } from "../lib/gamify";
 
 type IconProps = { size?: number; filled?: boolean };
 
-export function FlameIcon({ size = 18, filled = false }: IconProps) {
+/** Blobby streak flame — always solid, with an inner-tongue cutout.
+ *  Color comes from currentColor (ember in the HUD via `.flame`). */
+const FLAME_OUTER =
+  "M12.4 2.2C13.5 4.8 15.9 6.9 17.4 9.2C18.3 10.6 18.8 12.1 18.8 13.8C18.8 18 15.7 21.5 12 21.5C8.3 21.5 5.2 18 5.2 13.8C5.2 11 6.8 8.9 8.5 6.9C9.9 5.3 11.7 4.6 12.4 2.2Z";
+const FLAME_INNER =
+  "M11.6 12C13.2 13.3 14.3 14.7 14.3 16.3C14.3 18 13 19.2 11.4 19.2C9.8 19.2 8.6 18 8.6 16.4C8.6 14.6 10 13.3 11.6 12Z";
+
+export function FlameIcon({ size = 18 }: IconProps) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M12 2c1 4.5-4.5 6.5-4.5 11.5a4.5 4.5 0 009 0c0-2.2-1.1-3.8-2.2-5.4-.6 1.6-2.3 2.2-2.3 2.2.6-2.7 0-6 0-8.3z" />
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" fillRule="evenodd" d={FLAME_OUTER + FLAME_INNER} />
     </svg>
   );
 }
@@ -90,11 +97,11 @@ export function LevelRing({ xp, size = 40 }: { xp: number; size?: number }) {
   const r = (size - 6) / 2;
   const c = 2 * Math.PI * r;
   return (
-    <span className="ring" title={`Level ${lvl.level} · ${lvl.name}`}>
+    <span className="lvlring" title={`Level ${lvl.level} · ${lvl.name} · ${xp} XP`}>
       <svg width={size} height={size} aria-hidden="true">
-        <circle className="ring__track" cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth="5" />
+        <circle className="lvlring__track" cx={size / 2} cy={size / 2} r={r} fill="none" strokeWidth="5" />
         <circle
-          className="ring__fill"
+          className="lvlring__fill"
           cx={size / 2}
           cy={size / 2}
           r={r}
@@ -104,26 +111,23 @@ export function LevelRing({ xp, size = 40 }: { xp: number; size?: number }) {
           strokeDashoffset={c * (1 - p)}
         />
       </svg>
-      <span className="ring__n">{lvl.level}</span>
+      <span className="lvlring__n">L{lvl.level}</span>
     </span>
   );
 }
 
-/** The always-on game state: flame · XP · level. Never restated in copy.
+/** The always-on game state: flame · level ring (XP lives inside the ring —
+ *  it only exists to fill it). Never restated in copy.
  *  `col` stacks the stats vertically for the 96px desktop rail. */
 export function Hud({ profile, col = false }: { profile: Profile; col?: boolean }) {
   const alive = profile.lastActiveDay === localDay();
   return (
     <div className={`hud ${col ? "hud--col" : ""}`}>
       <span className={`hud__stat ${alive ? "hud__stat--fire" : ""}`} title={`${profile.streak}-day streak`}>
-        <span className={`flame ${alive ? "flame--on" : ""}`}>
-          <FlameIcon filled={alive} />
+        <span className="flame">
+          <FlameIcon />
         </span>
         {profile.streak}
-      </span>
-      <span className="hud__stat hud__stat--xp" title={`${profile.xp} XP`}>
-        <BoltIcon size={13} />
-        {profile.xp}
       </span>
       <LevelRing xp={profile.xp} />
     </div>
