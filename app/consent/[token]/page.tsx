@@ -93,7 +93,7 @@ export default function ConsentApprovalPage() {
       <div className="consent__inner">
         <Link href="/" className="consent__brand">
           <span className="topbar__logo" aria-hidden="true">
-            H
+            <img src="/brand/high-agency-mark.svg" alt="" />
           </span>
           High Agency
         </Link>

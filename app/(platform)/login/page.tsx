@@ -98,7 +98,7 @@ export default function LoginPage() {
     <section className="gate">
       <div className="gate__inner">
         <span className="gate__logo" aria-hidden="true">
-          H
+          <img src="/brand/high-agency-mark.svg" alt="" />
         </span>
         <h1 className="h1">Ready to build?</h1>
         <p className="gate__sub">Your squad&apos;s waiting.</p>

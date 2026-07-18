@@ -39,7 +39,7 @@ function Rail() {
   return (
     <aside className="rail">
       <Link href="/dashboard" className="rail__logo" aria-label="High Agency home">
-        H
+        <img src="/brand/high-agency-mark.svg" alt="" />
       </Link>
       {tabs.map((t) => (
         <Link
@@ -67,7 +67,7 @@ function TopBar() {
   return (
     <header className="topbar">
       <Link href="/dashboard" className="topbar__logo" aria-label="High Agency home">
-        H
+        <img src="/brand/high-agency-mark.svg" alt="" />
       </Link>
       {profile && <Hud profile={profile} />}
     </header>
