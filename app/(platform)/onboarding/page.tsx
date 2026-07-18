@@ -7,6 +7,7 @@ import { saveProfile, savePrivateProfile, requestConsentEmail } from "../../lib/
 import { localDay } from "../../lib/gamify";
 import { DOMAINS, SKILLS } from "../../lib/types";
 import { COUNTRIES } from "../../lib/countries";
+import { Bar } from "../../components/ui";
 import type { AgeBand, VentureStage } from "../../lib/types";
 
 const STAGES: { id: VentureStage; label: string }[] = [
@@ -27,10 +28,10 @@ const HEADLINE_PLACEHOLDERS = [
 ];
 
 const BUILDING_PLACEHOLDERS = [
-  "Don't have a project yet? Tell us what you'd love to explore.",
+  "No project yet? Say what you'd love to explore.",
   "A spark, a rough idea, or just a direction — all welcome.",
   "The problem, the thing, where it's at — a few lines.",
-  "Even \"I want to start something but don't know what\" works here.",
+  "Even \"I want to start something but don't know what\" works.",
 ];
 
 function ageFrom(dob: string): number {
@@ -97,8 +98,7 @@ export default function OnboardingPage() {
   }, [user]);
 
   // Cycle the example placeholders so the prompt reads as "any of these is
-  // fine", not "you must already have a launched product". Honors
-  // prefers-reduced-motion by holding on the first example.
+  // fine". Honors prefers-reduced-motion by holding on the first example.
   useEffect(() => {
     if (step !== 2) return;
     if (
@@ -220,261 +220,245 @@ export default function OnboardingPage() {
   if (!user) return null;
 
   return (
-    <section className="onboard wrap">
-      <div className="onboard__inner">
-        <span className="eyebrow">
-          <span className="dot" /> {step === 1 ? "Step 1 of 2 — the basics" : "Step 2 of 2 — operator profile"}
-        </span>
-        <h1 className="h2">
-          {step === 1 ? "Who are you?" : "What do you want to build?"}
-        </h1>
-        <p className="lead onboard__lead">
-          {step === 1
-            ? "Two minutes. We show your age as a band and your name as “First L.” — never more."
-            : "No project yet — or no idea what you'll build? That's the whole point. This profile just helps squads find you; you'll figure out the rest together. Everything here is editable later."}
-        </p>
+    <section className="ob">
+      <div className="ob__bar">
+        <span className="micro">{step}/2</span>
+        <Bar value={step === 1 ? 0.5 : 1} ember xs />
+      </div>
 
-        <div className="onboard__progress" aria-hidden="true">
-          <i style={{ width: step === 1 ? "50%" : "100%" }} />
-        </div>
+      <h1 className="h1">{step === 1 ? "Who are you?" : "What's your thing?"}</h1>
+      <p className="ob__sub">
+        {step === 1
+          ? "Squads only ever see “First L.” and an age band."
+          : "No idea yet is a valid answer. Edit anytime."}
+      </p>
 
-        {step === 1 ? (
-          <>
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="ob-first">First name</label>
-                <input
-                  id="ob-first"
-                  value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
-                  placeholder="Ada"
-                  maxLength={60}
-                />
-              </div>
-              <div className="field">
-                <label htmlFor="ob-last">Last name</label>
-                <input
-                  id="ob-last"
-                  value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
-                  placeholder="Lovelace"
-                  maxLength={60}
-                />
-              </div>
-            </div>
-
+      {step === 1 ? (
+        <>
+          <div className="field-row">
             <div className="field">
-              <label htmlFor="ob-dob">Date of birth</label>
+              <label htmlFor="ob-first">First name</label>
               <input
-                id="ob-dob"
-                type="date"
-                value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                max={localDay()}
+                id="ob-first"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Ada"
+                maxLength={60}
               />
-              <small className="field__hint">
-                Stored privately. Others only ever see an age band.
-              </small>
             </div>
-
-            <div className="field-row">
-              <div className="field">
-                <label htmlFor="ob-country">Country</label>
-                <select
-                  id="ob-country"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                >
-                  <option value="" disabled>
-                    Select your country
-                  </option>
-                  {COUNTRIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="ob-city">City (optional, private)</label>
-                <input
-                  id="ob-city"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="Toronto"
-                  maxLength={80}
-                />
-              </div>
-            </div>
-
-            {isMinor && (
-              <div className="field">
-                <label htmlFor="ob-parent">Parent or guardian email</label>
-                <input
-                  id="ob-parent"
-                  type="email"
-                  value={parentEmail}
-                  onChange={(e) => setParentEmail(e.target.value)}
-                  placeholder="parent@email.com"
-                  maxLength={254}
-                />
-                <small className="field__hint">
-                  We&apos;ll send them a consent request. Community access stays
-                  limited until they approve.
-                </small>
-              </div>
-            )}
-
-            {error && <p className="form-err">{error}</p>}
-
-            <button className="btn btn--primary onboard__submit" onClick={nextStep}>
-              Continue
-            </button>
-          </>
-        ) : (
-          <>
             <div className="field">
-              <label htmlFor="ob-headline">
-                Headline — your one-line hook (optional)
-              </label>
+              <label htmlFor="ob-last">Last name</label>
               <input
-                id="ob-headline"
-                value={headline}
-                onChange={(e) => setHeadline(e.target.value)}
-                placeholder={HEADLINE_PLACEHOLDERS[phIdx % HEADLINE_PLACEHOLDERS.length]}
+                id="ob-last"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Lovelace"
+                maxLength={60}
+              />
+            </div>
+          </div>
+
+          <div className="field">
+            <label htmlFor="ob-dob">Date of birth</label>
+            <input
+              id="ob-dob"
+              type="date"
+              value={dob}
+              onChange={(e) => setDob(e.target.value)}
+              max={localDay()}
+            />
+            <small className="field__hint">Stays private.</small>
+          </div>
+
+          <div className="field-row">
+            <div className="field">
+              <label htmlFor="ob-country">Country</label>
+              <select
+                id="ob-country"
+                value={country}
+                onChange={(e) => setCountry(e.target.value)}
+              >
+                <option value="" disabled>
+                  Pick one
+                </option>
+                {COUNTRIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="ob-city">City · optional</label>
+              <input
+                id="ob-city"
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Toronto"
                 maxLength={80}
               />
             </div>
+          </div>
 
+          {isMinor && (
             <div className="field">
-              <label htmlFor="ob-building">
-                What do you want to build? (optional)
-              </label>
-              <textarea
-                id="ob-building"
-                value={building}
-                onChange={(e) => setBuilding(e.target.value)}
-                placeholder={BUILDING_PLACEHOLDERS[phIdx % BUILDING_PLACEHOLDERS.length]}
-                maxLength={300}
+              <label htmlFor="ob-parent">Parent email</label>
+              <input
+                id="ob-parent"
+                type="email"
+                value={parentEmail}
+                onChange={(e) => setParentEmail(e.target.value)}
+                placeholder="parent@email.com"
+                maxLength={254}
               />
-              <div className="chip-row">
-                {STAGES.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`pick ${stage === s.id ? "sel" : ""}`}
-                    onClick={() => setStage(s.id)}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
               <small className="field__hint">
-                Where are you at? Brand new and just exploring? “Just an idea”
-                is exactly right — most operators start there.
+                We&apos;ll ask them to approve — you&apos;re under 18.
               </small>
             </div>
+          )}
 
-            <div className="field">
-              <label>Domains — areas you&apos;re drawn to</label>
-              <div className="chip-row">
-                {DOMAINS.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    className={`pick ${domains.includes(d) ? "sel" : ""}`}
-                    onClick={() => toggle(domains, setDomains, d)}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
+          {error && <p className="form-err">{error}</p>}
+
+          <div className="row-actions">
+            <button className="btn btn--primary" onClick={nextStep}>
+              Next
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="field">
+            <label htmlFor="ob-headline">Headline · optional</label>
+            <input
+              id="ob-headline"
+              value={headline}
+              onChange={(e) => setHeadline(e.target.value)}
+              placeholder={HEADLINE_PLACEHOLDERS[phIdx % HEADLINE_PLACEHOLDERS.length]}
+              maxLength={80}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="ob-building">Building · optional</label>
+            <textarea
+              id="ob-building"
+              value={building}
+              onChange={(e) => setBuilding(e.target.value)}
+              placeholder={BUILDING_PLACEHOLDERS[phIdx % BUILDING_PLACEHOLDERS.length]}
+              maxLength={300}
+            />
+          </div>
+
+          <div className="field">
+            <label>Where&apos;s it at?</label>
+            <div className="chip-row">
+              {STAGES.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  className={`pick ${stage === s.id ? "sel" : ""}`}
+                  onClick={() => setStage(s.id)}
+                >
+                  {s.label}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="field">
-              <label>Interests — what are you into?</label>
-              <div className="chip-row">
-                {SKILLS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    className={`pick ${skills.includes(s) ? "sel" : ""}`}
-                    onClick={() => toggle(skills, setSkills, s)}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
+          <div className="field">
+            <label>Domains</label>
+            <div className="chip-row">
+              {DOMAINS.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  className={`pick ${domains.includes(d) ? "sel" : ""}`}
+                  onClick={() => toggle(domains, setDomains, d)}
+                >
+                  {d}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="field">
-              <label htmlFor="ob-proof">
-                Proof of work — the best thing you&apos;ve ever made or done
-              </label>
-              <input
-                id="ob-proof"
-                value={proofUrl}
-                onChange={(e) => setProofUrl(e.target.value)}
-                placeholder="Link it (optional but it does the talking)"
-                maxLength={300}
-              />
-              <input
-                value={proofNote}
-                onChange={(e) => setProofNote(e.target.value)}
-                placeholder="One sentence on why it matters"
-                maxLength={200}
-              />
+          <div className="field">
+            <label>Into</label>
+            <div className="chip-row">
+              {SKILLS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  className={`pick ${skills.includes(s) ? "sel" : ""}`}
+                  onClick={() => toggle(skills, setSkills, s)}
+                >
+                  {s}
+                </button>
+              ))}
             </div>
+          </div>
 
-            <div className="field">
-              <label htmlFor="ob-bio">Short bio — personality, not résumé (optional)</label>
-              <textarea
-                id="ob-bio"
-                value={bio}
-                onChange={(e) => setBio(e.target.value)}
-                maxLength={300}
-              />
-            </div>
+          <div className="field">
+            <label>Proof of work · optional</label>
+            <input
+              id="ob-proof"
+              value={proofUrl}
+              onChange={(e) => setProofUrl(e.target.value)}
+              placeholder="Link the best thing you've made"
+              maxLength={300}
+            />
+            <input
+              value={proofNote}
+              onChange={(e) => setProofNote(e.target.value)}
+              placeholder="Why it matters — one line"
+              maxLength={200}
+            />
+          </div>
 
-            <div className="field">
-              <label>Links (optional)</label>
-              <input
-                value={github}
-                onChange={(e) => setGithub(e.target.value)}
-                placeholder="GitHub"
-                maxLength={200}
-              />
-              <input
-                value={linkedin}
-                onChange={(e) => setLinkedin(e.target.value)}
-                placeholder="LinkedIn"
-                maxLength={200}
-              />
-              <input
-                value={site}
-                onChange={(e) => setSite(e.target.value)}
-                placeholder="Personal site"
-                maxLength={200}
-              />
-            </div>
+          <div className="field">
+            <label htmlFor="ob-bio">Bio · optional</label>
+            <textarea
+              id="ob-bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              placeholder="Personality, not résumé"
+              maxLength={300}
+            />
+          </div>
 
-            {error && <p className="form-err">{error}</p>}
+          <div className="field">
+            <label>Links · optional</label>
+            <input
+              value={github}
+              onChange={(e) => setGithub(e.target.value)}
+              placeholder="GitHub"
+              maxLength={200}
+            />
+            <input
+              value={linkedin}
+              onChange={(e) => setLinkedin(e.target.value)}
+              placeholder="LinkedIn"
+              maxLength={200}
+            />
+            <input
+              value={site}
+              onChange={(e) => setSite(e.target.value)}
+              placeholder="Personal site"
+              maxLength={200}
+            />
+          </div>
 
-            <div className="row-actions">
-              <button className="btn btn--ghost" onClick={() => setStep(1)}>
-                Back
-              </button>
-              <button
-                className="btn btn--primary onboard__submit"
-                onClick={submit}
-                disabled={busy}
-              >
-                {busy ? "Saving…" : "Find my squad"}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
+          {error && <p className="form-err">{error}</p>}
+
+          <div className="row-actions">
+            <button className="btn btn--ghost" onClick={() => setStep(1)}>
+              Back
+            </button>
+            <button className="btn btn--primary" onClick={submit} disabled={busy}>
+              {busy ? "…" : "Find my squad"}
+            </button>
+          </div>
+        </>
+      )}
     </section>
   );
 }

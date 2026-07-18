@@ -14,6 +14,7 @@ import {
 } from "../../lib/db";
 import { rankCohorts } from "../../lib/match";
 import { DOMAINS, SKILLS, DECLINE_LABELS } from "../../lib/types";
+import { AvStack, FlameIcon, LockIcon } from "../../components/ui";
 import type { Cohort, CohortApplication, WeeklyHours } from "../../lib/types";
 
 const HOURS: WeeklyHours[] = ["<3", "3-5", "5-10", "10+"];
@@ -119,8 +120,8 @@ export default function CohortsPage() {
     } catch (e) {
       setError(
         e instanceof Error && e.message === "max-pending"
-          ? `You have ${MAX_PENDING_APPLICATIONS} applications out — wait for a decision or withdraw one.`
-          : "Application failed. Try again."
+          ? `Max ${MAX_PENDING_APPLICATIONS} applications out at once.`
+          : "Didn't send. Try again."
       );
     } finally {
       setBusy(false);
@@ -130,7 +131,7 @@ export default function CohortsPage() {
   async function submitCohort() {
     if (!profile) return;
     if (!newName.trim() || !newMission.trim() || !newSlot.trim()) {
-      setError("A squad needs a name, a mission, and a committed weekly slot.");
+      setError("Name, mission, and a weekly slot — all three.");
       return;
     }
     setBusy(true);
@@ -145,7 +146,7 @@ export default function CohortsPage() {
       });
       router.push(`/cohorts/${id}`);
     } catch {
-      setError("Couldn't create the squad. Try again.");
+      setError("Couldn't create it. Try again.");
       setBusy(false);
     }
   }
@@ -153,69 +154,60 @@ export default function CohortsPage() {
   if (!user || !profile) return null;
 
   return (
-    <div className="page">
-      <header className="masthead">
-        <div className="masthead__index">
-          <span className="eyebrow">
-            <span className="dot" /> Find your squad
-          </span>
-          {!creating && myCohorts.length === 0 && !consentPending && (
-            <button className="btn btn--accent" onClick={() => setCreating(true)}>
-              Start a squad
-            </button>
-          )}
-        </div>
-        <h1 className="masthead__title">Cohorts</h1>
-        <div className="masthead__sub">
-          <p className="lead">
-            Small crews of operators building in parallel. Find the one whose
-            mission rhymes with yours.
-          </p>
-        </div>
+    <div className="screen">
+      <header className="screen__head">
+        <h1 className="h1">Squads</h1>
+        {!creating && myCohorts.length === 0 && !consentPending && (
+          <button className="btn btn--primary" onClick={() => setCreating(true)}>
+            Start one
+          </button>
+        )}
       </header>
 
       {consentPending && (
-        <div className="panel notice page__block">
-          <b>Waiting on parental consent.</b> We&apos;ve flagged your parent or
-          guardian — you can browse squads, but applying and posting unlock
-          once they approve.
+        <div className="notice screen__block">
+          <LockIcon size={20} />
+          <span>
+            Browse away — applying unlocks after your parent&apos;s OK.
+          </span>
         </div>
       )}
 
       {creating && (
-        <div className="panel create-panel page__block">
+        <div className="tile screen__block">
+          <div className="tile__head">
+            <h2 className="h3">New squad</h2>
+          </div>
           <div className="field">
-            <label htmlFor="nc-name">Squad name</label>
+            <label htmlFor="nc-name">Name</label>
             <input
               id="nc-name"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
-              placeholder="e.g. Night Shift"
+              placeholder="Night Shift"
               maxLength={60}
             />
           </div>
           <div className="field">
-            <label htmlFor="nc-mission">Mission — one line</label>
+            <label htmlFor="nc-mission">Mission</label>
             <input
               id="nc-mission"
               value={newMission}
               onChange={(e) => setNewMission(e.target.value)}
-              placeholder="What is this crew about?"
+              placeholder="What's this crew about?"
               maxLength={140}
             />
           </div>
           <div className="field">
-            <label htmlFor="nc-slot">Weekly meeting slot — the ritual</label>
+            <label htmlFor="nc-slot">Weekly ritual</label>
             <input
               id="nc-slot"
               value={newSlot}
               onChange={(e) => setNewSlot(e.target.value)}
-              placeholder="e.g. Sundays 7pm ET"
+              placeholder="Sundays 7pm ET"
               maxLength={80}
             />
-            <small className="field__hint">
-              Required on purpose: commit to the cadence before you recruit.
-            </small>
+            <small className="field__hint">Commit to the cadence first.</small>
           </div>
           <div className="field">
             <label>Focus</label>
@@ -237,7 +229,7 @@ export default function CohortsPage() {
             </div>
           </div>
           <div className="field">
-            <label>Looking for (skills)</label>
+            <label>Recruiting</label>
             <div className="chip-row">
               {SKILLS.map((s) => (
                 <button
@@ -261,41 +253,48 @@ export default function CohortsPage() {
               Cancel
             </button>
             <button className="btn btn--primary" onClick={submitCohort} disabled={busy}>
-              {busy ? "Creating…" : "Create squad"}
+              {busy ? "…" : "Create"}
             </button>
           </div>
         </div>
       )}
 
       {myCohorts.length > 0 && (
-        <section className="page__block">
-          <h2 className="h3 page__subhead">Yours</h2>
-          <div className="cohort-grid">
+        <section className="screen__block">
+          <div className="screen__label">
+            <span className="micro">Yours</span>
+          </div>
+          <div className="squads">
             {myCohorts.map((c) => (
-              <Link key={c.id} href={`/cohorts/${c.id}`} className="ccard ccard--mine">
-                <div className="ccard__top">
-                  <h3 className="h3">{c.name}</h3>
-                  <span className="ccard__count">{c.memberUids.length} members</span>
+              <Link key={c.id} href={`/cohorts/${c.id}`} className="tile tile--tap tile--ember sq">
+                <div className="sq__top">
+                  <span className="sq__name">{c.name}</span>
+                  {c.weeklyStreak > 0 && (
+                    <span className="hud__stat hud__stat--fire">
+                      <FlameIcon filled size={14} />
+                      {c.weeklyStreak}w
+                    </span>
+                  )}
                 </div>
-                <p className="ccard__mission">{c.mission}</p>
-                <span className="ccard__go">Open workspace</span>
+                <AvStack names={c.memberUids.map((u) => c.memberNames[u] ?? "?")} />
+                <p className="sq__mission">{c.mission}</p>
               </Link>
             ))}
           </div>
         </section>
       )}
 
-      <section className="page__block">
-        <div className="page__subrow">
-          <h2 className="h3 page__subhead">Squads building things like yours</h2>
+      <section className="screen__block">
+        <div className="screen__label">
+          <span className="micro">Open squads</span>
           {atCap && (
-            <span className="kicker">
-              {pendingCount}/{MAX_PENDING_APPLICATIONS} applications out
+            <span className="micro">
+              {pendingCount}/{MAX_PENDING_APPLICATIONS} out
             </span>
           )}
         </div>
 
-        <div className="chip-row page__filters">
+        <div className="chip-row screen__block" style={{ marginBottom: 16 }}>
           <button
             type="button"
             className={`pick ${filter === null ? "sel" : ""}`}
@@ -316,36 +315,37 @@ export default function CohortsPage() {
         </div>
 
         {cohorts === null ? (
-          <p className="dash__empty">Loading squads…</p>
+          <p className="empty">Loading…</p>
         ) : matches.length === 0 ? (
-          <p className="dash__empty">
-            No open squads match yet. Start one — or clear the filter.
-          </p>
+          <div className="empty">
+            <p>Nothing matches.</p>
+            {!consentPending && (
+              <button className="btn btn--ghost" onClick={() => setCreating(true)}>
+                Start one
+              </button>
+            )}
+          </div>
         ) : (
-          <div className="cohort-grid">
+          <div className="squads">
             {matches.map(({ cohort: c, why }) => {
               const app = applied[c.id];
               return (
-                <article key={c.id} className="ccard">
-                  <div className="ccard__top">
-                    <h3 className="h3">{c.name}</h3>
-                    <span className="ccard__count">
-                      {c.memberUids.length} members
-                      {c.state === "forming" ? " · forming" : ""}
-                    </span>
+                <article key={c.id} className="tile sq">
+                  <div className="sq__top">
+                    <span className="sq__name">{c.name}</span>
+                    <AvStack
+                      names={c.memberUids.map((u) => c.memberNames[u] ?? "?")}
+                      max={4}
+                    />
                   </div>
-                  <p className="ccard__mission">{c.mission}</p>
-                  {why.length > 0 && (
-                    <div className="ccard__tags">
+                  <p className="sq__mission">{c.mission}</p>
+                  {(why.length > 0 || c.tags.length > 0 || (c.lookingFor ?? []).length > 0) && (
+                    <div className="sq__tags">
                       {why.map((w) => (
                         <span key={w} className="chip chip--why">
                           {w}
                         </span>
                       ))}
-                    </div>
-                  )}
-                  {(c.tags.length > 0 || (c.lookingFor ?? []).length > 0) && (
-                    <div className="ccard__tags">
                       {c.tags.map((t) => (
                         <span key={t} className="chip">
                           {t}
@@ -358,21 +358,22 @@ export default function CohortsPage() {
                       ))}
                     </div>
                   )}
-                  <div className="ccard__foot">
-                    <span className="ccard__founder">
-                      {c.meetingSlot ? `Meets ${c.meetingSlot}` : `By ${c.founderName}`}
+                  <div className="sq__foot">
+                    <span className="sq__slot">
+                      {c.meetingSlot || c.founderName}
+                      {c.state === "forming" && " · forming"}
                     </span>
                     {app?.status === "pending" ? (
-                      <span className="ccard__status">Applied</span>
+                      <span className="sq__status">Applied</span>
                     ) : app?.status === "declined" ? (
-                      <span className="ccard__status ccard__status--mute">
+                      <span className="sq__status sq__status--mute">
                         {app.declineReason
                           ? DECLINE_LABELS[app.declineReason]
                           : "Declined"}
                       </span>
                     ) : applyId === c.id ? null : (
                       <button
-                        className="btn btn--ghost ccard__apply"
+                        className="btn btn--primary btn--sm"
                         disabled={consentPending || atCap}
                         title={
                           consentPending
@@ -393,19 +394,17 @@ export default function CohortsPage() {
                     )}
                   </div>
                   {applyId === c.id && (
-                    <div className="apply-inline">
-                      <p className="apply-inline__note">
-                        Your profile goes with this automatically.
-                      </p>
+                    <div className="apply-box">
                       <textarea
+                        className="input"
                         value={pitch}
                         onChange={(e) => setPitch(e.target.value)}
-                        placeholder="Why this squad, and what do you bring?"
+                        placeholder="Why you? Your profile goes along too."
                         maxLength={300}
                       />
-                      <div className="apply-inline__hours">
-                        <span className="kicker">
-                          Hours you can commit to this squad
+                      <div>
+                        <span className="micro" style={{ display: "block", marginBottom: 8 }}>
+                          Hours / week
                         </span>
                         <div className="chip-row">
                           {HOURS.map((h) => (
@@ -415,22 +414,22 @@ export default function CohortsPage() {
                               className={`pick ${applyHours === h ? "sel" : ""}`}
                               onClick={() => setApplyHours(h)}
                             >
-                              {h === "<3" ? "Under 3" : h}
+                              {h === "<3" ? "<3" : h}
                             </button>
                           ))}
                         </div>
                       </div>
                       {error && <p className="form-err">{error}</p>}
-                      <div className="row-actions">
-                        <button className="btn btn--ghost" onClick={() => setApplyId(null)}>
+                      <div className="row-actions" style={{ marginTop: 0 }}>
+                        <button className="btn btn--ghost btn--sm" onClick={() => setApplyId(null)}>
                           Cancel
                         </button>
                         <button
-                          className="btn btn--primary"
+                          className="btn btn--primary btn--sm"
                           onClick={() => submitApplication(c.id)}
                           disabled={busy || !pitch.trim() || !applyHours}
                         >
-                          {busy ? "Sending…" : "Send application"}
+                          {busy ? "…" : "Send"}
                         </button>
                       </div>
                     </div>

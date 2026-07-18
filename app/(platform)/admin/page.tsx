@@ -130,20 +130,20 @@ function WorkshopForm({
     setDraft({ ...draft, [k]: v });
 
   return (
-    <div className="panel create-panel page__block">
+    <div className="tile screen__block">
       <div className="field">
         <label>Title</label>
         <input
           value={draft.title}
           onChange={(e) => set("title", e.target.value)}
-          placeholder="e.g. The Art of the Cold Ask"
+          placeholder="The Art of the Cold Ask"
           maxLength={120}
         />
       </div>
 
       <div className="field-row">
         <div className="field">
-          <label>Mentor name</label>
+          <label>Mentor</label>
           <input
             value={draft.mentorName}
             onChange={(e) => set("mentorName", e.target.value)}
@@ -172,14 +172,14 @@ function WorkshopForm({
         <textarea
           value={draft.description}
           onChange={(e) => set("description", e.target.value)}
-          placeholder="What operators will walk away with."
+          placeholder="What operators walk away with."
           maxLength={1000}
         />
       </div>
 
       <div className="field-row">
         <div className="field">
-          <label>Starts at</label>
+          <label>Starts</label>
           <input
             type="datetime-local"
             value={draft.startsAt}
@@ -187,7 +187,7 @@ function WorkshopForm({
           />
         </div>
         <div className="field">
-          <label>Duration (minutes)</label>
+          <label>Minutes</label>
           <input
             type="number"
             min={1}
@@ -199,7 +199,7 @@ function WorkshopForm({
       </div>
 
       <div className="field">
-        <label>Google Meet link</label>
+        <label>Meet link</label>
         <input
           value={draft.meetLink}
           onChange={(e) => set("meetLink", e.target.value)}
@@ -210,7 +210,7 @@ function WorkshopForm({
 
       <div className="field-row">
         <div className="field">
-          <label>Teaches milestone</label>
+          <label>Milestone</label>
           <select
             value={draft.milestoneId}
             onChange={(e) => set("milestoneId", Number(e.target.value))}
@@ -240,11 +240,11 @@ function WorkshopForm({
       </div>
 
       <div className="field">
-        <label>Recording URL (after the session)</label>
+        <label>Recording URL</label>
         <input
           value={draft.recordingUrl}
           onChange={(e) => set("recordingUrl", e.target.value)}
-          placeholder="Posted here once recorded"
+          placeholder="Posted after the session"
           maxLength={500}
         />
       </div>
@@ -255,7 +255,7 @@ function WorkshopForm({
           checked={draft.open}
           onChange={(e) => set("open", e.target.checked)}
         />
-        <span>Open to all (free, no level gate — the season&apos;s open session)</span>
+        <span>Open to all — the season&apos;s free session</span>
       </label>
 
       <div className="row-actions">
@@ -267,7 +267,7 @@ function WorkshopForm({
           onClick={onSave}
           disabled={busy || !draft.title.trim() || !draft.mentorName.trim()}
         >
-          {busy ? "Saving…" : "Save workshop"}
+          {busy ? "…" : "Save"}
         </button>
       </div>
     </div>
@@ -320,19 +320,11 @@ export default function AdminPage() {
 
   if (!isMentor) {
     return (
-      <div className="page">
-        <header className="masthead">
-          <div className="masthead__index">
-            <span className="eyebrow">
-              <span className="dot" /> Restricted
-            </span>
-          </div>
-          <h1 className="masthead__title">Mentors only</h1>
+      <div className="screen">
+        <header className="screen__head">
+          <h1 className="h1">Mentors only</h1>
         </header>
-        <p className="dash__empty">
-          The admin console is for mentors. If you should have access, ask the
-          High Agency crew to assign you the mentor role.
-        </p>
+        <p className="empty">Ask the crew for the mentor role if you should be here.</p>
       </div>
     );
   }
@@ -390,20 +382,10 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="page">
-      <header className="masthead">
-        <div className="masthead__index">
-          <span className="eyebrow">
-            <span className="dot" /> Mentor console
-          </span>
-          <span className="masthead__meta">{profile.name}</span>
-        </div>
-        <h1 className="masthead__title">Admin</h1>
-        <div className="masthead__sub">
-          <p className="lead">
-            Author the workshop catalog and clear the parental-consent queue.
-          </p>
-        </div>
+    <div className="screen">
+      <header className="screen__head">
+        <h1 className="h1">Admin</h1>
+        <span className="micro">{profile.name}</span>
       </header>
 
       <div className="admin-tabs">
@@ -417,17 +399,17 @@ export default function AdminPage() {
           className={`admin-tab ${tab === "members" ? "admin-tab--on" : ""}`}
           onClick={() => setTab("members")}
         >
-          Consent queue {pending && pending.length > 0 && `(${pending.length})`}
+          Consent {pending && pending.length > 0 && `(${pending.length})`}
         </button>
       </div>
 
       {tab === "workshops" && (
-        <section className="page__block">
-          <div className="page__subrow">
-            <h2 className="h3 page__subhead">Catalog</h2>
+        <section className="screen__block">
+          <div className="screen__label">
+            <span className="micro">Catalog</span>
             {editingId === null && (
-              <button className="btn btn--accent" onClick={startNew}>
-                New workshop
+              <button className="btn btn--primary btn--sm" onClick={startNew}>
+                New
               </button>
             )}
           </div>
@@ -443,9 +425,9 @@ export default function AdminPage() {
           )}
 
           {workshops === null ? (
-            <p className="dash__empty">Loading…</p>
+            <p className="empty">Loading…</p>
           ) : workshops.length === 0 ? (
-            <p className="dash__empty">No workshops yet. Create the first one.</p>
+            <p className="empty">No workshops yet.</p>
           ) : (
             <div className="admin-list">
               {workshops.map((w) =>
@@ -459,20 +441,18 @@ export default function AdminPage() {
                     busy={busy}
                   />
                 ) : (
-                  <div key={w.id} className="panel admin-row">
+                  <div key={w.id} className="tile tile--flat admin-row">
                     <div className="admin-row__body">
                       <div className="admin-row__title">
                         <b>{w.title}</b>
                         {w.startsAt.toDate().getTime() < now && (
                           <span className="chip chip--mute">past</span>
                         )}
-                        {w.open && <span className="chip chip--open">Open</span>}
+                        {w.open && <span className="chip chip--why">open</span>}
                         {w.levelGate > 0 && (
-                          <span className="chip chip--gate">L{w.levelGate}+</span>
+                          <span className="chip chip--on">L{w.levelGate}+</span>
                         )}
-                        {w.recordingUrl && (
-                          <span className="chip">recording</span>
-                        )}
+                        {w.recordingUrl && <span className="chip">rec</span>}
                       </div>
                       <span className="admin-row__meta">
                         {fmtWhen(w)} · {w.durationMins}m ·{" "}
@@ -481,15 +461,15 @@ export default function AdminPage() {
                         {w.milestoneId > 0 && ` · M${w.milestoneId}`}
                       </span>
                     </div>
-                    <div className="row-actions">
+                    <div className="row-actions" style={{ marginTop: 0 }}>
                       <button
-                        className="btn btn--ghost admin-row__btn"
+                        className="btn btn--ghost btn--sm"
                         onClick={() => startEdit(w)}
                       >
                         Edit
                       </button>
                       <button
-                        className="btn btn--ghost admin-row__btn"
+                        className="btn btn--ghost btn--sm"
                         onClick={() => remove(w.id)}
                       >
                         Delete
@@ -504,22 +484,18 @@ export default function AdminPage() {
       )}
 
       {tab === "members" && (
-        <section className="page__block">
-          <h2 className="h3 page__subhead">Awaiting parental consent</h2>
-          <p className="dash__empty page__note">
-            Minors stay limited until a parent approves. Approval normally happens
-            via the emailed link; use <b>Resend email</b> if a parent lost it, or
-            <b> Grant consent</b> as a manual override once you&apos;ve confirmed
-            out-of-band.
-          </p>
+        <section className="screen__block">
+          <div className="screen__label">
+            <span className="micro">Awaiting parental consent</span>
+          </div>
           {pending === null ? (
-            <p className="dash__empty">Loading…</p>
+            <p className="empty">Loading…</p>
           ) : sortedPending.length === 0 ? (
-            <p className="dash__empty">Queue clear — nobody waiting on consent.</p>
+            <p className="empty">Queue clear.</p>
           ) : (
             <div className="admin-list">
               {sortedPending.map((p) => (
-                <div key={p.uid} className="panel admin-row">
+                <div key={p.uid} className="tile tile--flat admin-row">
                   <div className="admin-row__body">
                     <div className="admin-row__title">
                       <b>{p.name}</b>
@@ -532,22 +508,22 @@ export default function AdminPage() {
                       {resendState[p.uid]
                         ? resendState[p.uid]
                         : p.consentEmailSentAt
-                          ? `Consent email sent ${fmtSent(p.consentEmailSentAt)}`
+                          ? `Email sent ${fmtSent(p.consentEmailSentAt)}`
                           : "No consent email sent yet"}
                     </span>
                   </div>
-                  <div className="row-actions">
+                  <div className="row-actions" style={{ marginTop: 0 }}>
                     <button
-                      className="btn btn--ghost admin-row__btn"
+                      className="btn btn--ghost btn--sm"
                       onClick={() => resendConsent(p.uid)}
                     >
-                      Resend email
+                      Resend
                     </button>
                     <button
-                      className="btn btn--primary admin-row__btn"
+                      className="btn btn--verify btn--sm"
                       onClick={() => grantConsent(p.uid).catch(() => {})}
                     >
-                      Grant consent
+                      Grant
                     </button>
                   </div>
                 </div>

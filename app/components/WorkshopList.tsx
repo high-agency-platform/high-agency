@@ -2,19 +2,18 @@
 
 import type { Profile, Workshop } from "../lib/types";
 import { canEnroll } from "../lib/gamify";
+import { CheckIcon, LockIcon } from "./ui";
 
-function fmt(ts: { toDate: () => Date }): string {
+function dateParts(ts: { toDate: () => Date }): { day: string; mon: string; time: string } {
   const d = ts.toDate();
-  return d.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-  }) +
-    " · " +
-    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return {
+    day: String(d.getDate()),
+    mon: d.toLocaleDateString(undefined, { month: "short" }),
+    time: d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
+  };
 }
 
-/** Without a profile this is a plain schedule (dashboard sidebars).
+/** Without a profile this is a plain schedule (dashboard tiles).
  *  With profile + handlers it becomes the enrollable catalog. */
 export function WorkshopList({
   workshops,
@@ -28,55 +27,59 @@ export function WorkshopList({
   onAttend?: (w: Workshop) => void;
 }) {
   return (
-    <div className="wlist">
+    <div>
       {workshops.map((w) => {
         const enrolled = profile?.enrolledWorkshops.includes(w.id) ?? false;
         const attended = profile?.attendedWorkshops.includes(w.id) ?? false;
         const gate = profile ? canEnroll(profile, w) : { ok: true, reason: "" };
         const started = w.startsAt.toDate().getTime() < Date.now() + w.durationMins * 60000;
+        const { day, mon, time } = dateParts(w.startsAt);
 
         return (
-          <div key={w.id} className="wrow">
-            <div className="wrow__when">{fmt(w.startsAt)}</div>
-            <div className="wrow__body">
-              <span className="wrow__title">
+          <div key={w.id} className="ses">
+            <div className={`ses__date ${enrolled && !attended ? "ses__date--live" : ""}`}>
+              <b>{day}</b>
+              <span>{mon}</span>
+            </div>
+            <div className="ses__body">
+              <span className="ses__title">
                 {w.title}
-                {w.open && <span className="chip chip--open">Open to all</span>}
-                {w.levelGate > 0 && (
-                  <span className="chip chip--gate">L{w.levelGate}+</span>
-                )}
+                {w.levelGate > 0 && <span className="chip chip--on">L{w.levelGate}+</span>}
               </span>
-              <span className="wrow__mentor">
-                {w.kind === "office_hours" ? "Office hours" : "Workshop"} ·{" "}
-                {w.mentorName}
+              <span className="ses__meta">
+                {time} · {w.mentorName}
               </span>
             </div>
-            {!profile ? (
-              <a className="btn btn--ghost wrow__join" href={w.meetLink} target="_blank" rel="noreferrer">
-                Join
-              </a>
-            ) : attended ? (
-              <span className="wrow__attended">Attended ✓ +50 XP</span>
-            ) : enrolled ? (
-              <div className="wrow__actions">
-                <a className="btn btn--primary wrow__join" href={w.meetLink} target="_blank" rel="noreferrer">
+            <div className="ses__act">
+              {!profile ? (
+                <a className="btn btn--ghost btn--sm" href={w.meetLink} target="_blank" rel="noreferrer">
                   Join
                 </a>
-                {started && onAttend && (
-                  <button className="btn btn--ghost wrow__join" onClick={() => onAttend(w)}>
-                    I attended
-                  </button>
-                )}
-              </div>
-            ) : gate.ok ? (
-              <button className="btn btn--ghost wrow__join" onClick={() => onEnroll?.(w)}>
-                Enroll
-              </button>
-            ) : (
-              <span className="wrow__locked" title={gate.reason}>
-                {gate.reason}
-              </span>
-            )}
+              ) : attended ? (
+                <span className="ses__done">
+                  <CheckIcon size={12} /> +50
+                </span>
+              ) : enrolled ? (
+                <>
+                  <a className="btn btn--primary btn--sm" href={w.meetLink} target="_blank" rel="noreferrer">
+                    Join
+                  </a>
+                  {started && onAttend && (
+                    <button className="btn btn--verify btn--sm" onClick={() => onAttend(w)}>
+                      I went
+                    </button>
+                  )}
+                </>
+              ) : gate.ok ? (
+                <button className="btn btn--ghost btn--sm" onClick={() => onEnroll?.(w)}>
+                  Enroll
+                </button>
+              ) : (
+                <span className="ses__lock" title={gate.reason}>
+                  <LockIcon /> L{w.levelGate}
+                </span>
+              )}
+            </div>
           </div>
         );
       })}

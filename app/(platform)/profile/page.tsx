@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../components/AuthProvider";
 import { saveProfile } from "../../lib/db";
-import { levelOf, localDay } from "../../lib/gamify";
+import { levelOf, nextLevel, levelProgress, localDay } from "../../lib/gamify";
 import { DOMAINS, SKILLS } from "../../lib/types";
+import { Avatar, Bar, FlameIcon } from "../../components/ui";
 import type { VentureStage } from "../../lib/types";
 
 const STAGES: { id: VentureStage; label: string }[] = [
@@ -65,7 +66,7 @@ export default function ProfilePage() {
   async function submit() {
     if (!user || !profile) return;
     if (!headline.trim() || !building.trim() || domains.length === 0 || skills.length === 0) {
-      setError("Headline, what you're building, a domain, and a skill — minimum.");
+      setError("Headline, what you're building, a domain, and an interest — minimum.");
       return;
     }
     setBusy(true);
@@ -117,28 +118,51 @@ export default function ProfilePage() {
   if (!user || !profile) return null;
 
   const lvl = levelOf(profile.xp);
+  const next = nextLevel(profile.xp);
 
   return (
-    <div className="page">
-      <header className="masthead">
-        <div className="masthead__index">
-          <span className="eyebrow">
-            <span className="dot" /> L{lvl.level} {lvl.name} · {profile.xp} XP
-          </span>
-          <span className="masthead__meta">
-            {profile.ageBand} · <b>{profile.country}</b>
-          </span>
+    <div className="screen">
+      {/* ---- Player card ---- */}
+      <section className="tile tile--lime screen__block">
+        <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <Avatar name={profile.name} size="lg" />
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <h1 className="h2">{profile.name}</h1>
+              <span className="badge badge--level">
+                L{lvl.level} {lvl.name}
+              </span>
+              {profile.streakFreezes > 0 && (
+                <span className="badge" title="Streak freezes banked">
+                  <FlameIcon size={11} /> ×{profile.streakFreezes}
+                </span>
+              )}
+            </div>
+            <span className="micro">
+              {profile.ageBand} · {profile.country}
+            </span>
+          </div>
         </div>
-        <h1 className="masthead__title">{profile.name}</h1>
-        <div className="masthead__sub">
-          <p className="lead">
-            This is what squads see when you apply. Your exact age, full name,
-            and city stay private — always.
-          </p>
+        <div style={{ marginTop: 16 }}>
+          <Bar value={levelProgress(profile.xp)} />
+          <div className="screen__label" style={{ marginTop: 8, marginBottom: 0 }}>
+            <span className="micro signal">{profile.xp} xp</span>
+            {next && (
+              <span className="micro">
+                {next.xp - profile.xp} to L{next.level} {next.name}
+              </span>
+            )}
+          </div>
         </div>
-      </header>
+      </section>
 
-      <div className="onboard__inner">
+      {/* ---- Edit ---- */}
+      <section className="tile" style={{ maxWidth: 640 }}>
+        <div className="tile__head">
+          <h2 className="h3">Your card</h2>
+          <span className="micro">what squads see</span>
+        </div>
+
         <div className="field">
           <label htmlFor="pf-headline">Headline</label>
           <input
@@ -150,13 +174,17 @@ export default function ProfilePage() {
         </div>
 
         <div className="field">
-          <label htmlFor="pf-building">What are you building?</label>
+          <label htmlFor="pf-building">Building</label>
           <textarea
             id="pf-building"
             value={building}
             onChange={(e) => setBuilding(e.target.value)}
             maxLength={300}
           />
+        </div>
+
+        <div className="field">
+          <label>Stage</label>
           <div className="chip-row">
             {STAGES.map((s) => (
               <button
@@ -188,7 +216,7 @@ export default function ProfilePage() {
         </div>
 
         <div className="field">
-          <label>Interests</label>
+          <label>Into</label>
           <div className="chip-row">
             {SKILLS.map((s) => (
               <button
@@ -209,19 +237,19 @@ export default function ProfilePage() {
             id="pf-proof"
             value={proofUrl}
             onChange={(e) => setProofUrl(e.target.value)}
-            placeholder="Link the best thing you've ever made or done"
+            placeholder="Link the best thing you've made"
             maxLength={300}
           />
           <input
             value={proofNote}
             onChange={(e) => setProofNote(e.target.value)}
-            placeholder="One sentence on why it matters"
+            placeholder="Why it matters — one line"
             maxLength={200}
           />
         </div>
 
         <div className="field">
-          <label htmlFor="pf-bio">Short bio</label>
+          <label htmlFor="pf-bio">Bio</label>
           <textarea
             id="pf-bio"
             value={bio}
@@ -254,14 +282,12 @@ export default function ProfilePage() {
 
         {error && <p className="form-err">{error}</p>}
 
-        <button
-          className="btn btn--primary onboard__submit"
-          onClick={submit}
-          disabled={busy}
-        >
-          {busy ? "Saving…" : saved ? "Saved" : "Save changes"}
-        </button>
-      </div>
+        <div className="row-actions">
+          <button className="btn btn--primary" onClick={submit} disabled={busy}>
+            {busy ? "…" : saved ? "Saved ✓" : "Save"}
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

@@ -95,81 +95,71 @@ export default function LoginPage() {
   }
 
   return (
-    <section className="auth-hero wrap">
-      <div className="auth-hero__copy">
-        <span className="eyebrow">
-          <span className="dot" /> Operator access
+    <section className="gate">
+      <div className="gate__inner">
+        <span className="gate__logo" aria-hidden="true">
+          H
         </span>
-        <h1 className="display">
-          Build with your <span className="strike">tribe.</span>
-        </h1>
-        <p className="lead">
-          Join a cohort of operators, set real milestones, and ship together.
+        <h1 className="h1">Ready to build?</h1>
+        <p className="gate__sub">Your squad&apos;s waiting.</p>
+
+        <button
+          className="btn btn--primary btn--block"
+          onClick={signInGoogle}
+          disabled={busy}
+        >
+          Continue with Google
+        </button>
+
+        <div className="auth-or">
+          <span>or</span>
+        </div>
+
+        <form onSubmit={signInEmail}>
+          <div className="field">
+            <label htmlFor="auth-email">Email</label>
+            <input
+              id="auth-email"
+              type="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@email.com"
+              maxLength={254}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="auth-password">Password</label>
+            <input
+              id="auth-password"
+              type="password"
+              autoComplete={mode === "create" ? "new-password" : "current-password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={mode === "create" ? "6+ characters" : "Your password"}
+              maxLength={128}
+            />
+          </div>
+          <button className="btn btn--ink btn--block" type="submit" disabled={busy}>
+            {busy ? "…" : mode === "create" ? "Create account" : "Sign in"}
+          </button>
+        </form>
+
+        <p className="auth-switch">
+          {mode === "create" ? "Already in?" : "New here?"}{" "}
+          <button
+            type="button"
+            className="link-btn"
+            onClick={() => {
+              setMode((m) => (m === "create" ? "signin" : "create"));
+              setError("");
+            }}
+          >
+            {mode === "create" ? "Sign in" : "Create one"}
+          </button>
         </p>
 
-        <div className="auth-hero__cta">
-          <button
-            className="btn btn--primary btn--block"
-            onClick={signInGoogle}
-            disabled={busy}
-          >
-            Continue with Google
-          </button>
-
-          <div className="auth-or">
-            <span>or use email</span>
-          </div>
-
-          <form className="auth-email" onSubmit={signInEmail}>
-            <div className="field">
-              <label htmlFor="auth-email">Email</label>
-              <input
-                id="auth-email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@email.com"
-                maxLength={254}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="auth-password">Password</label>
-              <input
-                id="auth-password"
-                type="password"
-                autoComplete={mode === "create" ? "new-password" : "current-password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={mode === "create" ? "At least 6 characters" : "Your password"}
-                maxLength={128}
-              />
-            </div>
-            <button
-              className="btn btn--primary btn--block"
-              type="submit"
-              disabled={busy}
-            >
-              {busy ? "Working…" : mode === "create" ? "Create account" : "Sign in"}
-            </button>
-          </form>
-
-          <p className="auth-switch">
-            {mode === "create" ? "Already have an account?" : "New here?"}{" "}
-            <button
-              type="button"
-              className="link-btn"
-              onClick={() => {
-                setMode((m) => (m === "create" ? "signin" : "create"));
-                setError("");
-              }}
-            >
-              {mode === "create" ? "Sign in instead" : "Create one"}
-            </button>
-          </p>
-
-          {error && <p className="form-err">{error}</p>}
-        </div>
+        {error && <p className="form-err">{error}</p>}
       </div>
     </section>
   );

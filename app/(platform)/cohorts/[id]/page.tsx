@@ -19,6 +19,7 @@ import {
 import { TRACK, squadThreshold } from "../../../lib/milestones";
 import { isoWeek } from "../../../lib/gamify";
 import { DECLINE_LABELS } from "../../../lib/types";
+import { Avatar, AvStack, CheckIcon, FlameIcon } from "../../../components/ui";
 import type {
   Cohort,
   CohortApplication,
@@ -158,11 +159,13 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
 
   if (cohort === null) {
     return (
-      <div className="page">
-        <p className="dash__empty">This squad doesn&apos;t exist.</p>
-        <Link href="/cohorts" className="btn btn--ghost">
-          Back to cohorts
-        </Link>
+      <div className="screen">
+        <div className="empty">
+          <p>This squad doesn&apos;t exist.</p>
+          <Link href="/cohorts" className="btn btn--ghost">
+            Back
+          </Link>
+        </div>
       </div>
     );
   }
@@ -171,69 +174,69 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
   const consentPending = profile?.consentStatus === "pending";
 
   return (
-    <div className="page">
-      <section className="dash__section cohort-head">
+    <div className="screen">
+      {/* ---- Squad header ---- */}
+      <header className="screen__head">
         <div>
-          <span className="eyebrow">
-            <span className="dot" /> Squad workspace
-            {cohort.state === "forming" && " · forming"}
-            {cohort.state === "stalled" && " · stalled"}
-          </span>
-          <h1 className="h2">{cohort.name}</h1>
-          <p className="lead">{cohort.mission}</p>
-          <p className="cohort-head__slot">
-            Meets {cohort.meetingSlot || "TBD"}
-            {cohort.weeklyStreak > 0 &&
-              ` · ${cohort.weeklyStreak}-week squad streak`}
-          </p>
-        </div>
-        <div className="cohort-head__members">
-          <span className="kicker">Squad</span>
-          <div className="chip-row">
-            {cohort.memberUids.map((uid) => (
-              <span
-                key={uid}
-                className={`chip ${uid === cohort.peerLeadUid ? "chip--on" : ""}`}
-              >
-                {cohort.memberNames[uid] ?? "Operator"}
-                {uid === cohort.peerLeadUid ? " · lead" : ""}
+          <h1 className="h1">
+            {cohort.name}
+            {cohort.weeklyStreak > 0 && (
+              <span className="hud__stat hud__stat--fire">
+                <FlameIcon filled size={14} />
+                {cohort.weeklyStreak}w
               </span>
-            ))}
+            )}
+          </h1>
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+            <AvStack
+              names={cohort.memberUids.map(
+                (uid) =>
+                  (cohort.memberNames[uid] ?? "?") +
+                  (uid === cohort.peerLeadUid ? " (lead)" : "")
+              )}
+            />
+            <span className="micro">
+              {cohort.meetingSlot || "no slot"}
+              {cohort.state === "forming" && " · forming"}
+              {cohort.state === "stalled" && " · stalled"}
+            </span>
           </div>
-          {isMember && (
+        </div>
+        {isMember &&
+          (ritualDone ? (
+            <span className="badge badge--earned">
+              <CheckIcon size={11} /> ritual done
+            </span>
+          ) : (
             <button
-              className={`btn ${ritualDone ? "btn--ghost" : "btn--primary"} cohort-head__ritual`}
-              disabled={ritualDone || busy || !profile}
+              className="btn btn--verify"
+              disabled={busy || !profile}
               onClick={() => profile && markRitual(cohort, profile)}
             >
-              {ritualDone ? "Ritual held this week ✓" : "We held our weekly ritual"}
+              We met <span className="num">+25</span>
             </button>
-          )}
-        </div>
-      </section>
+          ))}
+      </header>
 
       {!isMember && !isMentor ? (
-        <section className="dash__section">
-          <p className="dash__empty">
-            You&apos;re not in this squad. Apply from the{" "}
-            <Link href="/cohorts" className="accent">
-              cohort list
-            </Link>
-            .
-          </p>
-        </section>
+        <div className="empty">
+          <p>You&apos;re not in this squad.</p>
+          <Link href="/cohorts" className="btn btn--primary">
+            Find squads
+          </Link>
+        </div>
       ) : (
-        <div className="cohort-grid2">
-          {/* ---- The Ignition Track ---- */}
-          <section className="panel">
-            <div className="panel__head">
-              <h2 className="h3">Ignition Track</h2>
-              <span className="kicker">
-                squad completes at {threshold}/{cohort.memberUids.length} verified
+        <div className="grid2 grid2--wide">
+          {/* ---- The quest path ---- */}
+          <section className="tile">
+            <div className="tile__head">
+              <h2 className="h3">The Track</h2>
+              <span className="path__count">
+                clears at {threshold}/{cohort.memberUids.length}
               </span>
             </div>
 
-            <div className="track">
+            <div className="path">
               {TRACK.map((m) => {
                 const mySub = subs.find(
                   (s) => s.milestoneId === m.id && s.uid === user.uid
@@ -246,182 +249,179 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
                   (m.verifier === "peer_lead" && (isPeerLead || isMentor)) ||
                   (m.verifier === "mentor" && isMentor);
                 const queue = all.filter((s) => s.status === "submitted");
+                const state = squadDone ? "done" : isCurrent ? "active" : "locked";
 
                 return (
-                  <div
-                    key={m.id}
-                    className={`track__item ${squadDone ? "done" : isCurrent ? "active" : ""}`}
-                  >
-                    <div className="track__rail">
-                      <span className="track__dot">
-                        {squadDone ? (
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                            <path d="M20 6L9 17l-5-5" />
-                          </svg>
-                        ) : (
-                          m.id
-                        )}
-                      </span>
-                    </div>
-                    <div className="track__body">
-                      <div className="track__top">
-                        <b>{m.name}</b>
-                        <span className="track__meta">
-                          {m.week} · {m.xp} XP ·{" "}
-                          {m.verifier === "peer_lead" ? "peer-lead verifies" : "mentor verifies"}
-                        </span>
+                  <div key={m.id} className={`path__item ${state}`}>
+                    <span className="path__node">
+                      {squadDone ? <CheckIcon size={18} /> : m.id}
+                    </span>
+                    <div className="path__body">
+                      <div className="path__top">
+                        <span className="path__name">{m.name}</span>
+                        <div className="path__meta">
+                          <span className="xp">+{m.xp}</span>
+                          <span className="path__count">
+                            {verified}/{cohort.memberUids.length}
+                          </span>
+                        </div>
                       </div>
-                      <p className="track__why">{m.why}</p>
 
                       {(isCurrent || mySub) && (
-                        <p className="track__evidence">
-                          <b>Evidence:</b> {m.evidence}{" "}
-                          <span className="track__effort">(~{m.effort})</span>
-                        </p>
-                      )}
+                        <div className="path__detail">
+                          <p className="path__evidence">
+                            <b>Proof:</b> {m.evidence}{" "}
+                            <span className="muted">(~{m.effort})</span>
+                          </p>
 
-                      <div className="track__squad">
-                        {verified}/{cohort.memberUids.length} verified
-                        {all.filter((s) => s.status === "submitted").length > 0 &&
-                          ` · ${all.filter((s) => s.status === "submitted").length} awaiting review`}
-                      </div>
-
-                      {/* My state on this milestone */}
-                      {isMember && (
-                        <>
-                          {mySub?.status === "verified" && (
-                            <span className="track__mine track__mine--ok">
-                              Verified by {mySub.verifierName} · +{m.xp} XP — share your proof card
-                            </span>
-                          )}
-                          {mySub?.status === "submitted" && (
-                            <span className="track__mine">
-                              Submitted — awaiting {m.verifier === "peer_lead" ? "peer-lead" : "mentor"} review (48h SLA)
-                            </span>
-                          )}
-                          {mySub?.status === "returned" && (
-                            <div className="track__returned">
-                              <span>
-                                Returned — not rejected: <i>{mySub.returnReason}</i>
-                              </span>
-                              {submitFor !== m.id && (
-                                <button
-                                  className="btn btn--ghost track__btn"
-                                  onClick={() => {
-                                    setSubmitFor(m.id);
-                                    setEvidenceUrl(mySub.evidenceUrl);
-                                    setNote(mySub.note);
-                                  }}
-                                >
-                                  Resubmit
-                                </button>
+                          {/* My state on this milestone */}
+                          {isMember && (
+                            <>
+                              {mySub?.status === "verified" && (
+                                <span className="path__state path__state--ok pop">
+                                  <CheckIcon size={12} /> Verified by {mySub.verifierName}
+                                </span>
                               )}
-                            </div>
-                          )}
-                          {!mySub && isCurrent && submitFor !== m.id && (
-                            <button
-                              className="btn btn--primary track__btn"
-                              disabled={consentPending}
-                              onClick={() => {
-                                setSubmitFor(m.id);
-                                setEvidenceUrl("");
-                                setNote("");
-                              }}
-                            >
-                              Submit evidence
-                            </button>
-                          )}
-                          {submitFor === m.id && (
-                            <div className="track__form">
-                              <input
-                                autoFocus
-                                value={evidenceUrl}
-                                onChange={(e) => setEvidenceUrl(e.target.value)}
-                                placeholder="Link to your evidence (doc, screenshots, live URL)"
-                                maxLength={500}
-                              />
-                              <textarea
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
-                                placeholder="What should the verifier look at?"
-                                maxLength={500}
-                              />
-                              <div className="row-actions">
-                                <button className="btn btn--ghost" onClick={() => setSubmitFor(null)}>
-                                  Cancel
-                                </button>
-                                <button
-                                  className="btn btn--primary"
-                                  disabled={busy || !evidenceUrl.trim()}
-                                  onClick={() => sendSubmission(m.id)}
-                                >
-                                  {busy ? "Sending…" : "Submit for verification"}
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      )}
-
-                      {/* Verification queue for whoever can verify */}
-                      {canIVerify && queue.length > 0 && (
-                        <div className="track__queue">
-                          {queue.map((s) => {
-                            const key = `${s.milestoneId}_${s.uid}`;
-                            return (
-                              <div key={key} className="track__queue-row">
-                                <div className="track__queue-body">
-                                  <b>{s.name}</b>
-                                  <a href={s.evidenceUrl} target="_blank" rel="noreferrer" className="accent">
-                                    evidence
-                                  </a>
-                                  {s.note && <p>{s.note}</p>}
-                                </div>
-                                {returning === key ? (
-                                  <div className="track__form">
-                                    <input
-                                      autoFocus
-                                      value={returnReason}
-                                      onChange={(e) => setReturnReason(e.target.value)}
-                                      placeholder="What's missing, specifically?"
-                                      maxLength={300}
-                                    />
-                                    <div className="row-actions">
-                                      <button className="btn btn--ghost" onClick={() => setReturning(null)}>
-                                        Cancel
-                                      </button>
-                                      <button
-                                        className="btn btn--primary"
-                                        disabled={busy || !returnReason.trim()}
-                                        onClick={() => decide(s, "returned")}
-                                      >
-                                        Return with reason
-                                      </button>
-                                    </div>
-                                  </div>
-                                ) : (
-                                  <div className="row-actions">
+                              {mySub?.status === "submitted" && (
+                                <span className="path__state">
+                                  In review — {m.verifier === "peer_lead" ? "peer lead" : "mentor"}
+                                </span>
+                              )}
+                              {mySub?.status === "returned" && (
+                                <>
+                                  <span className="path__state path__state--warn">
+                                    Returned: {mySub.returnReason}
+                                  </span>
+                                  {submitFor !== m.id && (
                                     <button
-                                      className="btn btn--primary track__btn"
-                                      disabled={busy}
-                                      onClick={() => decide(s, "verified")}
-                                    >
-                                      Verify · +{m.xp} XP
-                                    </button>
-                                    <button
-                                      className="btn btn--ghost track__btn"
+                                      className="btn btn--ghost btn--sm"
                                       onClick={() => {
-                                        setReturning(key);
-                                        setReturnReason("");
+                                        setSubmitFor(m.id);
+                                        setEvidenceUrl(mySub.evidenceUrl);
+                                        setNote(mySub.note);
                                       }}
                                     >
-                                      Return
+                                      Fix &amp; resend
+                                    </button>
+                                  )}
+                                </>
+                              )}
+                              {!mySub && isCurrent && submitFor !== m.id && (
+                                <button
+                                  className="btn btn--primary btn--sm"
+                                  disabled={consentPending}
+                                  onClick={() => {
+                                    setSubmitFor(m.id);
+                                    setEvidenceUrl("");
+                                    setNote("");
+                                  }}
+                                >
+                                  Submit proof
+                                </button>
+                              )}
+                              {submitFor === m.id && (
+                                <div className="path__form">
+                                  <input
+                                    className="input"
+                                    autoFocus
+                                    value={evidenceUrl}
+                                    onChange={(e) => setEvidenceUrl(e.target.value)}
+                                    placeholder="Link your proof"
+                                    maxLength={500}
+                                  />
+                                  <textarea
+                                    className="input"
+                                    value={note}
+                                    onChange={(e) => setNote(e.target.value)}
+                                    placeholder="What should they look at?"
+                                    maxLength={500}
+                                  />
+                                  <div className="row-actions" style={{ marginTop: 0 }}>
+                                    <button
+                                      className="btn btn--ghost btn--sm"
+                                      onClick={() => setSubmitFor(null)}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      className="btn btn--primary btn--sm"
+                                      disabled={busy || !evidenceUrl.trim()}
+                                      onClick={() => sendSubmission(m.id)}
+                                    >
+                                      {busy ? "…" : "Send"}
                                     </button>
                                   </div>
-                                )}
-                              </div>
-                            );
-                          })}
+                                </div>
+                              )}
+                            </>
+                          )}
+
+                          {/* Verification queue for whoever can verify */}
+                          {canIVerify && queue.length > 0 && (
+                            <div className="path__queue">
+                              {queue.map((s) => {
+                                const key = `${s.milestoneId}_${s.uid}`;
+                                return (
+                                  <div key={key} className="path__queue-row">
+                                    <div className="path__queue-who">
+                                      <Avatar name={s.name} size="sm" />
+                                      {s.name}
+                                      <a href={s.evidenceUrl} target="_blank" rel="noreferrer">
+                                        proof
+                                      </a>
+                                    </div>
+                                    {s.note && <p className="path__queue-note">{s.note}</p>}
+                                    {returning === key ? (
+                                      <div className="path__form">
+                                        <input
+                                          className="input"
+                                          autoFocus
+                                          value={returnReason}
+                                          onChange={(e) => setReturnReason(e.target.value)}
+                                          placeholder="What's missing, specifically?"
+                                          maxLength={300}
+                                        />
+                                        <div className="row-actions" style={{ marginTop: 0 }}>
+                                          <button
+                                            className="btn btn--ghost btn--sm"
+                                            onClick={() => setReturning(null)}
+                                          >
+                                            Cancel
+                                          </button>
+                                          <button
+                                            className="btn btn--ink btn--sm"
+                                            disabled={busy || !returnReason.trim()}
+                                            onClick={() => decide(s, "returned")}
+                                          >
+                                            Return
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="row-actions" style={{ marginTop: 0 }}>
+                                        <button
+                                          className="btn btn--verify btn--sm"
+                                          disabled={busy}
+                                          onClick={() => decide(s, "verified")}
+                                        >
+                                          Verify <span className="num">+{m.xp}</span>
+                                        </button>
+                                        <button
+                                          className="btn btn--ghost btn--sm"
+                                          onClick={() => {
+                                            setReturning(key);
+                                            setReturnReason("");
+                                          }}
+                                        >
+                                          Return
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -431,19 +431,21 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
             </div>
           </section>
 
-          <div className="cohort-side">
+          <div className="stack">
             {/* ---- Build log ---- */}
-            <section className="panel">
-              <div className="panel__head">
+            <section className="tile">
+              <div className="tile__head">
                 <h2 className="h3">Build log</h2>
-                <span className="kicker">+10 XP · keeps your streak alive</span>
+                <span className="xp">+10/day</span>
               </div>
               {isMember && (
-                <div className="log-composer">
-                  <textarea
+                <div className="composer">
+                  <input
+                    className="input"
                     value={logText}
                     onChange={(e) => setLogText(e.target.value)}
-                    placeholder="What did you do today? One line counts."
+                    onKeyDown={(e) => e.key === "Enter" && !busy && logText.trim() && postLog()}
+                    placeholder="One line. What shipped?"
                     maxLength={300}
                     disabled={consentPending}
                   />
@@ -452,24 +454,21 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
                     disabled={busy || !logText.trim() || consentPending}
                     onClick={postLog}
                   >
-                    Post
+                    Ship
                   </button>
                 </div>
               )}
               {logs.length === 0 ? (
-                <p className="dash__empty">
-                  Nothing yet. The squad&apos;s pulse shows up here.
+                <p className="empty" style={{ marginTop: 12 }}>
+                  Quiet so far.
                 </p>
               ) : (
-                <div className="log-feed">
+                <div className="feed">
                   {logs.map((l) => (
-                    <div key={l.id} className="log-row">
-                      <span className="side__av" aria-hidden="true">
-                        {l.name.slice(0, 1)}
-                      </span>
-                      <div>
-                        <b>{l.name}</b>
-                        <span className="log-row__day"> · {l.day}</span>
+                    <div key={l.id} className="feed__row">
+                      <Avatar name={l.name} size="sm" />
+                      <div className="feed__body">
+                        <b>{l.name}</b> <span className="feed__day">{l.day}</span>
                         <p>{l.text}</p>
                       </div>
                     </div>
@@ -480,17 +479,18 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
 
             {/* ---- Applications ---- */}
             {isMember && apps.length > 0 && (
-              <section className="panel">
-                <div className="panel__head">
-                  <h2 className="h3">Applications</h2>
-                  <span className="kicker">{apps.length} pending</span>
+              <section className="tile tile--ember">
+                <div className="tile__head">
+                  <h2 className="h3">Wants in</h2>
+                  <span className="badge badge--level">{apps.length}</span>
                 </div>
-                <div className="app-list">
+                <div className="stack" style={{ gap: 14 }}>
                   {apps.map((a) => (
-                    <div key={a.applicantUid} className="app-row">
-                      <div className="app-row__body">
+                    <div key={a.applicantUid}>
+                      <div className="path__queue-who">
+                        <Avatar name={a.applicantName} size="sm" />
                         <button
-                          className="app-row__name"
+                          className="link-btn"
                           onClick={() => {
                             setViewingApp(a);
                             getProfile(a.applicantUid).then(setViewing).catch(() => {});
@@ -498,14 +498,12 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
                         >
                           {a.applicantName}
                         </button>
-                        <span className="app-row__hours kicker">
-                          {a.hours} hrs/week
-                        </span>
-                        {a.pitch && <p className="app-row__pitch">{a.pitch}</p>}
+                        <span className="micro">{a.hours}h/wk</span>
                       </div>
+                      {a.pitch && <p className="path__queue-note">{a.pitch}</p>}
                       {isFounder &&
                         (declining === a.applicantUid ? (
-                          <div className="chip-row">
+                          <div className="chip-row" style={{ marginTop: 8 }}>
                             {(Object.keys(DECLINE_LABELS) as DeclineReason[]).map((r) => (
                               <button
                                 key={r}
@@ -523,16 +521,16 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
                             </button>
                           </div>
                         ) : (
-                          <div className="app-row__actions">
+                          <div className="row-actions" style={{ marginTop: 8 }}>
                             <button
-                              className="btn btn--primary app-row__btn"
+                              className="btn btn--verify btn--sm"
                               disabled={cohort.memberUids.length >= 8}
                               onClick={() => decideApplication(cohort, a, true)}
                             >
                               Accept
                             </button>
                             <button
-                              className="btn btn--ghost app-row__btn"
+                              className="btn btn--ghost btn--sm"
                               onClick={() => setDeclining(a.applicantUid)}
                             >
                               Decline
@@ -565,35 +563,44 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
                 setViewing(null);
                 setViewingApp(null);
               }}
+              aria-label="Close"
             >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
                 <path d="M18 6L6 18M6 6l12 12" />
               </svg>
             </button>
-            <h3>{viewing.name}</h3>
-            <p className="modal__sub">
-              {viewing.ageBand} · {viewing.country}
-              {viewingApp ? ` · ${viewingApp.hours} hrs/week` : ""} ·{" "}
-              {viewing.stage}
-            </p>
-            {viewing.headline && <p className="profile-view__headline">{viewing.headline}</p>}
-            <div className="field">
-              <label>Building</label>
-              <p className="profile-view__text">{viewing.building}</p>
+            <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+              <Avatar name={viewing.name} size="lg" />
+              <div>
+                <h3 style={{ marginBottom: 0 }}>{viewing.name}</h3>
+                <span className="micro">
+                  {viewing.ageBand} · {viewing.country}
+                  {viewingApp ? ` · ${viewingApp.hours}h/wk` : ""} · {viewing.stage}
+                </span>
+              </div>
             </div>
+            {viewing.headline && (
+              <p style={{ fontWeight: 700, marginBottom: 14 }}>{viewing.headline}</p>
+            )}
+            {viewing.building && (
+              <div className="field">
+                <label>Building</label>
+                <p className="muted" style={{ fontSize: 15 }}>{viewing.building}</p>
+              </div>
+            )}
             {viewing.proofUrl && (
               <div className="field">
-                <label>Proof of work</label>
-                <p className="profile-view__text">
-                  <a href={viewing.proofUrl} target="_blank" rel="noreferrer" className="accent">
+                <label>Proof</label>
+                <p style={{ fontSize: 15 }}>
+                  <a href={viewing.proofUrl} target="_blank" rel="noreferrer" className="link-btn">
                     {viewing.proofUrl}
                   </a>
-                  {viewing.proofNote && <> — {viewing.proofNote}</>}
+                  {viewing.proofNote && <span className="muted"> — {viewing.proofNote}</span>}
                 </p>
               </div>
             )}
             <div className="field">
-              <label>Interests</label>
+              <label>Into</label>
               <div className="chip-row">
                 {viewing.skills.map((s) => (
                   <span key={s} className="chip">
@@ -605,7 +612,7 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
             {viewing.bio && (
               <div className="field">
                 <label>Bio</label>
-                <p className="profile-view__text">{viewing.bio}</p>
+                <p className="muted" style={{ fontSize: 15 }}>{viewing.bio}</p>
               </div>
             )}
           </div>

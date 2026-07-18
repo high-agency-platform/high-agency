@@ -34,100 +34,90 @@ export default function LearnPage() {
   if (!user || !profile) return null;
 
   return (
-    <div className="page">
-      <header className="masthead">
-        <div className="masthead__index">
-          <span className="eyebrow">
-            <span className="dot" /> Live, not lectures
-          </span>
-        </div>
-        <h1 className="masthead__title">Workshops</h1>
-        <div className="masthead__sub">
-          <p className="lead">
-            One live workshop per track milestone, taught by practitioners.
-            Attend live for +50 XP — recordings land here after each session.
-          </p>
-        </div>
+    <div className="screen">
+      <header className="screen__head">
+        <h1 className="h1">Learn</h1>
+        <span className="xp">live = +50</span>
       </header>
 
-      <section className="page__block">
-        <h2 className="h3 page__subhead">Upcoming sessions</h2>
-        <div className="panel">
-          {workshops === null ? (
-            <p className="dash__empty">Loading…</p>
-          ) : workshops.length === 0 ? (
-            <p className="dash__empty">Nothing scheduled.</p>
-          ) : (
-            <WorkshopList
-              workshops={workshops}
-              profile={profile}
-              onEnroll={(w) => enrollWorkshop(profile.uid, w.id).catch(() => {})}
-              onAttend={(w) => markAttended(profile, w.id).catch(() => {})}
-            />
-          )}
+      <section className="tile screen__block">
+        <div className="tile__head">
+          <h2 className="h3">Live sessions</h2>
         </div>
+        {workshops === null ? (
+          <p className="empty">Loading…</p>
+        ) : workshops.length === 0 ? (
+          <p className="empty">Nothing scheduled.</p>
+        ) : (
+          <WorkshopList
+            workshops={workshops}
+            profile={profile}
+            onEnroll={(w) => enrollWorkshop(profile.uid, w.id).catch(() => {})}
+            onAttend={(w) => markAttended(profile, w.id).catch(() => {})}
+          />
+        )}
       </section>
 
       {recordings.length > 0 && (
-        <section className="page__block">
-          <h2 className="h3 page__subhead">Recordings</h2>
-          <p className="dash__empty page__note">
-            Missed one live? Catch up on demand.
-          </p>
-          <div className="panel">
-            <div className="wlist">
-              {recordings.map((w) => (
-                <div key={w.id} className="wrow">
-                  <div className="wrow__when">
-                    {w.startsAt.toDate().toLocaleDateString(undefined, {
-                      month: "short",
-                      day: "numeric",
-                    })}
+        <section className="tile screen__block">
+          <div className="tile__head">
+            <h2 className="h3">Replays</h2>
+          </div>
+          <div>
+            {recordings.map((w) => {
+              const d = w.startsAt.toDate();
+              return (
+                <div key={w.id} className="ses">
+                  <div className="ses__date">
+                    <b>{d.getDate()}</b>
+                    <span>{d.toLocaleDateString(undefined, { month: "short" })}</span>
                   </div>
-                  <div className="wrow__body">
-                    <span className="wrow__title">{w.title}</span>
-                    <span className="wrow__mentor">
-                      {w.kind === "office_hours" ? "Office hours" : "Workshop"} ·{" "}
-                      {w.mentorName}
-                    </span>
+                  <div className="ses__body">
+                    <span className="ses__title">{w.title}</span>
+                    <span className="ses__meta">{w.mentorName}</span>
                   </div>
-                  <a
-                    className="btn btn--ghost wrow__join"
-                    href={w.recordingUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Watch
-                  </a>
+                  <div className="ses__act">
+                    <a
+                      className="btn btn--ghost btn--sm"
+                      href={w.recordingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Watch
+                    </a>
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </section>
       )}
 
-      <section className="page__block">
-        <h2 className="h3 page__subhead">The season map</h2>
-        <p className="dash__empty page__note">
-          Eight weeks, seven milestones. Each workshop teaches the milestone
-          you&apos;re about to hit.
-        </p>
-        <div className="season-map">
+      <section className="tile screen__block">
+        <div className="tile__head">
+          <h2 className="h3">The season</h2>
+          <span className="path__count">8 weeks · 7 milestones</span>
+        </div>
+        <div className="path">
           {TRACK.map((m) => {
             const linked = (workshops ?? []).find((w) => w.milestoneId === m.id);
             return (
-              <div key={m.id} className="season-map__row">
-                <span className="season-map__week">{m.week}</span>
-                <div className="season-map__body">
-                  <b>{m.name}</b>
-                  <small>{m.why}</small>
+              <div key={m.id} className="path__item">
+                <span className="path__node">{m.id}</span>
+                <div className="path__body">
+                  <div className="path__top">
+                    <span className="path__name">{m.name}</span>
+                    <div className="path__meta">
+                      <span className="xp">+{m.xp}</span>
+                      <span className="path__count">{m.week}</span>
+                    </div>
+                  </div>
                   {linked && (
-                    <small className="season-map__ws">
-                      Workshop: {linked.title} · {linked.mentorName}
-                    </small>
+                    <span className="micro" style={{ display: "block", marginTop: 4 }}>
+                      ⚡ {linked.title} · {linked.mentorName}
+                    </span>
                   )}
                 </div>
-                <span className="season-map__xp">{m.xp} XP</span>
               </div>
             );
           })}

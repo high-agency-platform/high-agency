@@ -6,6 +6,7 @@ import Counter from "./components/Counter";
 import Marquee from "./components/Marquee";
 import Faq from "./components/Faq";
 import ApplyModal from "./components/ApplyModal";
+import { CheckIcon, FlameIcon, SquadIcon, ZapIcon } from "./components/ui";
 import { PLATFORM_ENABLED } from "./lib/flags";
 
 function CaptureForm({
@@ -25,6 +26,8 @@ function CaptureForm({
       }}
     >
       <div className="capture__field">
+        {/* Password-manager extensions rewrite autocomplete on email fields
+            before React hydrates; the mismatch is attribute-only noise. */}
         <input
           type="email"
           name="email"
@@ -33,6 +36,7 @@ function CaptureForm({
           aria-label="Email address"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          suppressHydrationWarning
         />
       </div>
       <button type="submit" className="btn btn--primary">
@@ -92,7 +96,7 @@ export default function Waitlist() {
       <main id="top">
         {/* ===================== HERO ===================== */}
         <section className="hero">
-          <div className="wrap hero__grid">
+          <div className="wrap">
             <div className="hero__copy">
               <Reveal className="eyebrow hero__tag">
                 <span className="dot" />
@@ -104,11 +108,11 @@ export default function Waitlist() {
                 You weren&apos;t built to wait.
               </Reveal>
               <Reveal as="p" className="lead hero__sub" d={2}>
-                For operators who&apos;d rather <span className="em">build</span>{" "}
-                than study.
+                For 13–19s who&apos;d rather <b>build</b> than study. Real
+                milestones, a real squad, verified by real humans.
               </Reveal>
               <Reveal d={2}>
-                <CaptureForm label="Request Access" onApply={openModal} />
+                <CaptureForm label="Request access" onApply={openModal} />
               </Reveal>
               <Reveal className="capture__note" d={3}>
                 <span><b>By application</b> · Free · Ages 13–19</span>
@@ -117,7 +121,7 @@ export default function Waitlist() {
           </div>
         </section>
 
-        {/* proof strip, infinite marquee */}
+        {/* proof strip */}
         <div className="strip">
           <Marquee />
         </div>
@@ -138,39 +142,35 @@ export default function Waitlist() {
               </Reveal>
             </div>
 
-            <div className="dossier">
-              <div className="stat">
+            <div className="statgrid">
+              <Reveal className="tile stat" d={1}>
                 <div className="stat__n">
                   <Counter to={75} />
                   <span className="u">%</span>
                 </div>
                 <div className="stat__d">feel unprepared for real decisions.</div>
-                <span className="stat__tag">01</span>
-              </div>
-              <div className="stat">
+              </Reveal>
+              <Reveal className="tile stat" d={1}>
                 <div className="stat__n">
                   <Counter to={3} />
                   <span className="u">/4</span>
                 </div>
                 <div className="stat__d">say school feels meaningless.</div>
-                <span className="stat__tag">02</span>
-              </div>
-              <div className="stat">
+              </Reveal>
+              <Reveal className="tile stat" d={2}>
                 <div className="stat__n">
                   <Counter to={22} />
                   <span className="u">%</span>
                 </div>
                 <div className="stat__d">feel a real sense of purpose.</div>
-                <span className="stat__tag">03</span>
-              </div>
-              <div className="stat">
+              </Reveal>
+              <Reveal className="tile stat" d={2}>
                 <div className="stat__n">
                   &lt;<Counter to={10} />
                   <span className="u">%</span>
                 </div>
                 <div className="stat__d">of unis teach any AI literacy.</div>
-                <span className="stat__tag">04</span>
-              </div>
+              </Reveal>
             </div>
 
             <Reveal as="p" className="problem__punch" d={2}>
@@ -182,7 +182,7 @@ export default function Waitlist() {
 
         <div className="divider" />
 
-        {/* ===================== THE SYSTEM / PILLARS ===================== */}
+        {/* ===================== WHAT YOU JOIN ===================== */}
         <section className="section" id="system">
           <div className="wrap">
             <div className="shead">
@@ -195,39 +195,29 @@ export default function Waitlist() {
               </Reveal>
             </div>
 
-            <div className="pillars">
-              <Reveal as="article" className="pillar" d={1}>
-                <div className="pillar__ic">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <path d="M12 2C9 6 7 8 7 13a5 5 0 0 0 10 0c0-2-1-3.5-2-5-.5 1.5-1.5 2-2.5 2 .5-3-.5-6-.5-8Z" />
-                  </svg>
-                </div>
-                <h3 className="h3">Ignition</h3>
-                <p>Live workshops + office hours with operators who&apos;ve done it.</p>
+            <div className="loop">
+              <Reveal as="article" className="tile loop__card" d={1}>
+                <span className="loop__n">
+                  <SquadIcon size={20} />
+                </span>
+                <h3 className="h3">Your squad</h3>
+                <p>3–8 builders, one weekly ritual. They notice when you ghost.</p>
               </Reveal>
 
-              <Reveal as="article" className="pillar" d={2}>
-                <div className="pillar__ic">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <circle cx="12" cy="12" r="9" />
-                    <circle cx="12" cy="12" r="3.4" />
-                    <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
-                  </svg>
-                </div>
-                <h3 className="h3">Operational Zone</h3>
-                <p>Real milestones, verified by a mentor — never a quiz.</p>
+              <Reveal as="article" className="tile loop__card" d={2}>
+                <span className="loop__n">
+                  <CheckIcon size={20} />
+                </span>
+                <h3 className="h3">Real milestones</h3>
+                <p>Ship an MVP, land users, get paid — verified by a human, never a quiz.</p>
               </Reveal>
 
-              <Reveal as="article" className="pillar" d={3}>
-                <div className="pillar__ic">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <circle cx="8" cy="9" r="3" />
-                    <circle cx="16" cy="9" r="3" />
-                    <path d="M3 19c0-2.8 2.2-5 5-5M21 19c0-2.8-2.2-5-5-5M9.5 19h5" />
-                  </svg>
-                </div>
-                <h3 className="h3">Unit</h3>
-                <p>A founding team of 5–6, building one real thing together.</p>
+              <Reveal as="article" className="tile loop__card" d={3}>
+                <span className="loop__n">
+                  <ZapIcon size={20} />
+                </span>
+                <h3 className="h3">Live mentors</h3>
+                <p>Workshops and office hours with operators who&apos;ve done it.</p>
               </Reveal>
             </div>
           </div>
@@ -238,8 +228,8 @@ export default function Waitlist() {
         {/* ===================== HOW IT WORKS ===================== */}
         <section className="section">
           <div className="wrap how">
-            <div className="how__copy">
-              <div className="shead" style={{ marginBottom: 0 }}>
+            <div>
+              <div className="shead" style={{ marginBottom: 24 }}>
                 <Reveal className="eyebrow">
                   <span className="dot" />
                   The loop
@@ -249,73 +239,85 @@ export default function Waitlist() {
                   <br />
                   Momentum out.
                 </Reveal>
+                <Reveal as="p" className="lead" d={2}>
+                  Eight weeks. Seven milestones. Every one is a real-world win —
+                  and every win is XP, levels, and status you earned, not bought.
+                </Reveal>
               </div>
-              <Reveal className="steps" d={2}>
-                <div className="step">
-                  <div className="step__n">01</div>
-                  <div>
-                    <h3 className="h3">Apply &amp; get matched</h3>
-                    <p>Apply, then get placed in a Unit.</p>
-                  </div>
-                </div>
-                <div className="step">
-                  <div className="step__n">02</div>
-                  <div>
-                    <h3 className="h3">Hit real milestones</h3>
-                    <p>Verified by a mentor, not a quiz.</p>
-                  </div>
-                </div>
-                <div className="step">
-                  <div className="step__n">03</div>
-                  <div>
-                    <h3 className="h3">Ship something real</h3>
-                    <p>Leave with a launched product and first revenue.</p>
-                  </div>
-                </div>
+              <Reveal d={2}>
+                <CaptureForm label={applyLabel} onApply={openModal} />
               </Reveal>
             </div>
 
-            {/* track map */}
-            <Reveal className="track" d={2} aria-hidden="true">
-              <div className="track__head">
-                <span className="track__title">Unit · Skill Track</span>
+            {/* the actual product visual: a quest path */}
+            <Reveal className="tile demo-path" d={2} aria-hidden="true">
+              <div className="micro">
+                <span>The Ignition Track</span>
                 <span className="live">
                   <span className="blip" />
-                  IN PROGRESS
+                  live
                 </span>
               </div>
-              <div className="node done">
-                <span className="node__dot">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <path d="M5 12l5 5L19 7" />
-                  </svg>
+              <div className="path">
+                <div className="path__item done">
+                  <span className="path__node"><CheckIcon size={18} /></span>
+                  <div className="path__body">
+                    <div className="path__top">
+                      <span className="path__name">Mission locked</span>
+                      <span className="xp">+100</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="path__item done">
+                  <span className="path__node"><CheckIcon size={18} /></span>
+                  <div className="path__body">
+                    <div className="path__top">
+                      <span className="path__name">20 cold asks out</span>
+                      <span className="xp">+150</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="path__item active">
+                  <span className="path__node">3</span>
+                  <div className="path__body">
+                    <div className="path__top">
+                      <span className="path__name">MVP live</span>
+                      <div className="path__meta">
+                        <span className="xp">+250</span>
+                        <span className="badge badge--level">you are here</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="path__item locked">
+                  <span className="path__node">4</span>
+                  <div className="path__body">
+                    <div className="path__top">
+                      <span className="path__name">First users</span>
+                      <span className="path__count">locked</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="path__item locked">
+                  <span className="path__node">5</span>
+                  <div className="path__body">
+                    <div className="path__top">
+                      <span className="path__name">First revenue</span>
+                      <span className="path__count">locked</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
+                <span className="hud__stat hud__stat--fire">
+                  <FlameIcon filled size={14} /> 12
                 </span>
-                <span className="node__label">Form your Unit</span>
-                <span className="node__meta">Verified</span>
-              </div>
-              <div className="node done">
-                <span className="node__dot">
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <path d="M5 12l5 5L19 7" />
-                  </svg>
+                <span className="hud__stat hud__stat--xp">
+                  <ZapIcon size={13} /> 480
                 </span>
-                <span className="node__label">Define the initiative</span>
-                <span className="node__meta">Verified</span>
-              </div>
-              <div className="node active">
-                <span className="node__dot" />
-                <span className="node__label">Ship your MVP</span>
-                <span className="node__meta">Active</span>
-              </div>
-              <div className="node locked">
-                <span className="node__dot" />
-                <span className="node__label">Land your first user</span>
-                <span className="node__meta">Locked</span>
-              </div>
-              <div className="node locked">
-                <span className="node__dot" />
-                <span className="node__label">First $100 MRR</span>
-                <span className="node__meta">Locked</span>
+                <span className="badge badge--earned">
+                  <CheckIcon size={11} /> verified by a human
+                </span>
               </div>
             </Reveal>
           </div>
@@ -337,7 +339,7 @@ export default function Waitlist() {
                 <div className="rl">Founder &amp; Lead Mentor · High Agency</div>
               </div>
             </Reveal>
-            <div className="mentor__copy">
+            <div>
               <Reveal className="eyebrow">
                 <span className="dot" />
                 Who you learn from
@@ -376,7 +378,7 @@ export default function Waitlist() {
         <section className="section" id="faq">
           <div className="wrap faq-grid">
             <div className="faq-grid__head">
-              <Reveal className="eyebrow" style={{ marginBottom: 18 }}>
+              <Reveal className="eyebrow" style={{ marginBottom: 16 }}>
                 <span className="dot" />
                 Before you apply
               </Reveal>
@@ -398,14 +400,14 @@ export default function Waitlist() {
                 <span className="dot" />
                 Applications open
               </Reveal>
-              <Reveal as="h2" d={1}>
+              <Reveal as="h2" className="h2" d={1}>
                 Ambition is the only prerequisite.
               </Reveal>
               <Reveal as="p" className="lead" d={2}>
                 Stop rehearsing. Start building.
               </Reveal>
               <Reveal d={2}>
-                <CaptureForm label="Apply Now" onApply={openModal} />
+                <CaptureForm label="Apply now" onApply={openModal} />
               </Reveal>
               <Reveal className="capture__note" d={3}>
                 <span><b>By application</b> · Free</span>
