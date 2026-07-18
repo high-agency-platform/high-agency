@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- High Agency mark: an arrow breaking out of its frame. Ink #211C17, Ember #FF5A1E -->
+  <defs>
+    <mask id="breakout">
+      <rect width="512" height="512" fill="white"/>
+      <polygon points="132.28,500.28 424.36,208.21 458.3,242.15 488,88 333.85,117.7 367.79,151.64 75.72,443.72" fill="black" stroke="black" stroke-width="48" stroke-linejoin="miter"/>
+    </mask>
+  </defs>
+  <rect x="112" y="176" width="288" height="288" rx="10" fill="none" stroke="#211C17" stroke-width="30" mask="url(#breakout)"/>
+  <polygon points="132.28,500.28 424.36,208.21 458.3,242.15 488,88 333.85,117.7 367.79,151.64 75.72,443.72" fill="#FF5A1E"/>
+</svg>
