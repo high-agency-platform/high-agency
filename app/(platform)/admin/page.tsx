@@ -374,7 +374,9 @@ export default function AdminPage() {
             : "Email sent"
           : res.error === "no-parent-email"
             ? "No parent email on file"
-            : "Couldn't send — try again",
+            : res.error === "rate-limited"
+              ? `Sent recently — wait ${res.retryAfter ?? 60}s`
+              : "Couldn't send — try again",
       }));
     } catch {
       setResendState((s) => ({ ...s, [uid]: "Couldn't send — try again" }));

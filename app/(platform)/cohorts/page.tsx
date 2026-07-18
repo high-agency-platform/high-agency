@@ -15,6 +15,7 @@ import {
 import { rankCohorts } from "../../lib/match";
 import { DOMAINS, SKILLS, DECLINE_LABELS } from "../../lib/types";
 import { AvStack, FlameIcon, LockIcon } from "../../components/ui";
+import { SquadRoster } from "../../components/SquadRoster";
 import type { Cohort, CohortApplication, WeeklyHours } from "../../lib/types";
 
 const HOURS: WeeklyHours[] = ["<3", "3-5", "5-10", "10+"];
@@ -271,7 +272,7 @@ export default function CohortsPage() {
                   <span className="sq__name">{c.name}</span>
                   {c.weeklyStreak > 0 && (
                     <span className="hud__stat hud__stat--fire">
-                      <FlameIcon filled size={14} />
+                      <FlameIcon size={14} />
                       {c.weeklyStreak}w
                     </span>
                   )}
@@ -333,10 +334,7 @@ export default function CohortsPage() {
                 <article key={c.id} className="tile sq">
                   <div className="sq__top">
                     <span className="sq__name">{c.name}</span>
-                    <AvStack
-                      names={c.memberUids.map((u) => c.memberNames[u] ?? "?")}
-                      max={4}
-                    />
+                    <SquadRoster uids={c.memberUids} names={c.memberNames} />
                   </div>
                   <p className="sq__mission">{c.mission}</p>
                   {(why.length > 0 || c.tags.length > 0 || (c.lookingFor ?? []).length > 0) && (

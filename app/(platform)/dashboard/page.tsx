@@ -10,12 +10,15 @@ import {
   watchBuildLogs,
   addBuildLog,
   getUpcomingWorkshops,
+  enrollWorkshop,
+  markAttended,
 } from "../../lib/db";
 import { localDay } from "../../lib/gamify";
 import { TRACK } from "../../lib/milestones";
 import type { Cohort, MilestoneSubmission, BuildLog, Workshop } from "../../lib/types";
 import { Avatar, AvStack, Bar, CheckIcon, FlameIcon, LockIcon } from "../../components/ui";
-import { WorkshopList } from "../../components/WorkshopList";
+import { WeekCal } from "../../components/WeekCal";
+import { ConsentResend } from "../../components/ConsentResend";
 
 export default function HomePage() {
   const { user, profile } = useAuth();
@@ -98,6 +101,7 @@ export default function HomePage() {
             Waiting on your parent&apos;s OK.
             <small>They got an email — everything unlocks after.</small>
           </span>
+          <ConsentResend sentAtMs={profile.consentEmailSentAt?.toMillis()} />
         </div>
       )}
 
@@ -114,7 +118,7 @@ export default function HomePage() {
                     </>
                   ) : (
                     <>
-                      <span className="flame flame--on"><FlameIcon filled /></span> Ship one line
+                      <span className="flame"><FlameIcon /></span> Ship one line
                     </>
                   )}
                 </h2>
@@ -190,7 +194,7 @@ export default function HomePage() {
                 <span className="sq__name">{cohort.name}</span>
                 {cohort.weeklyStreak > 0 && (
                   <span className="hud__stat hud__stat--fire">
-                    <FlameIcon filled size={14} />
+                    <FlameIcon size={14} />
                     {cohort.weeklyStreak}w
                   </span>
                 )}
@@ -207,11 +211,12 @@ export default function HomePage() {
                   All
                 </Link>
               </div>
-              {workshops.length === 0 ? (
-                <p className="empty">Nothing yet.</p>
-              ) : (
-                <WorkshopList workshops={workshops.slice(0, 3)} />
-              )}
+              <WeekCal
+                workshops={workshops}
+                profile={profile}
+                onEnroll={(w) => enrollWorkshop(profile.uid, w.id).catch(() => {})}
+                onAttend={(w) => markAttended(profile, w.id).catch(() => {})}
+              />
             </section>
           </div>
         </div>
@@ -231,7 +236,12 @@ export default function HomePage() {
                   All
                 </Link>
               </div>
-              <WorkshopList workshops={workshops.slice(0, 3)} />
+              <WeekCal
+                workshops={workshops}
+                profile={profile}
+                onEnroll={(w) => enrollWorkshop(profile.uid, w.id).catch(() => {})}
+                onAttend={(w) => markAttended(profile, w.id).catch(() => {})}
+              />
             </section>
           )}
         </div>

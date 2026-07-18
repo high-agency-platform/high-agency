@@ -130,7 +130,7 @@ Button copy is **one or two words.**
 ### HUD (`.hud*`)
 The always-on game state, part of the shell: **flame + streak count** (green when alive
 today, faint when at risk), **XP pill** (mono), **level ring** (SVG progress ring around the
-level number). Pages never repeat these numbers.
+level, written `L1`…`L5` in mono). Pages never repeat these numbers.
 
 ### Nav
 - **Mobile (≤860px):** fixed bottom **tab bar** (`.tabbar`), 4–5 icon tabs, active = ember
@@ -148,6 +148,11 @@ level number). Pages never repeat these numbers.
 ### Identity
 - `.av` — avatar disc (initial, ember-tinted). Sizes 28/36/44. `.avstack` overlaps them —
   the default way to show "who's here" (never a name list when a stack will do).
+  **Evaluation surfaces** (the open squads an operator can apply to) use `.avroster` —
+  the same compact stack, but every disc is pressable: hover/focus → one-line peek card
+  (name + headline + `L#` pip), click → the full profile modal (`ProfileModal`). Past 4
+  members the stack scrolls horizontally (right-edge fade as the hint). Avatar discs are
+  opaque by construction so a stacked disc never shows through the one above it.
 - `.badge` — chunky pill: `.badge--level` (ember), `.badge--earned` (lime/green),
   `.badge--locked` (dashed). `.xp` — mono `+150` chip in green.
 - `.flame` — the streak icon: ember-filled when alive, outline when cold.
