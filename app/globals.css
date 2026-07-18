@@ -964,6 +964,75 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 @keyframes strikeDraw { from { transform: scaleX(0); } }
 
 /* ============================================================
+   ASCII LAYER (marketing set-pieces — launch-sequence narrative)
+   Canvases are absolutely positioned, aria-hidden, pointer-inert:
+   they paint behind/beside copy and never move layout.
+   ============================================================ */
+.ascii-host { position: absolute; inset: 0; pointer-events: none; }
+.ascii-host canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+/* --- hero: rocket launch on the right, copy stays left --- */
+.hero--launch {
+  position: relative; overflow: clip;
+  display: flex; align-items: center;
+  min-height: clamp(520px, 78vh, 760px);
+}
+.hero--launch .wrap { position: relative; z-index: 2; width: 100%; }
+.hero__ascii { left: auto; width: 52%; }
+@media (max-width: 900px) {
+  .hero__ascii { width: 100%; opacity: 0.3; }
+}
+
+/* --- #problem: the one dark moment on the page (paper → ink flip) --- */
+.section--void {
+  background: var(--text); overflow: clip;
+  padding: clamp(72px, 10vw, 132px) 0;
+}
+.section--void .wrap { position: relative; z-index: 2; }
+/* the section header lives outside .shead here — restore display scale,
+   cap the measure, and give it room before the stat tiles */
+.section--void .h2 {
+  font-size: clamp(30px, 5vw, 52px); font-weight: 900;
+  letter-spacing: -0.028em; line-height: 1.04;
+  max-width: 24ch; margin-bottom: clamp(32px, 5vw, 56px);
+}
+.section--void .h2,
+.section--void .problem__punch { color: var(--bg); }
+.section--void .lead { color: color-mix(in srgb, var(--bg) 78%, transparent); }
+.section--void .eyebrow { color: color-mix(in srgb, var(--bg) 62%, transparent); }
+
+/* --- #system: mission-chart flight path behind the cards --- */
+.section--chart { overflow: clip; }
+.section--chart .wrap { position: relative; z-index: 2; }
+@media (max-width: 640px) {
+  .chart__ascii { display: none; }
+}
+
+/* --- final CTA: engine static-fire + mission-control status line --- */
+.final { overflow: clip; }
+.final__grid {
+  display: grid; grid-template-columns: 1.15fr 0.85fr;
+  gap: clamp(28px, 5vw, 56px); align-items: center;
+}
+.final__pad { position: relative; }
+.final__burn { position: relative; inset: auto; height: 320px; }
+.mc-line {
+  margin-top: 12px; text-align: center;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-faint);
+}
+.mc-cursor { color: var(--accent); animation: mcBlink 1.1s steps(2, start) infinite; }
+@keyframes mcBlink { 50% { opacity: 0; } }
+@media (max-width: 900px) {
+  .final__grid { grid-template-columns: 1fr; }
+  .final__pad { max-width: 420px; width: 100%; }
+  .final__burn { height: 240px; }
+}
+@media (max-width: 640px) {
+  .final__pad { display: none; }
+}
+
+/* ============================================================
    STYLEGUIDE
    ============================================================ */
 .sg { display: flex; flex-direction: column; gap: 40px; }

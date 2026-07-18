@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>High Agency — ASCII Launch Hero (Prototype)</title>
+<link href="https://fonts.googleapis.com/css2?family=Gabarito:wght@400;600;700;800;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f2f0e8;
+    --ink: #1e1b16;
+    --orange: #e8541f;
+    --orange-soft: #f0885f;
+    --muted: #6f6a60;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Gabarito', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    overflow: hidden;
+    /* dot grid like current site */
+    background-image: radial-gradient(rgba(30,27,22,.07) 1px, transparent 1px);
+    background-size: 26px 26px;
+  }
+  /* mock nav */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 40px;
+    background: rgba(242,240,232,.85); backdrop-filter: blur(6px);
+    border-bottom: 1px solid rgba(30,27,22,.08);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 900; letter-spacing: .02em; font-size: 18px; }
+  .logo .mark {
+    width: 30px; height: 30px; border-radius: 8px; background: var(--orange);
+    color: #fff; display: grid; place-items: center; font-weight: 900; font-size: 15px;
+    box-shadow: 0 3px 0 rgba(30,27,22,.9);
+  }
+  .apply {
+    background: var(--orange); color: #fff; font-weight: 800; font-size: 15px;
+    padding: 10px 22px; border-radius: 999px; border: none;
+    box-shadow: 0 4px 0 rgba(30,27,22,.9); cursor: pointer;
+  }
+  /* hero layout */
+  .hero {
+    position: relative; height: 100vh; display: flex; align-items: center;
+    padding: 0 40px;
+  }
+  .copy { position: relative; z-index: 5; max-width: 640px; margin-left: 4vw; }
+  .eyebrow {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 12px; letter-spacing: .28em;
+    color: var(--muted); margin-bottom: 22px; text-transform: uppercase;
+  }
+  .eyebrow .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--orange); }
+  h1 { font-size: clamp(48px, 6.2vw, 84px); line-height: .98; font-weight: 900; letter-spacing: -.01em; }
+  h1 .hl { color: var(--orange); background: rgba(232,84,31,.12); padding: 0 .08em; border-radius: .08em; }
+  .sub { margin-top: 26px; font-size: 19px; line-height: 1.5; color: #3d3a33; max-width: 480px; }
+  .sub b { font-weight: 800; }
+  .cta { margin-top: 30px; display: flex; gap: 12px; }
+  .cta input {
+    font-family: inherit; font-size: 16px; padding: 14px 20px; width: 300px;
+    border: 2px solid rgba(30,27,22,.85); border-radius: 999px; background: #fff;
+  }
+  .cta button {
+    font-family: inherit; font-weight: 800; font-size: 16px; color: #fff;
+    background: var(--orange); border: none; border-radius: 999px; padding: 14px 26px;
+    box-shadow: 0 4px 0 rgba(30,27,22,.9); cursor: pointer;
+  }
+  .meta { margin-top: 16px; font-size: 14px; color: var(--muted); }
+  .meta b { color: var(--ink); }
+  /* ascii canvas fills right side, behind copy on small screens */
+  #ascii {
+    position: absolute; top: 0; right: 0; height: 100%; width: 52vw; z-index: 1;
+    cursor: pointer;
+  }
+  .hint {
+    position: fixed; bottom: 18px; right: 24px; z-index: 10;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .18em;
+    color: var(--muted); text-transform: uppercase;
+  }
+  .tag {
+    position: fixed; bottom: 18px; left: 24px; z-index: 10;
+    font-family: 'JetBrains Mono', monospace; font-size: 11px; letter-spacing: .18em;
+    color: var(--muted); text-transform: uppercase;
+  }
+  @media (max-width: 900px) {
+    #ascii { width: 100vw; opacity: .35; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <div class="logo"><span class="mark">H</span> HIGH AGENCY</div>
+  <button class="apply">Apply</button>
+</nav>
+
+<section class="hero">
+  <div class="copy">
+    <div class="eyebrow"><span class="dot"></span> FOUNDING BATCH 01</div>
+    <h1>School is a <span class="hl">waiting room.</span><br>You weren't built to wait.</h1>
+    <p class="sub">For 13&ndash;19s who'd rather <b>build</b> than study. Real milestones, a real squad, verified by real humans.</p>
+    <div class="cta">
+      <input type="email" placeholder="you@email.com">
+      <button>Request access</button>
+    </div>
+    <p class="meta"><b>By application</b> &middot; Free &middot; Ages 13&ndash;19</p>
+  </div>
+  <canvas id="ascii"></canvas>
+</section>
+
+<div class="tag">PROTOTYPE &middot; ASCII LAUNCH HERO &middot; ARCADE PAPER</div>
+<div class="hint">Click the rocket to launch &#8599;</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('ascii');
+  const ctx = canvas.getContext('2d');
+  const CELL = 11;                    // px per ascii cell
+  const RAMP = ' .·:;+=xX#@';        // density ramp
+  const INK = [30, 27, 22];
+  const ORANGE = [232, 84, 31];
+  const ORANGE2 = [240, 136, 95];
+  const GRAY = [140, 134, 122];
+
+  let W, H, cols, rows, off, octx;
+  function resize() {
+    const r = canvas.getBoundingClientRect();
+    W = r.width; H = r.height;
+    canvas.width = W * devicePixelRatio; canvas.height = H * devicePixelRatio;
+    ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+    cols = Math.floor(W / CELL); rows = Math.floor(H / CELL);
+    off = document.createElement('canvas');
+    off.width = cols; off.height = rows;
+    octx = off.getContext('2d', { willReadFrequently: true });
+  }
+  resize(); addEventListener('resize', resize);
+
+  // ---- scene state machine ----
+  // phases: idle -> ignite -> ascend -> gone -> reset
+  let phase = 'idle', t0 = performance.now(), particles = [], stars = [];
+  const PAD_Y = () => rows * 0.78;       // launch pad row (grid coords)
+  const ROCKET_X = () => cols * 0.52;
+  let ry = 0, rv = 0;                    // rocket offset above pad, velocity
+
+  function reset() { phase = 'idle'; t0 = performance.now(); ry = 0; rv = 0; particles = []; }
+  function launch() { if (phase === 'idle') { phase = 'ignite'; t0 = performance.now(); } }
+  canvas.addEventListener('click', launch);
+
+  for (let i = 0; i < 70; i++) stars.push({ x: Math.random(), y: Math.random(), s: .3 + Math.random() * .9 });
+
+  function spawnExhaust(x, y, power) {
+    for (let i = 0; i < power; i++) {
+      particles.push({
+        x: x + (Math.random() - .5) * 3.4,
+        y: y,
+        vx: (Math.random() - .5) * 0.45,
+        vy: 0.5 + Math.random() * 0.9,
+        life: 1,
+        decay: 0.02 + Math.random() * 0.03,
+        hot: Math.random() < 0.65
+      });
+    }
+  }
+
+  function draw(now) {
+    const t = (now - t0) / 1000;
+    // auto-launch after 3.2s idle so it demos itself
+    if (phase === 'idle' && t > 4.2) launch();
+    if (phase === 'ignite' && t > 0.9) { phase = 'ascend'; t0 = now; }
+    if (phase === 'ascend') {
+      rv += 0.006 + rv * 0.022;         // accelerating
+      ry += rv;
+      if (ry > rows * 1.4) { phase = 'gone'; t0 = now; }
+    }
+    if (phase === 'gone' && t > 1.1) reset();
+
+    // ---- paint low-res scene ----
+    octx.clearRect(0, 0, cols, rows);
+    const rx = ROCKET_X();
+    const py = PAD_Y();
+    const y = py - ry;                  // rocket base row
+    const shake = phase === 'ignite' ? (Math.random() - .5) * 0.8 : 0;
+    const sx = rx + shake;
+
+    // stars: drift when ascending (speed feel)
+    octx.fillStyle = 'rgba(30,27,22,0.5)';
+    const sSpeed = phase === 'ascend' ? rv * 2.2 : 0.006;
+    for (const st of stars) {
+      st.y += sSpeed * st.s * 0.08;
+      if (st.y > 1) { st.y -= 1; st.x = Math.random(); }
+      const len = phase === 'ascend' ? Math.min(4, rv * 3) : 0;
+      octx.globalAlpha = 0.35 * st.s;
+      octx.fillRect(st.x * cols, st.y * rows, 1, 1 + len);
+    }
+    octx.globalAlpha = 1;
+
+    // launch pad
+    if (phase !== 'gone') {
+      octx.fillStyle = 'rgb(30,27,22)';
+      octx.fillRect(rx - 10, py + 1, 20, 1.4);
+      octx.fillRect(rx - 8, py + 2.4, 2.5, 1.2);
+      octx.fillRect(rx + 5.5, py + 2.4, 2.5, 1.2);
+    }
+
+    // rocket (drawn only if on screen)
+    if (phase !== 'gone' && y > -20) {
+      const bodyW = 8, bodyH = 17;
+      // body
+      octx.fillStyle = 'rgb(30,27,22)';
+      octx.beginPath();
+      octx.roundRect(sx - bodyW / 2, y - bodyH, bodyW, bodyH, 1.6);
+      octx.fill();
+      // nose cone
+      octx.beginPath();
+      octx.moveTo(sx - bodyW / 2, y - bodyH + 0.5);
+      octx.lineTo(sx, y - bodyH - 7);
+      octx.lineTo(sx + bodyW / 2, y - bodyH + 0.5);
+      octx.closePath(); octx.fill();
+      // fins
+      octx.beginPath();
+      octx.moveTo(sx - bodyW / 2, y - 5); octx.lineTo(sx - bodyW / 2 - 4, y + 0.5); octx.lineTo(sx - bodyW / 2, y);
+      octx.closePath(); octx.fill();
+      octx.beginPath();
+      octx.moveTo(sx + bodyW / 2, y - 5); octx.lineTo(sx + bodyW / 2 + 4, y + 0.5); octx.lineTo(sx + bodyW / 2, y);
+      octx.closePath(); octx.fill();
+      // window (orange)
+      octx.fillStyle = 'rgb(232,84,31)';
+      octx.beginPath(); octx.arc(sx, y - bodyH + 5, 2, 0, 7); octx.fill();
+    }
+
+    // exhaust
+    if (phase === 'ignite') spawnExhaust(sx, y + 0.5, 10);
+    if (phase === 'ascend') spawnExhaust(sx, y + 0.5, 14);
+    if (phase === 'idle') { if (Math.random() < .25) spawnExhaust(sx, y + 0.5, 1); }
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy; p.life -= p.decay;
+      p.vx *= 0.99; p.vy *= 0.985;
+      if (p.life <= 0 || p.y > rows + 2) { particles.splice(i, 1); continue; }
+      const c = p.hot && p.life > 0.45 ? (p.life > 0.75 ? ORANGE : ORANGE2) : GRAY;
+      octx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${Math.min(1, p.life * 1.4)})`;
+      const sz = p.life > 0.7 ? 2 : 1;
+      octx.fillRect(p.x - sz / 2, p.y, sz, sz);
+    }
+
+    // ---- ASCII pass: sample low-res pixels -> chars ----
+    const img = octx.getImageData(0, 0, cols, rows).data;
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = `700 ${CELL}px "JetBrains Mono", monospace`;
+    ctx.textBaseline = 'top';
+    for (let gy = 0; gy < rows; gy++) {
+      for (let gx = 0; gx < cols; gx++) {
+        const i = (gy * cols + gx) * 4;
+        const a = img[i + 3];
+        if (a < 18) continue;
+        const idx = Math.min(RAMP.length - 1, Math.floor((a / 255) * (RAMP.length - 1) + 0.5));
+        const ch = RAMP[idx];
+        if (ch === ' ') continue;
+        ctx.fillStyle = `rgba(${img[i]},${img[i + 1]},${img[i + 2]},${Math.max(.25, a / 255)})`;
+        ctx.fillText(ch, gx * CELL, gy * CELL);
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduced) { draw(performance.now()); } else { requestAnimationFrame(draw); }
+})();
+</script>
+</body>
+</html>
