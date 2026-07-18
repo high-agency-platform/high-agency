@@ -7,6 +7,12 @@ import Marquee from "./components/Marquee";
 import Faq from "./components/Faq";
 import ApplyModal from "./components/ApplyModal";
 import { CheckIcon, FlameIcon, SquadIcon, ZapIcon } from "./components/ui";
+import AsciiCanvas from "./components/ascii/AsciiCanvas";
+import VideoAscii from "./components/ascii/VideoAscii";
+import rocketLaunch from "./components/ascii/programs/rocketLaunch";
+import waitingRoom from "./components/ascii/programs/waitingRoom";
+import trajectory from "./components/ascii/programs/trajectory";
+import engineBurn from "./components/ascii/programs/engineBurn";
 import { PLATFORM_ENABLED } from "./lib/flags";
 
 function CaptureForm({
@@ -95,7 +101,15 @@ export default function Waitlist() {
 
       <main id="top">
         {/* ===================== HERO ===================== */}
-        <section className="hero">
+        <section className="hero hero--launch">
+          {/* Generative launch loop. If a licensed clip exists at
+              /public/video/launch.mp4 it plays as luminance-mapped ASCII;
+              otherwise the procedural rocketLaunch program runs. */}
+          <VideoAscii
+            src="/video/launch.mp4"
+            fallback={rocketLaunch}
+            className="hero__ascii"
+          />
           <div className="wrap">
             <div className="hero__copy">
               <Reveal className="eyebrow hero__tag">
@@ -127,20 +141,13 @@ export default function Waitlist() {
         </div>
 
         {/* ===================== PROBLEM ===================== */}
-        <section className="section" id="problem">
+        <section className="section section--void" id="problem">
+          <AsciiCanvas program={waitingRoom} cell={13} />
           <div className="wrap">
-            <div className="shead">
-              <Reveal className="eyebrow">
-                <span className="dot" />
-                The diagnosis
-              </Reveal>
-              <Reveal as="h2" className="h2" d={1}>
-                School optimizes for the wrong thing.
-              </Reveal>
-              <Reveal as="p" className="lead" d={2}>
-                It rewards conformity. The world rewards nerve.
-              </Reveal>
-            </div>
+            <Reveal as="h2" className="h2" d={2}>
+              The world rewards action.{" "}
+              <span className="accent">Stop waiting for permission.</span>
+            </Reveal>
 
             <div className="statgrid">
               <Reveal className="tile stat" d={1}>
@@ -172,18 +179,18 @@ export default function Waitlist() {
                 <div className="stat__d">of unis teach any AI literacy.</div>
               </Reveal>
             </div>
-
-            <Reveal as="p" className="problem__punch" d={2}>
-              You already know this.{" "}
-              <span className="accent">Stop waiting for permission.</span>
-            </Reveal>
           </div>
         </section>
 
         <div className="divider" />
 
         {/* ===================== WHAT YOU JOIN ===================== */}
-        <section className="section" id="system">
+        <section className="section section--chart" id="system">
+          <AsciiCanvas
+            program={trajectory}
+            cell={13}
+            className="chart__ascii"
+          />
           <div className="wrap">
             <div className="shead">
               <Reveal className="eyebrow eyebrow--accent">
@@ -395,23 +402,36 @@ export default function Waitlist() {
         {/* ===================== FINAL CTA ===================== */}
         <section className="section final">
           <div className="wrap">
-            <div className="final__inner">
-              <Reveal className="eyebrow eyebrow--accent">
-                <span className="dot" />
-                Applications open
-              </Reveal>
-              <Reveal as="h2" className="h2" d={1}>
-                Ambition is the only prerequisite.
-              </Reveal>
-              <Reveal as="p" className="lead" d={2}>
-                Stop rehearsing. Start building.
-              </Reveal>
-              <Reveal d={2}>
-                <CaptureForm label="Apply now" onApply={openModal} />
-              </Reveal>
-              <Reveal className="capture__note" d={3}>
-                <span><b>By application</b> · Free</span>
-              </Reveal>
+            <div className="final__grid">
+              <div className="final__inner">
+                <Reveal className="eyebrow eyebrow--accent">
+                  <span className="dot" />
+                  Applications open
+                </Reveal>
+                <Reveal as="h2" className="h2" d={1}>
+                  Ambition is the only prerequisite.
+                </Reveal>
+                <Reveal as="p" className="lead" d={2}>
+                  Stop rehearsing. Start building.
+                </Reveal>
+                <Reveal d={2}>
+                  <CaptureForm label="Apply now" onApply={openModal} />
+                </Reveal>
+                <Reveal className="capture__note" d={3}>
+                  <span><b>By application</b> · Free</span>
+                </Reveal>
+              </div>
+              <div className="final__pad" aria-hidden="true">
+                <AsciiCanvas
+                  program={engineBurn}
+                  cell={12}
+                  className="final__burn"
+                />
+                <div className="mc-line">
+                  T-MINUS 00 · Systems: go · Pad: ready
+                  <span className="mc-cursor">_</span>
+                </div>
+              </div>
             </div>
           </div>
         </section>
