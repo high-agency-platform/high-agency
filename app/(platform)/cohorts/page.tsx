@@ -13,7 +13,16 @@ import {
   MAX_PENDING_APPLICATIONS,
 } from "../../lib/db";
 import { rankCohorts } from "../../lib/match";
-import { DOMAINS, SKILLS, DECLINE_LABELS } from "../../lib/types";
+import {
+  DOMAINS,
+  SKILLS,
+  DECLINE_LABELS,
+  MAX_FOCUS_TAGS,
+  MAX_TAG_LEN,
+  normalizeFocusTag,
+  normalizeLink,
+} from "../../lib/types";
+import { fileToSquareIcon } from "../../lib/image";
 import { AvStack, FlameIcon, LockIcon } from "../../components/ui";
 import { SquadRoster } from "../../components/SquadRoster";
 import type { Cohort, CohortApplication, WeeklyHours } from "../../lib/types";
@@ -37,8 +46,13 @@ export default function CohortsPage() {
   const [newName, setNewName] = useState("");
   const [newMission, setNewMission] = useState("");
   const [newTags, setNewTags] = useState<string[]>([]);
+  const [tagDraft, setTagDraft] = useState("");
   const [newLookingFor, setNewLookingFor] = useState<string[]>([]);
   const [newSlot, setNewSlot] = useState("");
+  const [newLink, setNewLink] = useState("");
+  const [newIcon, setNewIcon] = useState(""); // compressed data: URL, or ""
+  const [iconBusy, setIconBusy] = useState(false);
+  const [iconErr, setIconErr] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -129,6 +143,60 @@ export default function CohortsPage() {
     }
   }
 
+  const atTagCap = newTags.length >= MAX_FOCUS_TAGS;
+
+  // Toggle a preset domain chip. Respects the total-tag cap when adding.
+  function toggleDomain(t: string) {
+    setNewTags((p) =>
+      p.includes(t)
+        ? p.filter((x) => x !== t)
+        : p.length >= MAX_FOCUS_TAGS
+        ? p
+        : [...p, t]
+    );
+  }
+
+  // Add whatever's in the draft as a custom focus tag. Normalizes first, folds
+  // a typed domain name onto its preset chip, dedupes case-insensitively, and
+  // silently no-ops at the cap or on empty input.
+  function addCustomTag() {
+    const t = normalizeFocusTag(tagDraft);
+    if (!t) {
+      setTagDraft("");
+      return;
+    }
+    const value = DOMAINS.find((d) => d.toLowerCase() === t.toLowerCase()) ?? t;
+    setNewTags((p) => {
+      if (p.length >= MAX_FOCUS_TAGS) return p;
+      if (p.some((x) => x.toLowerCase() === value.toLowerCase())) return p;
+      return [...p, value];
+    });
+    setTagDraft("");
+  }
+
+  function removeTag(t: string) {
+    setNewTags((p) => p.filter((x) => x !== t));
+  }
+
+  // Resize/compress a picked icon file client-side into an inline data URL.
+  async function pickIcon(file: File | null) {
+    if (!file) return;
+    setIconErr("");
+    setIconBusy(true);
+    try {
+      setNewIcon(await fileToSquareIcon(file));
+    } catch (e) {
+      setIconErr(e instanceof Error ? e.message : "Couldn't use that image.");
+    } finally {
+      setIconBusy(false);
+    }
+  }
+
+  // Custom tags = whatever the founder typed that isn't a preset domain.
+  const customTags = newTags.filter(
+    (t) => !DOMAINS.some((d) => d === t)
+  );
+
   async function submitCohort() {
     if (!profile) return;
     if (!newName.trim() || !newMission.trim() || !newSlot.trim()) {
@@ -144,6 +212,8 @@ export default function CohortsPage() {
         tags: newTags,
         lookingFor: newLookingFor,
         meetingSlot: newSlot.trim(),
+        link: normalizeLink(newLink),
+        icon: newIcon,
       });
       router.push(`/cohorts/${id}`);
     } catch {
@@ -213,21 +283,61 @@ export default function CohortsPage() {
           <div className="field">
             <label>Focus</label>
             <div className="chip-row">
-              {DOMAINS.map((t) => (
+              {DOMAINS.map((t) => {
+                const sel = newTags.includes(t);
+                return (
+                  <button
+                    key={t}
+                    type="button"
+                    className={`pick ${sel ? "sel" : ""}`}
+                    disabled={!sel && atTagCap}
+                    onClick={() => toggleDomain(t)}
+                  >
+                    {t}
+                  </button>
+                );
+              })}
+              {customTags.map((t) => (
                 <button
                   key={t}
                   type="button"
-                  className={`pick ${newTags.includes(t) ? "sel" : ""}`}
-                  onClick={() =>
-                    setNewTags((p) =>
-                      p.includes(t) ? p.filter((x) => x !== t) : [...p, t]
-                    )
-                  }
+                  className="pick sel"
+                  onClick={() => removeTag(t)}
+                  title="Remove"
                 >
-                  {t}
+                  {t} ×
                 </button>
               ))}
             </div>
+            <div className="tag-add">
+              <input
+                aria-label="Add a custom focus"
+                value={tagDraft}
+                onChange={(e) => setTagDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addCustomTag();
+                  }
+                }}
+                placeholder="Add your own…"
+                maxLength={MAX_TAG_LEN}
+                disabled={atTagCap}
+              />
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={addCustomTag}
+                disabled={atTagCap || !tagDraft.trim()}
+              >
+                Add
+              </button>
+            </div>
+            <small className="field__hint">
+              {atTagCap
+                ? `That's the max — ${MAX_FOCUS_TAGS} focuses.`
+                : `Pick a few or add your own. ${newTags.length}/${MAX_FOCUS_TAGS}.`}
+            </small>
           </div>
           <div className="field">
             <label>Recruiting</label>
@@ -248,6 +358,71 @@ export default function CohortsPage() {
               ))}
             </div>
           </div>
+
+          <details className="more">
+            <summary className="more__toggle">
+              Customize more
+              <span className="more__hint">icon · landing page</span>
+            </summary>
+            <div className="more__body">
+              <div className="field">
+                <label>Squad icon</label>
+                <div className="iconpick">
+                  <div className="iconpick__preview">
+                    {newIcon ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={newIcon} alt="" />
+                    ) : (
+                      <span className="iconpick__ph">
+                        {(newName.trim()[0] || "?").toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="iconpick__ctl">
+                    <label className="btn btn--ghost btn--sm">
+                      {iconBusy ? "…" : newIcon ? "Replace" : "Upload"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={(e) => {
+                          pickIcon(e.target.files?.[0] ?? null);
+                          e.target.value = "";
+                        }}
+                      />
+                    </label>
+                    {newIcon && (
+                      <button
+                        type="button"
+                        className="btn btn--ghost btn--sm"
+                        onClick={() => setNewIcon("")}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <small className="field__hint">
+                  Square works best — we shrink it to a small icon.
+                </small>
+                {iconErr && <p className="form-err">{iconErr}</p>}
+              </div>
+              <div className="field">
+                <label htmlFor="nc-link">Landing page</label>
+                <input
+                  id="nc-link"
+                  value={newLink}
+                  onChange={(e) => setNewLink(e.target.value)}
+                  placeholder="yoursquad.com"
+                  maxLength={200}
+                />
+                <small className="field__hint">
+                  Optional — a site, deck, or demo.
+                </small>
+              </div>
+            </div>
+          </details>
+
           {error && <p className="form-err">{error}</p>}
           <div className="row-actions">
             <button className="btn btn--ghost" onClick={() => setCreating(false)}>
@@ -269,7 +444,13 @@ export default function CohortsPage() {
             {myCohorts.map((c) => (
               <Link key={c.id} href={`/cohorts/${c.id}`} className="tile tile--tap tile--ember sq">
                 <div className="sq__top">
-                  <span className="sq__name">{c.name}</span>
+                  <span className="sq__id">
+                    {c.icon && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img className="sq__icon" src={c.icon} alt="" />
+                    )}
+                    <span className="sq__name">{c.name}</span>
+                  </span>
                   {c.weeklyStreak > 0 && (
                     <span className="hud__stat hud__stat--fire">
                       <FlameIcon size={14} />
@@ -333,7 +514,13 @@ export default function CohortsPage() {
               return (
                 <article key={c.id} className="tile sq">
                   <div className="sq__top">
-                    <span className="sq__name">{c.name}</span>
+                    <span className="sq__id">
+                      {c.icon && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="sq__icon" src={c.icon} alt="" />
+                      )}
+                      <span className="sq__name">{c.name}</span>
+                    </span>
                     <SquadRoster uids={c.memberUids} names={c.memberNames} />
                   </div>
                   <p className="sq__mission">{c.mission}</p>

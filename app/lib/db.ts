@@ -170,10 +170,19 @@ export async function createCohort(
     tags: string[];
     lookingFor: string[];
     meetingSlot: string;
+    /** Optional; omitted from the write when empty so Firestore never sees
+     *  an undefined value (which the SDK rejects). */
+    link?: string;
+    icon?: string;
   }
 ): Promise<string> {
+  // Pull optionals out so a passed-through `undefined` never reaches the
+  // write (the SDK rejects undefined); re-add only when non-empty.
+  const { link, icon, ...rest } = data;
   const ref = await addDoc(collection(getDb(), "cohorts"), {
-    ...data,
+    ...rest,
+    ...(link ? { link } : {}),
+    ...(icon ? { icon } : {}),
     timezone: founder.timezone,
     state: "forming",
     founderUid: founder.uid,

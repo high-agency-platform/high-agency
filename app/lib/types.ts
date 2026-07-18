@@ -31,6 +31,29 @@ export const DOMAINS = [
 ] as const;
 export type Domain = (typeof DOMAINS)[number];
 
+/** Focus tags on a squad may be picked from DOMAINS *or* typed freely. Custom
+ *  tags are user text that ends up cross-cohort readable (and minor-facing), so
+ *  they're always run through normalizeFocusTag + bounded by these caps before
+ *  they touch Firestore. Rules can't loop a list to check element length, so
+ *  the per-tag limit is client-enforced; the total count is bounded both here
+ *  and in firestore.rules (validStringList). */
+export const MAX_FOCUS_TAGS = 6;
+export const MAX_TAG_LEN = 24;
+
+/** Clean a free-typed focus tag: unicode-normalize, drop anything that isn't a
+ *  letter/number/space or a light technical separator (kills emoji, control
+ *  chars, and punctuation soup), collapse whitespace, and clamp length. Returns
+ *  "" when nothing usable survives (e.g. "🔥🔥" or "  ") — callers drop those. */
+export function normalizeFocusTag(raw: string): string {
+  const cleaned = raw
+    .normalize("NFC")
+    .replace(/[^\p{L}\p{N}\s&/+.#-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, MAX_TAG_LEN);
+  return /[\p{L}\p{N}]/u.test(cleaned) ? cleaned : "";
+}
+
 export const SKILLS = [
   "Coding",
   "Design",
@@ -149,11 +172,33 @@ export interface Cohort {
   /** Denormalized display names so member lists render without N reads. */
   memberNames: Record<string, string>;
   open: boolean;
+  /** Optional landing page for the squad — a site, deck, or demo link.
+   *  Founder-set, shown to signed-in users; validated http(s) in the rules. */
+  link?: string;
+  /** Optional square icon, stored inline as a compressed data: URL (bounded by
+   *  COHORT_ICON_MAX_CHARS) so squads get a picture without a Storage bucket —
+   *  and, being inline, it loads nothing external onto a minor-facing page. */
+  icon?: string;
   /** Consecutive weeks the squad held its ritual + someone progressed. */
   weeklyStreak: number;
   /** Last ISO week (YYYY-Www) that counted. */
   lastRitualWeek: string;
   createdAt?: Timestamp;
+}
+
+/** Squad icon: center-cropped to a square this many px before it's encoded. */
+export const COHORT_ICON_PX = 128;
+/** Hard cap on the icon data: URL length (~30KB). Keeps discovery-list reads
+ *  lean and stays well under Firestore's 1MB doc limit. Mirrored in the rules. */
+export const COHORT_ICON_MAX_CHARS = 40000;
+
+/** Trim + light-normalize a user-typed URL: prefix https:// when it's
+ *  scheme-less so "yoursquad.com" becomes a real link. "" stays "". The rules
+ *  additionally enforce the http(s) shape server-side. */
+export function normalizeLink(raw: string): string {
+  const t = raw.trim();
+  if (!t) return "";
+  return /^https?:\/\//i.test(t) ? t : `https://${t}`;
 }
 
 /* ------------------------------------------------------------------ */

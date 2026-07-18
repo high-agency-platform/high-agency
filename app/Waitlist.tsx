@@ -122,8 +122,7 @@ export default function Waitlist() {
                 You weren&apos;t built to wait.
               </Reveal>
               <Reveal as="p" className="lead hero__sub" d={2}>
-                For 13–19s who&apos;d rather <b>build</b> than study. Real
-                milestones, a real squad, verified by real humans.
+                Empowering teens who&apos;d rather <b>build</b>.
               </Reveal>
               <Reveal d={2}>
                 <CaptureForm label="Request access" onApply={openModal} />
@@ -247,7 +246,7 @@ export default function Waitlist() {
                   Momentum out.
                 </Reveal>
                 <Reveal as="p" className="lead" d={2}>
-                  Eight weeks. Seven milestones. Every one is a real-world win —
+                  Seven milestones. Every one is a real-world win —
                   and every win is XP, levels, and status you earned, not bought.
                 </Reveal>
               </div>

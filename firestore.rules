@@ -231,16 +231,30 @@ service cloud.firestore {
 
     function isValidCohort(data) {
       return hasOnlyAllowedFields(['name', 'mission', 'tags', 'lookingFor', 'meetingSlot',
-               'timezone', 'state', 'founderUid', 'founderName', 'peerLeadUid',
+               'link', 'icon', 'timezone', 'state', 'founderUid', 'founderName', 'peerLeadUid',
                'memberUids', 'memberNames', 'open', 'weeklyStreak', 'lastRitualWeek', 'createdAt']) &&
              hasRequiredFields(['name', 'mission', 'meetingSlot', 'timezone', 'state',
                'founderUid', 'founderName', 'peerLeadUid',
                'memberUids', 'memberNames', 'open', 'weeklyStreak', 'createdAt']) &&
              validString(data.name, 1, 60) &&
              validString(data.mission, 1, 140) &&
-             (!('tags' in data) || validStringList(data.tags, 9)) &&
+             // Focus tags may be preset domains or founder-typed free text.
+             // Count is bounded here (mirrors MAX_FOCUS_TAGS in the client);
+             // per-tag length/content is normalized client-side since rules
+             // can't loop a list. Residual free-text risk accepted for v1.
+             (!('tags' in data) || validStringList(data.tags, 6)) &&
              (!('lookingFor' in data) || validStringList(data.lookingFor, 7)) &&
              validString(data.meetingSlot, 1, 80) &&
+             // Optional landing page: blank, or an http(s) URL under 200 chars.
+             (!('link' in data) ||
+               (data.link is string && data.link.size() <= 200 &&
+                (data.link == '' || data.link.matches('https?://.*')))) &&
+             // Optional icon: blank, or an inline data:image URL. Bounded to
+             // mirror COHORT_ICON_MAX_CHARS — keeps list reads lean and the doc
+             // under 1MB. It's a data URL, so nothing external loads for viewers.
+             (!('icon' in data) ||
+               (data.icon is string && data.icon.size() <= 40000 &&
+                (data.icon == '' || data.icon.matches('data:image/.*')))) &&
              validString(data.timezone, 1, 60) &&
              data.state in ['forming', 'active', 'stalled', 'archived'] &&
              data.founderUid is string &&

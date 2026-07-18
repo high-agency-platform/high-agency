@@ -179,7 +179,11 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
       {/* ---- Squad header ---- */}
       <header className="screen__head">
         <div>
-          <h1 className="h1">
+          <h1 className="h1" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {cohort.icon && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="sq__icon sq__icon--lg" src={cohort.icon} alt="" />
+            )}
             {cohort.name}
             {cohort.weeklyStreak > 0 && (
               <span className="hud__stat hud__stat--fire">
@@ -201,6 +205,16 @@ export default function CohortPage({ params }: { params: Promise<{ id: string }>
               {cohort.state === "forming" && " · forming"}
               {cohort.state === "stalled" && " · stalled"}
             </span>
+            {cohort.link && (
+              <a
+                className="micro sq__link"
+                href={cohort.link}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Visit site ↗
+              </a>
+            )}
           </div>
         </div>
         {isMember &&

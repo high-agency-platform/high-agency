@@ -333,6 +333,48 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .pick:hover { color: var(--text); transform: translateY(-1px); }
 .pick:active { transform: translateY(3px); box-shadow: 0 0 0 var(--border-strong); }
 .pick.sel { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); box-shadow: 0 3px 0 var(--accent-line); }
+.pick:disabled { opacity: 0.4; box-shadow: 0 3px 0 var(--border-strong); cursor: not-allowed; }
+.pick:disabled:hover { transform: none; color: var(--text-muted); }
+
+/* Custom-focus adder — text input paired with a compact Add button */
+.tag-add { display: flex; gap: 8px; margin-top: 10px; }
+.tag-add input { flex: 1; min-width: 0; }
+.tag-add .btn { flex: none; }
+
+/* "Customize more" — a subtle disclosure for optional squad richness */
+.more { border-top: 2px solid var(--border); margin-top: 4px; }
+.more__toggle {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 2px; cursor: pointer; list-style: none;
+  font-size: 14px; font-weight: 700; color: var(--text-muted);
+  user-select: none;
+}
+.more__toggle::-webkit-details-marker { display: none; }
+.more__toggle::before {
+  content: "+"; display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; flex: none;
+  border: 2px solid var(--border-strong); border-radius: var(--radius-sm);
+  font-size: 16px; line-height: 1; color: var(--text-muted);
+  transition: color var(--t-fast), border-color var(--t-fast);
+}
+.more[open] .more__toggle::before { content: "–"; color: var(--accent); border-color: var(--accent-line); }
+.more__toggle:hover { color: var(--text); }
+.more__hint { font-family: var(--font-mono); font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
+.more__body { padding: 2px 2px 6px; display: flex; flex-direction: column; gap: 4px; }
+
+/* Icon picker — a preview piece beside upload/replace controls */
+.iconpick { display: flex; align-items: center; gap: 14px; }
+.iconpick__preview {
+  width: 60px; height: 60px; flex: none;
+  border-radius: var(--radius-sm); overflow: hidden;
+  border: 2px solid var(--border); background: var(--surface-2);
+  box-shadow: 0 3px 0 var(--border-strong);
+  display: flex; align-items: center; justify-content: center;
+}
+.iconpick__preview img { width: 100%; height: 100%; object-fit: cover; }
+.iconpick__ph { font-size: 24px; font-weight: 900; color: var(--text-faint); }
+.iconpick__ctl { display: flex; gap: 8px; flex-wrap: wrap; }
+.iconpick__ctl .btn { cursor: pointer; }
 
 /* ============================================================
    PROGRESS — bars, rings, the quest path
@@ -672,7 +714,18 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .squads { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
 .sq { display: flex; flex-direction: column; gap: 12px; }
 .sq__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.sq__id { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
 .sq__name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+/* Inline squad icon — a small floating piece, matches the tile language */
+.sq__icon {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 10px; object-fit: cover;
+  border: 2px solid var(--border); background: var(--surface-2);
+  box-shadow: 0 2px 0 var(--border-strong);
+}
+.sq__icon--lg { width: 44px; height: 44px; border-radius: 12px; }
+.sq__link { color: var(--accent); }
+.sq__link:hover { text-decoration: underline; }
 .sq__mission { color: var(--text-muted); font-size: 15px; line-height: 1.45; }
 .sq__tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .sq__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 12px; border-top: 2px solid var(--border); }
