@@ -137,10 +137,6 @@ export default function OnboardingPage() {
 
   async function submit() {
     if (!user || age === null) return;
-    if (!stage) {
-      setError("Pick where you're at — even just an idea counts.");
-      return;
-    }
     if (domains.length === 0 || skills.length === 0) {
       setError("Pick at least one domain and one interest so squads can find you.");
       return;
@@ -175,7 +171,7 @@ export default function OnboardingPage() {
           timezone,
           headline: headline.trim(),
           building: building.trim(),
-          stage,
+          stage: stage ?? "idea",
           domains,
           skills,
           proofUrl: proofUrl.trim(),
@@ -357,22 +353,26 @@ export default function OnboardingPage() {
                 placeholder={BUILDING_PLACEHOLDERS[phIdx % BUILDING_PLACEHOLDERS.length]}
                 maxLength={300}
               />
-              <div className="chip-row">
-                {STAGES.map((s) => (
-                  <button
-                    key={s.id}
-                    type="button"
-                    className={`pick ${stage === s.id ? "sel" : ""}`}
-                    onClick={() => setStage(s.id)}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-              <small className="field__hint">
-                Where are you at? Brand new and just exploring? “Just an idea”
-                is exactly right — most operators start there.
-              </small>
+              {building.trim().length > 0 && (
+                <>
+                  <div className="chip-row">
+                    {STAGES.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className={`pick ${stage === s.id ? "sel" : ""}`}
+                        onClick={() => setStage(s.id)}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                  <small className="field__hint">
+                    Where are you at? Brand new and just exploring? “Just an idea”
+                    is exactly right — most operators start there.
+                  </small>
+                </>
+              )}
             </div>
 
             <div className="field">
