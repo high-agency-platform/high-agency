@@ -91,8 +91,10 @@ export default function ConsentApprovalPage() {
   return (
     <main className="consent">
       <div className="consent__inner">
-        <Link href="/" className="brand consent__brand">
-          <span className="brand__mark" aria-hidden="true" />
+        <Link href="/" className="consent__brand">
+          <span className="topbar__logo" aria-hidden="true">
+            H
+          </span>
           High Agency
         </Link>
 
@@ -117,7 +119,7 @@ function ConsentBody({
 
   if (state.status === "granted") {
     return (
-      <div className="panel consent__card">
+      <div className="tile consent__card">
         <span className="eyebrow eyebrow--signal">
           <span className="dot" /> Approved
         </span>
@@ -133,7 +135,7 @@ function ConsentBody({
 
   if (state.status === "valid") {
     return (
-      <div className="panel consent__card">
+      <div className="tile consent__card">
         <span className="eyebrow">
           <span className="dot" /> Parental consent
         </span>
@@ -168,7 +170,7 @@ function ConsentBody({
   // used / expired / invalid / error → a calm, non-punitive dead-end with a path forward.
   const { title, body } = deadEndCopy(state.status, ("childName" in state && state.childName) || undefined);
   return (
-    <div className="panel consent__card">
+    <div className="tile consent__card">
       <span className="eyebrow">
         <span className="dot" /> Parental consent
       </span>

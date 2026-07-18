@@ -1,252 +1,204 @@
 # High Agency — Design System
 
-**"Operator OS" · Light edition** — the visual language of a launchpad that rewards proof.
+**"Operator OS v2 · Arcade Paper"** — a game console for shipping real things.
 
-This is the single source of truth for every surface, marketing and product. **Read it
-before touching any UI.** Tokens live in [`app/globals.css`](app/globals.css); fonts are
-wired in [`app/layout.tsx`](app/layout.tsx). A living reference renders at **`/styleguide`**.
+Single source of truth for every surface, marketing and product. Tokens live in
+[`app/globals.css`](app/globals.css); fonts in [`app/layout.tsx`](app/layout.tsx). The living
+reference renders at **`/styleguide`**.
 
-> **Light-mode first, and light-mode only for now.** There is no dark theme in this version
-> — the warm paper canvas *is* the brand. (Tokens are structured so a dark theme could be
-> reintroduced later behind a `[data-theme]` switch, but don't build one unless asked.)
+> **Light-mode only.** The warm paper canvas *is* the brand. Mobile-first: most operators
+> are on phones.
 
 ---
 
 ## 0. The idea in one breath
 
-High Agency is a gamified squad-based launchpad for ambitious teenage builders. Status here
-is **earned, not bought** — you level up by shipping real things a human verifies. The
-interface has to feel like that: bright, warm, premium, and tactile — **a builder's
-workshop, not a dark terminal.**
+High Agency players are 13–18. They live in Duolingo, Discord and games — not in SaaS
+dashboards. So the interface is a **game, played on warm paper**: every interactive thing is
+a physical piece you can press, progress is drawn (bars, paths, flames), and the words get
+out of the way. **If a screen needs a paragraph to explain itself, the design failed.**
 
-- **Warm paper canvas** (`#F5F2EB`) under a **gentle abstract wash** — a faint warm dot
-  grid plus soft ember/lime light pooling in the corners. Atmosphere behind everything,
-  never a focal point.
-- **White cards that float.** Surfaces carry a soft, warm, layered shadow *by default*
-  (askjo-style). On hover they *settle* — the hairline warms and the float deepens a touch,
-  with no jump. Depth comes from light, not borders.
-- **Two ownable accents, two jobs.** **Ember** is energy and action. **Lime/green** is
-  proof — XP, levels, streaks, verified milestones.
-- **A 3D "push" CTA.** The primary button rests on a solid darker-ember base edge, lifts on
-  hover, and *travels down* when pressed — a real button being pushed. The product's
-  signature interaction.
-- **Mono for every number that proves work.** XP, levels, streaks, milestone codes and
-  timers render in Geist Mono so data reads like instrumentation.
+Fun, but not childish — these are builders shipping real products. The toy physics are
+precise, the type is confident, the numbers are mono and true.
 
-### The brand colors and what they mean
-| | Ember `#FF5A1E` | Lime/green |
-|---|---|---|
-| **Means** | energy · action · *doing* | proof · earned · *verified* |
-| **Lives on** | primary CTA, active/in-progress, links-as-emphasis | XP fills, verify button, level/streak chips, verified seals |
-| **Forms** | one ember (fills + large text) + a darker base edge for the 3D button | **fill** = bright lime `#C6F24E`; **text/icons** = deep green `#3F8F1C` (readable on light) |
+### The five laws
 
-Keep both **scarce**. Paper and ink carry ~90% of every screen; the accents land hard
-*because* they're rare. The lime is bright — use it as a **fill** (bars, badges, the verify
-button), and use the **deep green** for any earned/verified text or icon on a light surface.
+1. **Show, don't tell.** Icons, numbers, bars, paths. One-word buttons ("Ship", "Join",
+   "Verify"). No explanatory sentences on student surfaces — explanation lives in the
+   marketing page and the parent consent page only.
+2. **Everything pressable is a physical piece.** Tiles and buttons sit on a hard bottom
+   **edge** (`box-shadow: 0 Npx 0 <edge>`); pressing travels them down into the paper. Depth
+   is edge, not blur.
+3. **Two accents, two jobs — unchanged.** **Ember** = action/doing. **Lime** = earned/
+   verified (bright lime fills, deep green text). Paper + ink carry ~90% of every screen.
+4. **The game state is always on screen.** Streak flame, XP and level live in the shell HUD
+   — pages never re-explain them.
+5. **Big targets, quick wins.** Tap targets ≥ 44px, primary actions thumb-reachable,
+   every screen has one obvious next move.
 
 ---
 
-## 1. The discipline (anti-slop — evolved, not abandoned)
+## 1. Color — the palette survives, everything around it changed
 
-1. **Gradients** only as **same-hue tonal depth** on small functional surfaces — an XP fill,
-   a button's 3D base, the canvas wash. **Never** multi-hue decorative gradients, never a
-   gradient as a section background.
-2. **The page wash is gentle and abstract.** Soft, low-opacity, large. It must never compete
-   with content or tint a card. If you notice it before you notice the headline, dial it back.
-3. **Depth is shadow, not chrome.** Cards float on soft warm shadows; avoid heavy borders,
-   double outlines, or boxes-inside-boxes.
-4. **Accents stay scarce; paper + ink carry the page.**
-5. **Layout stays left-aligned and asymmetric.** No perfectly-centered pages.
-6. **Real-content placeholders.** A real name, a real milestone — never a striped box.
-7. **Mono is for data, not decoration.** Numbers, codes, units, eyebrows/labels. Not body.
+Values are identical to v1. Always the CSS variable, never a hex.
 
----
-
-## 2. Color
-
-Flat tokens in `:root`. **Always use the variable**, never a hardcoded hex.
-
-### Surfaces — warm paper + white floating cards
+### Surfaces
 | Token | Hex | Use |
 |---|---|---|
-| `--bg` | `#F5F2EB` | Page canvas. The abstract wash is layered on top via `background-image`. |
-| `--surface` | `#FFFFFF` | Cards, panels, inputs — float above the paper on `--shadow-md`. |
-| `--surface-2` | `#F1EDE4` | Hover / inset / selected fill. |
-| `--surface-3` | `#FBFAF6` | Nested insets (evidence boxes, composer fields). |
-| `--border` | `#E9E4D8` | Hairline borders, dividers. |
-| `--border-strong` | `#D8D2C4` | Input borders, ghost edges. |
+| `--bg` | `#F5F2EB` | Page canvas (warm paper, faint dot grid + corner washes). |
+| `--surface` | `#FFFFFF` | Tiles, sheets, inputs. |
+| `--surface-2` | `#F1EDE4` | Pressed / selected / inset fill, progress tracks. |
+| `--surface-3` | `#FBFAF6` | Nested insets. |
+| `--border` | `#E9E4D8` | The 2px tile outline. |
+| `--border-strong` | `#D8D2C4` | The tile's hard bottom **edge**; input borders. |
 
-### Text — warm ink
-| Token | Hex | Use |
-|---|---|---|
-| `--text` | `#211C17` | Primary text, headings. |
-| `--text-muted` | `#6E665B` | Body copy, secondary. |
-| `--text-faint` | `#9C9385` | Labels, eyebrows, meta, captions. |
+### Ink
+`--text #211C17` · `--text-muted #6E665B` · `--text-faint #9C9385`.
 
-### Ember — brand / energy / doing
-| Token | Hex | Use |
-|---|---|---|
-| `--accent` | `#FF5A1E` | Primary CTA fill, active states, links-as-emphasis, key numbers. |
-| `--accent-hover` | `#F04E14` | Hover — **darker** on a light bg. |
-| `--accent-press` | `#CE400C` | The 3D button's solid base edge. |
-| `--accent-ink` | `#2A1206` | Dark text on ember (when not using white). |
-| `--accent-soft` | `rgba(255,90,30,.10)` | Tint fills, selected chips, focus rings. |
-| `--accent-line` | `rgba(255,90,30,.30)` | Tinted borders on selected/owned surfaces. |
+### Ember — action / doing
+`--accent #FF5A1E` · `--accent-hover #F04E14` · `--accent-press #CE400C` (button edge) ·
+`--accent-ink #2A1206` · `--accent-soft rgba(255,90,30,.10)` · `--accent-line rgba(255,90,30,.30)`.
 
-Primary buttons use **white** text on ember (with a 1px dark text-shadow for crispness).
-
-### Lime / green — earned / verified / XP / level / streak
-| Token | Hex | Use |
-|---|---|---|
-| `--signal` | `#C6F24E` | The bright **fill**: XP bars, verify button, earned badge backgrounds. |
-| `--signal-hi` | `#D4FB66` | Top of an XP fill, hover. |
-| `--signal-press` | `#8FB534` | The 3D base edge under a lime button; verified ring. |
-| `--signal-ink` | `#1B2E00` | Dark text on a lime fill. |
-| `--signal-text` | `#3F8F1C` | **Readable green for earned/verified TEXT + icons** on light. |
-| `--signal-soft` | `rgba(141,201,42,.14)` | Tint fills, earned chips. |
-| `--signal-line` | `rgba(120,170,40,.40)` | Tinted borders on earned surfaces. |
+### Lime / green — earned / verified / XP / streak
+`--signal #C6F24E` (fill) · `--signal-hi #D4FB66` · `--signal-press #8FB534` (edge) ·
+`--signal-ink #1B2E00` (text on lime) · `--signal-text #3F8F1C` (green text/icons on light) ·
+`--signal-soft rgba(141,201,42,.14)` · `--signal-line rgba(120,170,40,.40)`.
 
 ### Functional
-| Token | Hex | Use |
-|---|---|---|
-| `--success` | `#3F8F1C` | "Verified" status text, live blips (the same green as earned). |
-| `--warn` | `#C2790F` | "Returned", attention. Never red — *returned ≠ rejected*. |
-| `--danger` | `#D63A2C` | **Errors only.** Never reuse ember for errors. |
-
-### Glass & elevation
-Frosted **white** glass: `--glass-bg` `rgba(255,255,255,.72)` · `--glass-bg-strong`
-`rgba(255,255,255,.84)` · `--glass-border` `rgba(33,28,23,.08)` · `--glass-blur` `16px`.
-Shadows are soft and warm (brown-toned, not black): `--shadow-sm/md/lg` (cards default to
-`--shadow-md`, hover `--shadow-lg`), plus the one colored glow `--shadow-ember` under the CTA.
-
-### The abstract canvas (don't hand-roll your own)
-It's defined once on `body` and is `background-attachment: fixed`: a faint dot grid
-(`rgba(86,66,38,.05)`, 26px) + an ember wash top-right + a lime wash bottom-left + a soft
-ember pool below. Page sections sit on it transparently; cards cover it. Don't add competing
-page backgrounds — let this show through the gutters.
+`--success #3F8F1C` · `--warn #C2790F` (returned ≠ rejected — never red) ·
+`--danger #D63A2C` (errors only, never ember).
 
 ---
 
-## 3. Typography
+## 2. Typography — one loud family + mono
 
-Three faces, three jobs. Loaded via `next/font/google` in `app/layout.tsx`.
-
-| Role | Family | Variable | Job |
+| Role | Family | Token | Job |
 |---|---|---|---|
-| **Display** | **Fraunces** (600–700) | `--font-display` → `--font-head` | Headlines, mastheads, card titles. A high-contrast serif — distinctive, premium, characterful, and very readable at scale. The brand voice. |
-| **Body / UI** | **Schibsted Grotesk** (400–600) | `--font-text` → `--font` | Everything you read. Clean, modern, friendly grotesque. |
-| **Mono / data** | Geist Mono (500–600) | `--font-geist-mono` → `--font-mono` | XP, levels, streaks, milestone codes, units, eyebrows, timers. |
+| Everything | **Gabarito** 400–900 | `--font` | Display at 800–900 (big, tight, friendly-geometric); UI/body at 400–600. One family = game-UI coherence. |
+| Data | **Geist Mono** 500–700 | `--font-mono` | XP, streaks, counts, dates, codes. Numbers that prove work stay mono. |
 
-The serif-display / grotesk-body pairing is deliberate: it reads crafted and ambitious
-rather than another templated tech sans. Set headings with `font-optical-sizing: auto` so
-Fraunces uses its display optical size at large sizes.
+Fraunces and Schibsted Grotesk are **retired**.
 
 ### Scale
-| Role | Size | Weight | Notes |
-|---|---|---|---|
-| Display (`.display`, h1) | `clamp(46px, 8.5vw, 104px)` | 600 | `line-height: .98`, `letter-spacing: -.025em`. Left-aligned. |
-| Masthead title | `clamp(44px, 9vw, 116px)` | 600 | `-.03em`. The page's name, oversized. |
-| h2 (`.h2`) | `clamp(30px, 5vw, 54px)` | 600 | `-.022em`. |
-| h3 (`.h3`) | `clamp(19px, 2vw, 23px)` | 600 | `-.012em`. |
-| Lead (`.lead`) | `clamp(17px, 1.5vw, 20px)` | 400 | `--text-muted`, `max-width: 62ch`. Schibsted. |
-| Body | `16px` | 400 | `line-height: 1.6`. **Never below 16px** for paragraphs. |
-| Eyebrow (`.eyebrow`, `.kicker`) | `11px` | 500 | **Mono**, uppercase, `letter-spacing: .1–.14em`, `--text-faint`. |
-| Data figure (`.mono`) | varies | 600 | Mono, `tnum` on. XP / level / streak numbers. |
+| Class | Size | Weight |
+|---|---|---|
+| `.display` (marketing h1) | `clamp(44px, 9vw, 96px)` | 900, `-0.03em`, lh 0.95 |
+| `.h1` (screen title) | `clamp(28px, 5vw, 44px)` | 800 |
+| `.h2` | `clamp(22px, 3vw, 30px)` | 800 |
+| `.h3` (tile title) | `17–19px` | 700 |
+| Body | 16px | 400–500 (body ≥ 16px, always) |
+| `.micro` | 11–12px mono | 600, uppercase, tracked — labels/meta only |
+| `.num` | context | mono 700, `tnum` |
 
 ---
 
-## 4. Spacing, radii, motion
+## 3. Shape, depth, space, motion
 
-**Spacing:** `--space-xs 4` · `--space-tight 8` · `--space-sm 12` · `--space-gap 24` ·
-`--space-cta 48` · `--space-lg 64`. Section padding `clamp(64px, 9vw, 120px)`; gutter
-`clamp(20px, 5vw, 64px)`; `--maxw 1240px`.
-
-**Radii (friendly + tactile):** `--radius-xs 8` · `--radius 12` (inputs, buttons) ·
-`--radius-card 20` (cards, panels) · `--radius-lg 28` (modals) · `--radius-pill 999`
-(chips, badges, avatars, XP bars). Slightly softer than a typical app — warmer, more toy-like.
-
-**Motion:** easings `--ease-out` (entrances) and `--ease-spring` (the button + pops).
-Durations `--t-fast .15s`, `--t-med .25s`, `--t-slow .5s`.
-- Entrances: opacity + `translateY(≤18px)`, staggered via `data-d`.
-- The **3D push button** (see below) is the signature interaction.
-- Earned moments (verify, level-up) may use a brief spring pop — never an ambient loop.
-- **No** infinite ambient animation (the canvas wash is static).
-- Honor `prefers-reduced-motion: reduce` — entrances and all button transforms disabled.
+- **Radii:** `--radius-sm 12` · `--radius 16` (buttons, inputs, chips) · `--radius-tile 22`
+  (tiles) · `--radius-lg 28` (sheets/modals) · `--radius-pill 999`.
+- **The edge (replaces soft shadows):** resting tiles = `2px solid --border` outline +
+  `0 4px 0 --border-strong`. Buttons = `0 5px 0 <press color>`. Press = translateY(+edge),
+  edge collapses to 0. One soft ambient shadow (`--shadow-pop`) is reserved for floating
+  chrome (modals, tab bar).
+- **Spacing:** 4 / 8 / 12 / 16 / 24 / 40 / 64. Screens are `--maxw 1100px`, gutter
+  `clamp(16px, 4vw, 48px)`. Tap targets ≥ 44px.
+- **Motion:** `--ease-out` for entrances, `--ease-spring` for pops. Press travel ~90ms.
+  Earned moments (verify, level-up, streak tick) get one spring pop (`.pop`). Bars animate
+  width 0.6s. No ambient loops. `prefers-reduced-motion` kills all of it.
 
 ---
 
-## 5. Components
+## 4. Components (the vocabulary)
 
-### Buttons (`.btn`) — the 3D push
-Rounded (`--radius`), 15px/600. Variants:
-- **`.btn--primary`** — the signature **ember push button**. White text, sits on a solid
-  `--accent-press` base edge (`box-shadow: 0 4px 0`) + a soft ember glow. **Hover** lifts it
-  (`translateY(-2px)`, base grows to 6px). **Active** travels it down (`translateY(4px)`,
-  base collapses to 0) — it physically depresses into the page.
-- **`.btn--signal`** — same push mechanic in lime/green, for verify/earned actions.
-- **`.btn--neutral`** — ink push button for high-emphasis secondary.
-- **`.btn--ghost`** — quiet white outline that warms to ember on hover (small lift, no base).
-- **`.btn--accent`** — alias of primary.
-- Disabled `opacity .5`, no travel.
+### Tiles (`.tile`)
+The universal card: white, 2px `--border` outline, `--radius-tile`, hard bottom edge.
+- `.tile--tap` — interactive: hover lifts 1px, active travels down (a real piece).
+- `.tile--ember` — "your move" surfaces: ember outline + ember-soft tint.
+- `.tile--lime` — earned surfaces: lime tint + `--signal-line` outline.
+- `.tile--flat` — no edge (quiet lists inside panels, admin density).
 
-### Inputs / fields (`.field`)
-White `--surface`, `1px --border-strong`, `--radius`, 16px text. Label above in **mono**
-uppercase `--text-faint`, 8px gap. Focus: `border --accent` + `0 0 0 3px --accent-soft`.
-Placeholder `--text-faint`. Nested composer/inline fields use `--surface-3`.
+### Buttons (`.btn`) — the push, chunkier
+Gabarito 700, 16px, `--radius`, min-height 48px (`.btn--sm` 38px). Travel mechanic kept
+from v1 but the pieces are thicker:
+- `.btn--primary` — ember, white text, `0 5px 0 --accent-press`.
+- `.btn--verify` — lime fill, `--signal-ink` text, `0 5px 0 --signal-press`. Earned actions only.
+- `.btn--ink` — ink piece, for high-emphasis secondary.
+- `.btn--ghost` — white piece with 2px border + border-strong edge (still travels).
+- `.btn--block` full width. Disabled: 50%, no travel.
+Button copy is **one or two words.**
 
-### Cards / panels (`.panel`, `.pillar`, `.ccard`, `.dossier`, `.season-map`)
-White `--surface`, hairline `--border`, `--radius-card`, **`--shadow-md` by default** —
-they float. On hover, cards *settle* rather than jump: the hairline warms to
-`--border-strong` and the shadow deepens to `--shadow-lg` with **no `transform`**. **Owned/mine**
-surfaces wear an `--accent-line` ring; **earned** surfaces wear `--signal-line`.
+### HUD (`.hud*`)
+The always-on game state, part of the shell: **flame + streak count** (green when alive
+today, faint when at risk), **XP pill** (mono), **level ring** (SVG progress ring around the
+level number). Pages never repeat these numbers.
 
-### Glass (`.glass`, nav, `.side` rail, modals)
-Frosted white: `--glass-bg` + `backdrop-filter: blur() saturate()` + hairline border. Nav
-and modals are glass; the sidebar rail is solid white with a soft shadow.
+### Nav
+- **Mobile (≤860px):** fixed bottom **tab bar** (`.tabbar`), 4–5 icon tabs, active = ember
+  icon + dot. Safe-area padded. Top bar carries brand + HUD.
+- **Desktop:** slim left **rail** (`.rail`, ~92px): logo, icon+word tabs, HUD at bottom.
 
-### Gamification vocabulary
-- **XP / progress meter (`.meter`)** — 9px pill, light track, **lime** charge.
-  `.meter--ember` for in-progress (not-yet-earned) tracks.
-- **Level badge (`.badge--level`)** — mono, ember-tinted pill (Cadet → Builder → Operator →
-  Closer → Architect).
-- **Earned badge / verified (`.badge--earned`)** — mono, green-tinted pill.
-- **XP pill (`.xp-pill`)** — mono green on a lime tint, e.g. `+10 XP`.
-- **Milestone track (`.track__item`)** — numbered mono `.track__dot`; `.active` = ember ring,
-  `.done` = lime fill + green ring. `.track__returned` uses `--warn`.
-- **Streak (`.side__streak`)** — green-tinted chip, flame + count in green mono.
+### Progress
+- `.bar` — 14px pill track (`--surface-2`, inset ring), lime charge with a top shine.
+  `.bar--ember` for in-progress tracks. `.bar--xs` 8px.
+- `.path` — the **quest path** (milestone track): 48px circular nodes on a thick vertical
+  rail. `done` = lime fill + green ring + check; `active` = white + ember ring + pulse dot;
+  `locked` = faint outline. Node meta is icons + mono numbers, not sentences.
+- `.ring` — SVG progress ring (level, squad %).
 
-### Chips & pickers (`.chip`, `.pick`)
-Pill-shaped. `.pick.sel` / `.chip--on` / `.chip--gate` = ember-tint. `.chip--why` /
-`.chip--open` (earned, open-to-all) = green-tint. `.chip--want` = dashed ghost.
+### Identity
+- `.av` — avatar disc (initial, ember-tinted). Sizes 28/36/44. `.avstack` overlaps them —
+  the default way to show "who's here" (never a name list when a stack will do).
+- `.badge` — chunky pill: `.badge--level` (ember), `.badge--earned` (lime/green),
+  `.badge--locked` (dashed). `.xp` — mono `+150` chip in green.
+- `.flame` — the streak icon: ember-filled when alive, outline when cold.
+
+### Fields (`.field`)
+2px `--border-strong` border, `--radius`, 16px text, 48px min height. Focus = ember border
++ soft ring. Labels are `.micro` mono (one or two words) — or absent when the placeholder
+says it all. `.choices`/`.pick` chips are physical pieces too (2px border, edge, press).
+
+### Sheets & modals (`.sheet`)
+White, `--radius-lg`, 2px border, `--shadow-pop`; slide-up on mobile (bottom sheet),
+centered on desktop. Scrim blurs the paper.
 
 ### Icons
-Monochrome outline only (Feather/Lucide, `stroke: currentColor`, `~1.6`). Color comes from
-context, never a glow. Never filled, multicolor, or emoji.
+Inline SVG, `stroke: currentColor`, width 2–2.2 (thicker than v1 — toy-like). Filled shapes
+allowed for the game glyphs (flame, bolt, check seal). No emoji in UI chrome; emoji are
+allowed *sparingly* in celebratory copy ("🔥" next to a record streak is fine, one per view).
 
 ---
 
-## 6. Layout
+## 5. Voice & copy rules
 
-- **Asymmetric by default.** Two-column sections use uneven ratios (`.8fr 1.2fr`, `1.1fr .9fr`).
-- Hero left-aligned, single column, ~800px, over the canvas wash (and an optional faint
-  `.blueprint` grid for extra texture).
-- The product shell is a **white sidebar rail** + scrolling main. Page headers are oversized
-  **mastheads** (Fraunces) that name the screen.
-- Grids carry stats/cards; let light + spacing — not boxes-on-boxes — do the work.
+- Student surfaces: **no paragraphs.** Headings ≤ 4 words, buttons 1–2 words, hints ≤ 6
+  words. If it needs more, cut the feature copy, not the clarity: prefer a number, an icon,
+  a bar.
+- Second person, present tense, zero corporate ("Ship something today", "Your move",
+  "Squad's waiting").
+- Encouraging on setbacks: returned work says what to fix in the verifier's words — the UI
+  itself never scolds. `--warn`, never red.
+- **Two exceptions:** the marketing page persuades (sentences allowed, still tight) and the
+  **parent consent page** reassures (calm, complete sentences, no game visuals, no slang —
+  parents are the one non-teen audience).
 
----
+## 6. Layout recipes
+
+- **Screen = HUD (shell) + one title word + tiles.** Titles are `.h1` single words or short
+  phrases ("Today", "Squads", "Sessions").
+- Tile grids: 2-col on desktop, single column on mobile, 12–16px gaps.
+- The **quest path** is the spine of the squad screen; everything else hangs off it.
+- Empty states: one line + one button. Never a paragraph.
+- Admin (mentor console) may be denser (`.tile--flat` lists, tabs) but uses the same pieces.
 
 ## 7. Pre-ship checklist
 
-- [ ] Light only. Warm paper canvas with the gentle wash showing through gutters.
-- [ ] Cards are white and **float** (soft warm shadow by default; settle — not lift — on hover).
-- [ ] Only the two accents, scarce. Ember = action, lime/green = earned. Never mixed up.
-- [ ] Lime as **fill**; deep green (`--signal-text`) for earned/verified **text + icons**.
-- [ ] Primary/verify buttons use the 3D push (base edge + travel-on-click).
-- [ ] No multi-hue/decorative gradients; the wash is gentle and never tints a card.
-- [ ] Earned numbers (XP, level, streak) are **mono + green**.
-- [ ] Fraunces headlines, Schibsted Grotesk body, Geist Mono data. Body ≥16px.
-- [ ] Headlines left-aligned; layout asymmetric, not centered.
-- [ ] Errors use `--danger`, not ember. Returned uses `--warn`, not red.
+- [ ] Palette untouched: paper canvas, ink, ember = action, lime fill/green text = earned.
+- [ ] Every interactive element is a piece: 2px outline, hard bottom edge, press travel.
+- [ ] Streak/XP/level appear in the HUD only — never re-stated in page copy.
+- [ ] No explanatory paragraphs outside `/` (marketing) and `/consent/*` (parents).
+- [ ] Buttons ≤ 2 words. Labels ≤ 2 words or absent.
+- [ ] Numbers are mono (`tnum`). Earned numbers are green.
+- [ ] Mobile: bottom tab bar, safe-area insets, tap targets ≥ 44px, 390px looks intentional.
+- [ ] Errors `--danger`; returned `--warn`; never ember for either.
 - [ ] Colors via CSS variables — zero hardcoded hex in components.
-- [ ] Motion is opacity/translate (+ the button push); reduced-motion honored.
+- [ ] Reduced motion honored (no travel, no pops, no bar animation).

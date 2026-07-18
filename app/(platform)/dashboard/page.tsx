@@ -11,9 +11,10 @@ import {
   addBuildLog,
   getUpcomingWorkshops,
 } from "../../lib/db";
-import { levelOf, nextLevel, levelProgress, localDay } from "../../lib/gamify";
+import { localDay } from "../../lib/gamify";
 import { TRACK } from "../../lib/milestones";
 import type { Cohort, MilestoneSubmission, BuildLog, Workshop } from "../../lib/types";
+import { Avatar, AvStack, Bar, CheckIcon, FlameIcon, LockIcon } from "../../components/ui";
 import { WorkshopList } from "../../components/WorkshopList";
 
 export default function HomePage() {
@@ -71,10 +72,6 @@ export default function HomePage() {
 
   if (!user || !profile) return null;
 
-  const lvl = levelOf(profile.xp);
-  const next = nextLevel(profile.xp);
-  const pct = Math.round(levelProgress(profile.xp) * 100);
-
   const myVerified = subs.filter(
     (s) => s.uid === profile.uid && s.status === "verified"
   ).length;
@@ -84,193 +81,161 @@ export default function HomePage() {
         (s) => s.uid === profile.uid && s.milestoneId === m.id && s.status === "verified"
       )
   );
-  const nextSession = workshops[0];
   const loggedToday = profile.lastBuildLogDay === localDay();
   const consentPending = profile.consentStatus === "pending";
+  const first = profile.name.split(" ")[0];
 
   return (
-    <div className="page">
-      <header className="masthead">
-        <div className="masthead__index">
-          <span className="eyebrow">
-            <span className="dot" /> Operator console
-          </span>
-          <span className="masthead__meta">
-            L{lvl.level} {lvl.name} · <b>{profile.xp} XP</b>
-          </span>
-        </div>
-        <h1 className="masthead__title">
-          {profile.name.split(" ")[0]},<br />
-          ship something <span className="accent">today.</span>
-        </h1>
+    <div className="screen">
+      <header className="screen__head">
+        <h1 className="h1">Yo, {first}.</h1>
       </header>
 
       {consentPending && (
-        <div className="panel notice page__block">
-          <b>Waiting on parental consent.</b> We&apos;ve flagged your parent or
-          guardian. Community features unlock once they approve.
+        <div className="notice screen__block">
+          <LockIcon size={20} />
+          <span>
+            Waiting on your parent&apos;s OK.
+            <small>They got an email — everything unlocks after.</small>
+          </span>
         </div>
       )}
 
-      {/* ---- Stats ---- */}
-      <div className="stats">
-        <div className="panel stat-card">
-          <span className="stat-card__label">Streak</span>
-          <span className="stat-card__n">
-            {profile.streak}
-            <small> {profile.streak === 1 ? "day" : "days"}</small>
-          </span>
-          <span className="stat-card__hint">
-            {profile.streakFreezes > 0
-              ? `${profile.streakFreezes} freeze${profile.streakFreezes > 1 ? "s" : ""} banked`
-              : loggedToday
-                ? "Counted today."
-                : "Post a build log to keep it alive."}
-          </span>
-        </div>
-
-        <div className="panel stat-card">
-          <span className="stat-card__label">
-            L{lvl.level} {lvl.name}
-          </span>
-          <span className="stat-card__n">
-            {profile.xp}
-            <small> xp</small>
-          </span>
-          <span className="meter" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-            <i style={{ width: `${pct}%` }} />
-          </span>
-          <span className="stat-card__hint">
-            {next
-              ? `${next.xp - profile.xp} xp to L${next.level} ${next.name}`
-              : "Top of the ladder."}
-          </span>
-        </div>
-
-        <div className="panel stat-card">
-          <span className="stat-card__label">Track</span>
-          <span className="stat-card__n">
-            {myVerified}
-            <small> / {TRACK.length} verified</small>
-          </span>
-          <span className="stat-card__hint">
-            {cohort
-              ? myCurrent
-                ? `Now: ${myCurrent.name}`
-                : "Season complete."
-              : "Join a squad to start the track."}
-          </span>
-        </div>
-
-        <div className="panel stat-card">
-          <span className="stat-card__label">Next session</span>
-          <span className="stat-card__n stat-card__n--sm">
-            {nextSession
-              ? nextSession.startsAt.toDate().toLocaleDateString(undefined, {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })
-              : "—"}
-          </span>
-          <span className="stat-card__hint">
-            {nextSession
-              ? `${nextSession.title} · ${nextSession.mentorName}`
-              : "Nothing scheduled."}
-          </span>
-        </div>
-      </div>
-
-      <div className="home-grid">
-        {/* ---- My squad + build log ---- */}
-        <section>
-          <h2 className="h3 page__subhead">Your squad</h2>
-          {myCohorts === null ? null : cohort ? (
-            <>
-              <Link href={`/cohorts/${cohort.id}`} className="ccard ccard--mine">
-                <div className="ccard__top">
-                  <h3 className="h3">{cohort.name}</h3>
-                  <span className="ccard__count">
-                    {cohort.memberUids.length} members
-                    {cohort.weeklyStreak > 0 && ` · ${cohort.weeklyStreak}wk streak`}
-                  </span>
+      {cohort ? (
+        <div className="grid2 grid2--wide">
+          <div className="stack">
+            {/* ---- Today's move: the build log ---- */}
+            <section className={`tile ${loggedToday ? "tile--lime" : "tile--ember"}`}>
+              <div className="tile__head">
+                <h2 className="h3">
+                  {loggedToday ? (
+                    <>
+                      <span className="signal"><CheckIcon /></span> Shipped today
+                    </>
+                  ) : (
+                    <>
+                      <span className="flame flame--on"><FlameIcon filled /></span> Ship one line
+                    </>
+                  )}
+                </h2>
+                {!loggedToday && <span className="xp">+10</span>}
+              </div>
+              <div className="composer">
+                <input
+                  className="input"
+                  value={logText}
+                  onChange={(e) => setLogText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !busy && logText.trim() && postLog()}
+                  placeholder={loggedToday ? "Shipped more? Log it." : "What did you build today?"}
+                  maxLength={300}
+                  disabled={consentPending}
+                />
+                <button
+                  className="btn btn--primary"
+                  disabled={busy || !logText.trim() || consentPending}
+                  onClick={postLog}
+                >
+                  Ship
+                </button>
+              </div>
+              {logs.length > 0 && (
+                <div className="feed">
+                  {logs.slice(0, 3).map((l) => (
+                    <div key={l.id} className="feed__row">
+                      <Avatar name={l.name} size="sm" />
+                      <div className="feed__body">
+                        <b>{l.name}</b> <span className="feed__day">{l.day}</span>
+                        <p>{l.text}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-                <p className="ccard__mission">{cohort.mission}</p>
-                {myCurrent && (
-                  <span className="meter meter--wide">
-                    <i style={{ width: `${Math.round((myVerified / TRACK.length) * 100)}%` }} />
-                  </span>
-                )}
-                <span className="ccard__go">Open workspace</span>
-              </Link>
+              )}
+            </section>
 
-              <div className="panel log-quick">
-                <div className="panel__head">
-                  <h3 className="h3">Build log</h3>
-                  <span className="kicker">
-                    {loggedToday ? "logged today ✓" : "+10 XP · feeds your streak"}
-                  </span>
-                </div>
-                <div className="log-composer">
-                  <textarea
-                    value={logText}
-                    onChange={(e) => setLogText(e.target.value)}
-                    placeholder="What did you do today? One line counts."
-                    maxLength={300}
-                    disabled={consentPending}
-                  />
-                  <button
-                    className="btn btn--primary"
-                    disabled={busy || !logText.trim() || consentPending}
-                    onClick={postLog}
-                  >
-                    Post
-                  </button>
-                </div>
-                {logs.slice(0, 3).map((l) => (
-                  <div key={l.id} className="log-row">
-                    <span className="side__av" aria-hidden="true">
-                      {l.name.slice(0, 1)}
-                    </span>
-                    <div>
-                      <b>{l.name}</b>
-                      <span className="log-row__day"> · {l.day}</span>
-                      <p>{l.text}</p>
+            {/* ---- Next milestone ---- */}
+            <Link href={`/cohorts/${cohort.id}`} className="tile tile--tap">
+              <div className="tile__head">
+                <h2 className="h3">Next up</h2>
+                {myCurrent && <span className="xp">+{myCurrent.xp}</span>}
+              </div>
+              {myCurrent ? (
+                <div className="path" style={{ marginBottom: 12 }}>
+                  <div className="path__item active" style={{ padding: 0 }}>
+                    <span className="path__node">{myCurrent.id}</span>
+                    <div className="path__body">
+                      <span className="path__name">{myCurrent.name}</span>
+                      <div className="path__meta">
+                        <span className="path__count">{myCurrent.week}</span>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="panel empty-cta">
-              <p className="dash__empty">
-                You&apos;re not in a squad yet — that&apos;s the whole point of
-                this place.
-              </p>
-              <Link href="/cohorts" className="btn btn--primary">
-                Find your squad
-              </Link>
-            </div>
-          )}
-        </section>
-
-        {/* ---- This week ---- */}
-        <section>
-          <div className="page__subrow">
-            <h2 className="h3 page__subhead">This week</h2>
-            <Link href="/learn" className="page__more">
-              All sessions
+                </div>
+              ) : (
+                <p className="path__state path__state--ok" style={{ marginBottom: 12 }}>
+                  Track complete
+                </p>
+              )}
+              <Bar value={myVerified / TRACK.length} />
+              <span className="micro" style={{ display: "block", marginTop: 8 }}>
+                {myVerified}/{TRACK.length} verified
+              </span>
             </Link>
           </div>
-          <div className="panel">
-            {workshops.length === 0 ? (
-              <p className="dash__empty">Nothing scheduled.</p>
-            ) : (
-              <WorkshopList workshops={workshops.slice(0, 3)} />
-            )}
+
+          <div className="stack">
+            {/* ---- Squad ---- */}
+            <Link href={`/cohorts/${cohort.id}`} className="tile tile--tap sq">
+              <div className="sq__top">
+                <span className="sq__name">{cohort.name}</span>
+                {cohort.weeklyStreak > 0 && (
+                  <span className="hud__stat hud__stat--fire">
+                    <FlameIcon filled size={14} />
+                    {cohort.weeklyStreak}w
+                  </span>
+                )}
+              </div>
+              <AvStack names={cohort.memberUids.map((u) => cohort.memberNames[u] ?? "?")} />
+              <p className="sq__mission">{cohort.mission}</p>
+            </Link>
+
+            {/* ---- This week ---- */}
+            <section className="tile">
+              <div className="tile__head">
+                <h2 className="h3">This week</h2>
+                <Link href="/learn" className="screen__more">
+                  All
+                </Link>
+              </div>
+              {workshops.length === 0 ? (
+                <p className="empty">Nothing yet.</p>
+              ) : (
+                <WorkshopList workshops={workshops.slice(0, 3)} />
+              )}
+            </section>
           </div>
-        </section>
-      </div>
+        </div>
+      ) : myCohorts === null ? null : (
+        <div className="stack">
+          <section className="tile tile--ember empty" style={{ alignItems: "flex-start" }}>
+            <h2 className="h2">No squad yet.</h2>
+            <Link href="/cohorts" className="btn btn--primary">
+              Find your squad
+            </Link>
+          </section>
+          {workshops.length > 0 && (
+            <section className="tile">
+              <div className="tile__head">
+                <h2 className="h3">This week</h2>
+                <Link href="/learn" className="screen__more">
+                  All
+                </Link>
+              </div>
+              <WorkshopList workshops={workshops.slice(0, 3)} />
+            </section>
+          )}
+        </div>
+      )}
     </div>
   );
 }

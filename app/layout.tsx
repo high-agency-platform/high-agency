@@ -1,24 +1,17 @@
 import type { Metadata } from "next";
-import { Fraunces, Schibsted_Grotesk, Geist_Mono } from "next/font/google";
+import { Gabarito, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-// Display — Fraunces: a distinctive high-contrast serif for oversized,
-// characterful headlines (masthead scale). Unique brand voice, very readable.
-const display = Fraunces({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-  axes: ["opsz", "SOFT"],
-});
-
-// Text — Schibsted Grotesk: a clean, modern grotesque for body, UI, labels.
-const text = Schibsted_Grotesk({
+// One loud family — Gabarito (400–900): friendly-geometric at body weights,
+// game-title confident at 800/900. The whole UI speaks it.
+const text = Gabarito({
   subsets: ["latin"],
   variable: "--font-text",
   display: "swap",
+  weight: ["400", "500", "600", "700", "800", "900"],
 });
 
-// Mono — instrumentation: XP, levels, streaks, milestone codes, timers.
+// Mono — instrumentation: XP, streaks, counts, dates, codes.
 const mono = Geist_Mono({
   subsets: ["latin"],
   variable: "--font-geist-mono",
@@ -56,7 +49,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${display.variable} ${text.variable} ${mono.variable}`}
+      className={`${text.variable} ${mono.variable}`}
       data-scroll-behavior="smooth"
     >
       <body suppressHydrationWarning>{children}</body>
