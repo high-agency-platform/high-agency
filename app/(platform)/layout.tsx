@@ -96,7 +96,10 @@ function TabBar() {
 function Shell({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const pathname = usePathname();
-  const bare = pathname === "/login" || pathname === "/onboarding";
+  const bare =
+    pathname === "/login" ||
+    pathname === "/onboarding" ||
+    pathname.startsWith("/mentor"); // invite-only mentor signup renders bare too
 
   if (bare || !user) return <main>{children}</main>;
 

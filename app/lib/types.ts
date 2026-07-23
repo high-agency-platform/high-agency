@@ -15,8 +15,41 @@ export type ConsentStatus = "none" | "pending" | "granted";
 
 export type Plan = "free" | "pro";
 
-/** mentor is staff-assigned (admin script); peer-leads are per-cohort. */
+/** mentor is staff-assigned — via a single-use invite link (`/mentor/join`,
+ *  minted by scripts/mentor-invite.js) or the break-glass admin script.
+ *  Peer-leads are per-cohort. */
 export type Role = "operator" | "mentor";
+
+/** What the mentor signup form submits to POST /api/mentor/redeem. The server
+ *  (Admin SDK, bypasses rules) sanitizes + bounds every field itself before
+ *  writing the profile — this type is the wire contract, not the validation.
+ *  Deliberately no DOB / parent email: mentors are adults (attested 18+ in the
+ *  form), so no privateProfiles doc is created and consent is "granted". */
+export interface MentorSignupInput {
+  firstName: string;
+  lastName: string;
+  country: string;
+  /** IANA timezone from the browser — office-hours scheduling signal. */
+  timezone: string;
+  /** Credibility one-liner, e.g. "Founder of X — 2 exits". */
+  headline: string;
+  /** What they're building/working on now (optional, like operators). */
+  building: string;
+  stage: VentureStage;
+  /** Expertise areas — DOMAINS presets or free-typed tags (mentors are niche
+   *  experts); server-normalized via normalizeFocusTag, capped at 9. */
+  domains: string[];
+  /** What they can coach — SKILLS presets or free-typed tags; server-
+   *  normalized, capped at 7. */
+  skills: string[];
+  proofUrl: string;
+  proofNote: string;
+  bio: string;
+  links: { github: string; linkedin: string; site: string };
+  /** Signup day in the mentor's local time (YYYY-MM-DD) — seeds the streak
+   *  fields the same client-trusted way operator onboarding does. */
+  localDay: string;
+}
 
 export const DOMAINS = [
   "AI",

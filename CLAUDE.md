@@ -91,8 +91,19 @@ not buy"). Don't conflate level gates with paywalls.
   admin panel** at `/admin` (`app/(platform)/admin/page.tsx`) now handles workshop CRUD and the
   parental-consent queue (gated on `role == "mentor"`, enforced by `firestore.rules`). **Break-
   glass / bootstrap operations still run as local Node scripts** (`scripts/`) — they authenticate
-  with the firebase-tools CLI OAuth token (IAM bypasses security rules), which is how the *first*
-  mentor gets promoted (`admin-set.js <uid> mentor`) and how seed/cleanup run.
+  with the firebase-tools CLI OAuth token (IAM bypasses security rules), which is how seed/cleanup
+  run and how a mentor can be promoted directly (`admin-set.js <uid> mentor`).
+- **Mentors onboard via single-use invite links, not the operator funnel.** Staff mints a code
+  with `scripts/mentor-invite.js "<label>" [days]` and shares the printed
+  `/mentor/join?code=…` URL 1:1. The join page (deliberately unlinked from any nav) validates
+  the code, signs the mentor in, and runs a **mentor-shaped onboarding** (identity + expertise;
+  no DOB/parent email — mentors attest 18+, `ageBand: "18+"`, consent `granted`, no
+  privateProfiles doc). Redemption is server-authoritative: `POST /api/mentor/redeem` verifies
+  the Firebase ID token and, in one Admin-SDK transaction, consumes the invite and mints
+  `role: "mentor"` — or **promotes an existing operator account in place**. Invites live in
+  `mentorInvites/{sha256(code)}` (server-only, rules deny-all, mirrors `consentTokens`); the
+  raw code is printed once at mint and never stored. Clients remain rules-blocked from ever
+  writing `role: "mentor"`.
 
 ## Domain model (the vocabulary)
 
@@ -100,8 +111,9 @@ Types live in [`app/lib/types.ts`](app/lib/types.ts); data access in
 [`app/lib/db.ts`](app/lib/db.ts).
 
 - **Operator** — an ambitious student member (primary persona). **Mentor** — staff/expert
-  who verifies advanced milestones and runs workshops (`Role` is `operator | mentor`,
-  mentor set by admin script).
+  who verifies advanced milestones and runs workshops (`Role` is `operator | mentor`;
+  mentors join via invite link — `scripts/mentor-invite.js` → `/mentor/join?code=…` — or
+  by admin script).
 - **Profile** (`profiles/{uid}`) — the public artifact cohorts evaluate. **Privacy by
   construction:** display name is `"First L."`, age is an `AgeBand` (`13-15 | 16-17 | 18+`),
   location is country + IANA timezone. **No email/phone/DOB/exact city ever.** Readable by
@@ -141,8 +153,14 @@ Types live in [`app/lib/types.ts`](app/lib/types.ts); data access in
   collection via [`app/lib/firebase.ts`](app/lib/firebase.ts) `submitApplication`).
 - `app/(platform)/` — the authenticated **product**, wrapped by
   [`app/(platform)/layout.tsx`](app/(platform)/layout.tsx) (AuthProvider + sidebar Shell;
-  `/login` and `/onboarding` render "bare"). Routes: `/login`, `/onboarding`, `/dashboard`,
-  `/cohorts`, `/cohorts/[id]`, `/profile`, `/learn`, and `/admin` (mentor-only).
+  `/login`, `/onboarding`, and `/mentor/*` render "bare"). Routes: `/login`, `/onboarding`,
+  `/dashboard`, `/cohorts`, `/cohorts/[id]`, `/profile`, `/learn`, `/admin` (mentor-only),
+  and `/mentor/join` (invite-only mentor signup, unlinked from nav).
+- `app/api/` — the server-authoritative Route Handlers (Node, `firebase-admin`, bypass rules):
+  `consent/send` + `consent/approve` (parental consent; approval page at `/consent/[token]`)
+  and `mentor/peek` + `mentor/redeem` (mentor invites). Server logic lives in
+  `app/lib/firebaseAdmin.ts`, `app/lib/consentServer.ts`, `app/lib/mentorInviteServer.ts` —
+  **never import these from client components.**
 - `app/styleguide/page.tsx` — the living design-system reference (top-level route, `noindex`).
 - `app/components/AuthProvider.tsx` — client auth context (`useAuth()` → `{ user, profile,
   logout }`); `user`/`profile` are `undefined` while resolving, `null` when absent.
@@ -153,9 +171,10 @@ Types live in [`app/lib/types.ts`](app/lib/types.ts); data access in
   is false (production), it redirects every platform route back to the waitlist at `/`.
 - `scripts/` — local admin/dev tooling (Node, REST + firebase CLI OAuth):
   `seed.js` (squads, profiles, workshops, build logs — the Learn page's content is these
-  workshops), `admin-set.js` (`<uid> consent|mentor|pro`), `cleanup-test.js`,
-  `test-applicant.js` (exercises the security rules as a real client), `fb-token.js` (token
-  helper). There is no `seed-courses.js`.
+  workshops), `admin-set.js` (`<uid> consent|mentor|pro`), `mentor-invite.js` (mint a
+  single-use mentor invite link), `cleanup-test.js`, `test-applicant.js` (exercises the
+  security rules as a real client), `fb-token.js` (token helper). There is no
+  `seed-courses.js`.
 - `firestore.rules` — the enforcement backend. `design-system.md` — visual SoT (read before
   any UI). `prd.md` — product spec. `High Agency Waitlist (standalone).html` — a standalone
   export of the waitlist (reference artifact).
@@ -197,13 +216,19 @@ npm run build    # next build
 npm run lint     # eslint
 
 # Local admin / data tooling (need `firebase login` as info@high-agency.io first):
-node scripts/seed.js                     # seed squads, profiles, workshops, build logs
-node scripts/admin-set.js <uid> mentor   # promote first mentor (also: consent | pro)
-node scripts/cleanup-test.js <cohortId>  # remove smoke-test artifacts
+node scripts/seed.js                        # seed squads, profiles, workshops, build logs
+node scripts/admin-set.js <uid> mentor      # promote a mentor directly (also: consent | pro)
+node scripts/mentor-invite.js "<label>" 30  # mint a single-use mentor invite link (days opt.)
+node scripts/cleanup-test.js <cohortId>     # remove smoke-test artifacts
+
+# Tests (wrap the Firestore emulator; pinned firebase-tools@13 devDep):
+npm test             # rules + consent + mentor-invite suites
+npm run test:rules   # firestore.rules enforcement (tests/rules.test.mjs)
+npm run test:consent # server consent-token logic (tests/consent.test.mts)
+npm run test:mentor  # server mentor-invite logic (tests/mentorInvite.test.mts)
 ```
 
-There is **no automated test suite** yet; `scripts/` are manual smoke-test + seed/admin
-helpers.
+Beyond those suites, `scripts/` are manual smoke-test + seed/admin helpers.
 
 ## Gotchas
 
@@ -218,6 +243,11 @@ helpers.
 - **Nothing is deployed.** `firestore.rules` lives in the repo but confirm it's actually
   **deployed** to `highagency-62e67` (`firebase deploy --only firestore:rules`) before trusting
   the live security posture — a repo rules file is not a deployed rules file.
+- **The `app/api/**` routes need Firebase Admin credentials in their runtime env.** Locally,
+  Application Default Credentials or the emulator suffice; on Vercel, set
+  `FIREBASE_SERVICE_ACCOUNT` (or `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY`) or every
+  server-authoritative flow — parental consent **and** mentor-invite redemption — 500s. Same
+  secret serves both.
 - **Firebase web config keys are public by design** (committed in `app/lib/firebase.ts`);
   security comes from Firestore rules, not from hiding keys. Don't "fix" this by removing
   them. They're overridable via `NEXT_PUBLIC_FIREBASE_*` env vars.

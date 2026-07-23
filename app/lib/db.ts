@@ -31,6 +31,7 @@ import type {
   BuildLog,
   Workshop,
   WeeklyHours,
+  MentorSignupInput,
 } from "./types";
 import { COHORT_MIN_TO_ACTIVATE } from "./types";
 import { XP, localDay, isoWeek, touchStreak } from "./gamify";
@@ -588,6 +589,60 @@ export async function requestConsentEmail(
     delivery?: "sent" | "logged";
     error?: string;
     retryAfter?: number;
+  };
+  return { ok: res.ok, ...data };
+}
+
+/* ---------------- Mentor invites ---------------- */
+
+export type MentorInviteStatus = "valid" | "used" | "expired" | "invalid";
+
+/** Check a mentor invite code before sign-in (step 1 of /mentor/join).
+ *  Unauthenticated — the server returns validity only, never invite details. */
+export async function peekMentorInvite(
+  code: string
+): Promise<MentorInviteStatus> {
+  const res = await fetch("/api/mentor/peek", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    status?: MentorInviteStatus;
+  };
+  return data.status ?? "invalid";
+}
+
+/** Redeem a mentor invite for the signed-in user. The server verifies the ID
+ *  token, consumes the single-use code, and either creates the mentor profile
+ *  from `profile` (fresh signup) or promotes the caller's existing operator
+ *  account when one exists (profile payload then ignored). This is the only
+ *  client-reachable way to become a mentor — rules block the role everywhere
+ *  else. Throws if not signed in. */
+export async function redeemMentorInvite(
+  code: string,
+  profile?: MentorSignupInput
+): Promise<{
+  ok: boolean;
+  /** "created" | "promoted" | "already-mentor" on success. */
+  status?: string;
+  /** "invalid" | "used" | "expired" | "profile-required" on failure. */
+  error?: string;
+}> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error("not-signed-in");
+  const idToken = await user.getIdToken();
+  const res = await fetch("/api/mentor/redeem", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${idToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(profile ? { code, profile } : { code }),
+  });
+  const data = (await res.json().catch(() => ({}))) as {
+    status?: string;
+    error?: string;
   };
   return { ok: res.ok, ...data };
 }

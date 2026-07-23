@@ -17,6 +17,7 @@ const PLATFORM_PREFIXES = [
   "/profile",
   "/learn",
   "/admin",
+  "/mentor",
 ];
 
 export function proxy(request: NextRequest) {
@@ -53,5 +54,7 @@ export const config = {
     "/learn/:path*",
     "/admin",
     "/admin/:path*",
+    "/mentor",
+    "/mentor/:path*",
   ],
 };

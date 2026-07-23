@@ -247,6 +247,25 @@ test("clients cannot read or write consentTokens", async () => {
   await assertFails(getDoc(doc(anon, "consentTokens/abc")));
 });
 
+test("clients cannot read or write mentorInvites", async () => {
+  const authed = testEnv.authenticatedContext("minor").firestore();
+  await assertFails(getDoc(doc(authed, "mentorInvites/abc")));
+  await assertFails(setDoc(doc(authed, "mentorInvites/abc"), { used: false }));
+
+  const anon = testEnv.unauthenticatedContext().firestore();
+  await assertFails(getDoc(doc(anon, "mentorInvites/abc")));
+});
+
+test("client cannot create a profile with role mentor (invite route only)", async () => {
+  const db = testEnv.authenticatedContext("wannabe").firestore();
+  await assertFails(
+    setDoc(doc(db, "profiles/wannabe"), {
+      ...profile("wannabe", "granted"),
+      role: "mentor",
+    })
+  );
+});
+
 /* ================= sanity: reads stay open while pending ================= */
 
 test("pending minor can still READ (sees the waiting-on-consent state)", async () => {

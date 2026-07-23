@@ -16,8 +16,9 @@ service cloud.firestore {
     //   by construction: name is "First L.", age is a band, location is
     //   country + timezone. No email/phone/DOB/exact city ever.
     //   role ('operator'|'mentor') and plan ('free'|'pro') are set by
-    //   admin tooling (OAuth bypasses rules); clients can't grant
-    //   themselves either. Other users may bump xp only (bounded) —
+    //   admin tooling (OAuth bypasses rules) or, for mentors, by the
+    //   invite-redemption Route Handler (Admin SDK — /api/mentor/redeem);
+    //   clients can't grant themselves either. Other users may bump xp only (bounded) —
     //   this is how verifiers pay out milestone XP (client-trusted v1).
     //
     // Collection: privateProfiles/{uid} — DOB, full name, exact city,
@@ -182,7 +183,8 @@ service cloud.firestore {
 
     // Mentors (trusted staff) grant parental consent in-app — the only
     // other cross-user profile write. Scoped to flipping consentStatus to
-    // 'granted'; role and plan grants stay in admin CLI tooling.
+    // 'granted'; role and plan grants stay server-side (admin CLI tooling
+    // and the mentor-invite redemption route).
     function isConsentGrant() {
       return isMentor() &&
              request.resource.data.diff(resource.data).affectedKeys().hasOnly(['consentStatus', 'updatedAt']) &&
@@ -449,6 +451,19 @@ service cloud.firestore {
     // ===============================================================
 
     match /consentTokens/{tokenHash} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Mentor invites — server-only, same posture as consentTokens.
+    // Minted by staff (scripts/mentor-invite.js, CLI OAuth) and consumed
+    // exclusively by the Admin SDK (/api/mentor/redeem). The doc id is the
+    // SHA-256 hash of the invite code, so even a hypothetical read could
+    // never leak a usable code — but no client may read or write anyway:
+    // becoming a mentor must stay server-authoritative.
+    // ===============================================================
+
+    match /mentorInvites/{codeHash} {
       allow read, write: if false;
     }
   }
