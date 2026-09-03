@@ -297,7 +297,7 @@ function MentorJoin() {
       <section className="gate">
         <div className="gate__inner">
           <h1 className="h1">You&apos;re already a mentor.</h1>
-          <p className="gate__sub">Nothing to redeem — your squads are waiting.</p>
+          <p className="gate__sub">Nothing to redeem — your operators are waiting.</p>
           <button
             className="btn btn--primary btn--block"
             onClick={() => router.replace("/mentor")}

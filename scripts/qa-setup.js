@@ -1,20 +1,17 @@
 // Dev-only: build / repair / inspect the permanent local-QA fixture.
 //
-// The fixture is two allowlisted accounts and one squad that ties them together:
-//   saiamartya19+qa-operator@gmail.com → operator, founder + peer-lead of "QA Squad"
-//   saiamartya19+qa-mentor@gmail.com   → mentor of "QA Squad"
-//   + two seed operators (seed-dev, seed-lena) so the squad clears
-//     COHORT_MIN_TO_ACTIVATE and can be `active`.
+// The fixture is two allowlisted accounts:
+//   saiamartya19+qa-operator@gmail.com → operator
+//   saiamartya19+qa-mentor@gmail.com   → mentor
+// plus the live season (seasons/s1, from scripts/season.js) they both work
+// against. There is no squad any more — everyone is in one room.
 //
 // Everything is idempotent — run it whenever the fixture looks off. It never
-// deletes anything (use scripts/cleanup-test.js <cohortId> for that).
+// deletes anything (use scripts/cleanup-test.js for that).
 //
 // Usage:
-//   node scripts/qa-setup.js            # ensure allowlist + squad membership, print status
+//   node scripts/qa-setup.js            # ensure allowlist, print status
 //   node scripts/qa-setup.js --status   # read-only report
-//   node scripts/qa-setup.js --adopt    # also make the QA mentor the squad's mentor
-//                                       # (normally do this through the UI:
-//                                       #  Mentor → Squads → Needs a mentor → Take it on)
 //   node scripts/qa-setup.js --link operator|mentor|<email>
 //                                       # mint a sign-in link for that account and print
 //                                       # it — no email, no dev-server log needed. Open it
@@ -22,7 +19,6 @@
 //
 // Auth: firebase-tools CLI OAuth token (IAM bypasses the rules) — run
 // `firebase login` as info@high-agency.io first. Same mechanism as seed.js.
-// The sign-in links themselves come from the dev server: see docs/qa-e2e.md.
 const { getAccessToken } = require("./fb-token");
 
 const PROJECT = "highagency-62e67";
@@ -37,17 +33,8 @@ const QA = {
   operator: { email: "saiamartya19+qa-operator@gmail.com", name: "QA Operator" },
   mentor: { email: "saiamartya19+qa-mentor@gmail.com", name: "QA Mentor" },
 };
-const SQUAD_NAME = "QA Squad";
-/** Doc id used only when the squad has to be created from scratch. */
-const SQUAD_ID = "qa-squad";
-/** Real-content seed profiles (scripts/seed.js) borrowed as extra members. */
-const EXTRA_MEMBERS = { "seed-dev": "Dev P.", "seed-lena": "Lena F." };
 
 const s = (v) => ({ stringValue: String(v) });
-const arr = (vals) => ({ arrayValue: { values: vals.map(s) } });
-const map = (obj) => ({
-  mapValue: { fields: Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, s(v)])) },
-});
 const decode = (v) => {
   if (!v) return undefined;
   if ("stringValue" in v) return v.stringValue;
@@ -106,9 +93,8 @@ async function main() {
     if (!res.ok) throw new Error(`GET ${path}: ${res.status} ${await res.text()}`);
     return decodeDoc(await res.json());
   }
-  async function patch(path, fields, maskPaths) {
-    const qs = maskPaths ? "?" + maskPaths.map((p) => `updateMask.fieldPaths=${p}`).join("&") : "";
-    const res = await fetch(`${BASE}/${path}${qs}`, { method: "PATCH", headers, body: JSON.stringify({ fields }) });
+  async function patch(path, fields) {
+    const res = await fetch(`${BASE}/${path}`, { method: "PATCH", headers, body: JSON.stringify({ fields }) });
     if (!res.ok) throw new Error(`PATCH ${path}: ${res.status} ${await res.text()}`);
     console.log("  wrote", path);
   }
@@ -117,30 +103,6 @@ async function main() {
     if (!res.ok) throw new Error(`auth lookup ${email}: ${res.status} ${await res.text()}`);
     const json = await res.json();
     return json.users?.[0]?.localId ?? null;
-  }
-  async function findSquad(founderUid) {
-    const res = await fetch(`${BASE}:runQuery`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: "cohorts" }],
-          where: {
-            compositeFilter: {
-              op: "AND",
-              filters: [
-                { fieldFilter: { field: { fieldPath: "founderUid" }, op: "EQUAL", value: s(founderUid) } },
-                { fieldFilter: { field: { fieldPath: "name" }, op: "EQUAL", value: s(SQUAD_NAME) } },
-              ],
-            },
-          },
-          limit: 1,
-        },
-      }),
-    });
-    if (!res.ok) throw new Error(`runQuery: ${res.status} ${await res.text()}`);
-    const rows = await res.json();
-    return decodeDoc(rows.find((r) => r.document)?.document);
   }
 
   /* ---- 1. Allowlist ---- */
@@ -171,74 +133,29 @@ async function main() {
     const profile = await get(`profiles/${uid}`);
     console.log(
       `  ${profile ? "ok   " : "NO PROFILE"} ${email}\n        uid ${uid}` +
-        (profile ? ` · ${profile.name} · role ${profile.role} · consent ${profile.consentStatus}` : " — finish onboarding in the browser")
+        (profile ? ` · ${profile.name} · role ${profile.role} · consent ${profile.consentStatus} · streak ${profile.streak ?? 0}` : " — finish onboarding in the browser")
     );
     if (profile && profile.role !== role) console.log(`        !! profile role is ${profile.role}, expected ${role}`);
   }
-  if (!uids.operator) return console.log("\nNo operator account yet — nothing more to do until it exists.");
 
-  /* ---- 3. The squad ---- */
-  console.log(`Squad ("${SQUAD_NAME}"):`);
-  let squad = await findSquad(uids.operator);
-  if (!squad) {
-    if (readOnly) return console.log("  MISSING — run without --status to create it, or create it from Squads → Start one.");
-    const founder = await get(`profiles/${uids.operator}`);
-    if (!founder) return console.log("  cannot create: the operator has no profile yet.");
-    const fields = {
-      name: s(SQUAD_NAME),
-      mission: s("Permanent QA squad for end-to-end testing of the operator and mentor apps. Not a real venture."),
-      tags: arr(["AI"]),
-      lookingFor: arr(["Coding"]),
-      meetingSlot: s("Sundays 7pm ET"),
-      timezone: s(founder.timezone ?? "America/Toronto"),
-      state: s("forming"),
-      founderUid: s(uids.operator),
-      founderName: s(founder.name),
-      memberUids: arr([uids.operator]),
-      memberNames: map({ [uids.operator]: founder.name }),
-      open: { booleanValue: true },
-      weeklyStreak: { integerValue: "0" },
-      lastRitualWeek: s(""),
-      createdAt: { timestampValue: new Date().toISOString() },
-    };
-    await patch(`cohorts/${SQUAD_ID}`, fields);
-    squad = await get(`cohorts/${SQUAD_ID}`);
-  }
-  console.log(`  id ${squad.id} · state ${squad.state} · members ${squad.memberUids.length} · mentor ${squad.mentorName ?? "—"}`);
-
-  // Membership: founder + the borrowed seed operators.
-  const wantUids = [...new Set([...squad.memberUids, ...Object.keys(EXTRA_MEMBERS)])];
-  const wantNames = { ...squad.memberNames, ...EXTRA_MEMBERS };
-  const membersMissing = wantUids.length !== squad.memberUids.length;
-  if (membersMissing) {
-    if (readOnly) console.log(`  MISSING members: ${Object.keys(EXTRA_MEMBERS).filter((u) => !squad.memberUids.includes(u)).join(", ")}`);
-    else {
-      await patch(`cohorts/${squad.id}`, { memberUids: arr(wantUids), memberNames: map(wantNames) }, ["memberUids", "memberNames"]);
-      squad.memberUids = wantUids;
-    }
+  /* ---- 3. The season ---- */
+  console.log("Season:");
+  const season = await get("seasons/s1");
+  if (!season) console.log("  MISSING seasons/s1 — run `node scripts/season.js` (the operator page is empty without it)");
+  else {
+    const steps = (season.milestones ?? []).map((m) => `${m.title} [${m.verifier === "mentor" ? "mentor" : "open"}]`);
+    console.log(`  ok    "${season.name}" · ${season.state} · ${steps.length} steps\n        ${steps.join(" · ")}`);
+    if (season.state !== "live") console.log("        !! not live — operators only see the live season");
   }
 
-  // Mentor: normally adopted through the mentor UI so that path gets exercised.
-  if (flags.has("--adopt") && uids.mentor) {
-    const mentor = await get(`profiles/${uids.mentor}`);
-    if (!mentor) console.log("  cannot adopt: the mentor has no profile yet.");
-    else if (squad.mentorUid === uids.mentor) console.log("  ok    already mentored by the QA mentor");
-    else {
-      const active = squad.memberUids.length >= 3;
-      await patch(
-        `cohorts/${squad.id}`,
-        { mentorUid: s(uids.mentor), mentorName: s(mentor.name), ...(active ? { state: s("active") } : {}) },
-        ["mentorUid", "mentorName", ...(active ? ["state"] : [])]
-      );
-    }
-  } else if (!squad.mentorUid) {
-    console.log("  no mentor yet → sign in as the QA mentor: Squads → Needs a mentor → Take it on (or rerun with --adopt)");
-  } else if (uids.mentor && squad.mentorUid !== uids.mentor) {
-    console.log(`  !! mentored by ${squad.mentorName} (${squad.mentorUid}), not the QA mentor`);
+  /* ---- 4. The operator's proof so far ---- */
+  if (uids.operator && season) {
+    const res = await fetch(`${BASE}/seasons/s1/submissions?pageSize=200`, { headers });
+    const rows = res.ok ? ((await res.json()).documents ?? []).map(decodeDoc) : [];
+    const mine = rows.filter((r) => r.uid === uids.operator);
+    const waiting = rows.filter((r) => r.status === "submitted").length;
+    console.log(`Proof: ${rows.length} rows · QA operator ${mine.length} (${mine.map((r) => `${r.milestoneId}:${r.status}`).join(", ") || "none"}) · ${waiting} waiting on a mentor`);
   }
-
-  const final = await get(`cohorts/${squad.id}`);
-  console.log(`\n${SQUAD_NAME}: /cohorts/${final.id} · ${final.state} · ${final.memberUids.length} members · mentor ${final.mentorName ?? "—"}`);
 }
 
 main().catch((e) => {

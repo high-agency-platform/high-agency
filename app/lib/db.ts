@@ -4,7 +4,6 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  addDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -13,9 +12,6 @@ import {
   limit,
   onSnapshot,
   serverTimestamp,
-  writeBatch,
-  arrayUnion,
-  arrayRemove,
   Timestamp,
   type Unsubscribe,
   type FirestoreError,
@@ -24,19 +20,14 @@ import { getDb, getFirebaseAuth } from "./firebase";
 import type {
   Profile,
   PrivateProfile,
-  Cohort,
-  CohortApplication,
-  DeclineReason,
   BuildLog,
   Workshop,
-  CheckIn,
-  WeeklyHours,
   MentorSignupInput,
-  TrackMilestone,
+  Season,
+  SeasonMilestone,
+  Submission,
 } from "./types";
-import { canActivate, CHECKIN_DEFAULT_MINS, TRACK_MAX_MILESTONES } from "./types";
-
-export const MAX_PENDING_APPLICATIONS = 3;
+import { normalizeVerifier } from "./types";
 
 export type ListenerErrorHandler = (e: FirestoreError) => void;
 
@@ -72,7 +63,6 @@ function normalizeProfile(uid: string, data: Record<string, unknown>): Profile {
     domains: (data.domains as string[]) ?? [],
     skills: (data.skills as string[]) ?? [],
     enrolledWorkshops: (data.enrolledWorkshops as string[]) ?? [],
-    pendingApplications: (data.pendingApplications as string[]) ?? [],
     links: {
       github: "",
       linkedin: "",
@@ -138,352 +128,177 @@ export async function getPrivateProfile(
   return snap.exists() ? (snap.data() as PrivateProfile) : null;
 }
 
-/* ---------------- Cohorts ---------------- */
+/** How many operators the mentor roster shows. One batch is ~30; the cap
+ *  keeps the listener bounded if intake ever grows past a screenful. */
+export const ROSTER_LIMIT = 200;
 
-export function watchCohorts(cb: (cohorts: Cohort[]) => void): Unsubscribe {
+/** Every operator — the mentor's roster. Profiles are readable by any
+ *  signed-in user, so this is UI-scoped to mentors, not rules-scoped. */
+export function watchOperators(cb: (profiles: Profile[]) => void): Unsubscribe {
   const q = query(
-    collection(getDb(), "cohorts"),
-    orderBy("createdAt", "desc"),
-    limit(50)
-  );
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Cohort));
-  });
-}
-
-export function watchMyCohorts(
-  uid: string,
-  cb: (cohorts: Cohort[]) => void
-): Unsubscribe {
-  const q = query(
-    collection(getDb(), "cohorts"),
-    where("memberUids", "array-contains", uid)
-  );
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Cohort));
-  });
-}
-
-export function watchCohort(
-  id: string,
-  cb: (c: Cohort | null) => void
-): Unsubscribe {
-  return onSnapshot(doc(getDb(), "cohorts", id), (snap) => {
-    cb(snap.exists() ? ({ id: snap.id, ...snap.data() } as Cohort) : null);
-  }, listenerError(`cohorts/${id}`));
-}
-
-/** Creation requires a committed weekly slot — deliberate friction that
- *  forces the founder to commit to the ritual before recruiting. */
-export async function createCohort(
-  founder: Profile,
-  data: {
-    name: string;
-    mission: string;
-    tags: string[];
-    lookingFor: string[];
-    meetingSlot: string;
-    /** Optional; omitted from the write when empty so Firestore never sees
-     *  an undefined value (which the SDK rejects). */
-    link?: string;
-    icon?: string;
-  }
-): Promise<string> {
-  // Pull optionals out so a passed-through `undefined` never reaches the
-  // write (the SDK rejects undefined); re-add only when non-empty.
-  const { link, icon, ...rest } = data;
-  const ref = await addDoc(collection(getDb(), "cohorts"), {
-    ...rest,
-    ...(link ? { link } : {}),
-    ...(icon ? { icon } : {}),
-    timezone: founder.timezone,
-    state: "forming",
-    founderUid: founder.uid,
-    founderName: founder.name,
-    memberUids: [founder.uid],
-    memberNames: { [founder.uid]: founder.name },
-    open: true,
-    weeklyStreak: 0,
-    lastRitualWeek: "",
-    createdAt: serverTimestamp(),
-  });
-  return ref.id;
-}
-
-/* The weekly ritual and the build log are STREAK actions and are written by
-   the server (POST /api/ritual, POST /api/build-log — see lib/api.ts), so the
-   streak can never be set from a browser. Reads stay here. */
-
-/* ---------------- The track (mentor-authored) ---------------- */
-
-/** The squad's mentor writes the whole track in one go: the ordered list of
- *  milestones with their done state. Rules restrict this write to the
- *  assigned mentor and bound the list length; the shape of each milestone
- *  is trusted from the mentor (staff). */
-export async function saveTrack(
-  cohortId: string,
-  track: TrackMilestone[]
-): Promise<void> {
-  if (track.length > TRACK_MAX_MILESTONES) throw new Error("track-too-long");
-  await updateDoc(doc(getDb(), "cohorts", cohortId), {
-    track: track.map((m) => ({
-      id: m.id,
-      title: m.title,
-      detail: m.detail,
-      dueDay: m.dueDay,
-      doneAt: m.doneAt,
-    })),
-    trackUpdatedAt: serverTimestamp(),
-  });
-}
-
-/* ---------------- Mentor adoption ---------------- */
-
-/** How many of the newest squads the approval feed scans for "no mentor yet".
- *  Firestore can't query for an absent field, so the filter runs client-side
- *  over a bounded window instead of the whole collection. Batch 1 is ~10
- *  squads; if the platform ever outgrows this window, the fix is a stored
- *  `mentorUid: null` (or a `needsMentor` flag) that can be queried directly —
- *  not a bigger scan. */
-export const UNASSIGNED_SCAN_LIMIT = 100;
-
-/** The mentor approval feed: every squad nobody has adopted yet. Read
- *  client-side rather than queried — see UNASSIGNED_SCAN_LIMIT. */
-export function watchUnassignedCohorts(
-  cb: (cohorts: Cohort[]) => void
-): Unsubscribe {
-  const q = query(
-    collection(getDb(), "cohorts"),
-    orderBy("createdAt", "desc"),
-    limit(UNASSIGNED_SCAN_LIMIT)
+    collection(getDb(), "profiles"),
+    where("role", "==", "operator"),
+    limit(ROSTER_LIMIT)
   );
   return onSnapshot(q, (snap) => {
     cb(
       snap.docs
-        .map((d) => ({ id: d.id, ...d.data() }) as Cohort)
-        .filter((c) => !c.mentorUid && c.state !== "archived")
+        .map((d) => normalizeProfile(d.id, d.data()))
+        .sort((a, b) => a.name.localeCompare(b.name))
     );
-  });
+  }, listenerError("operators"));
 }
 
-/** Squads this mentor owns — the source for their check-in queue. */
-export function watchMentoredCohorts(
-  mentorUid: string,
-  cb: (cohorts: Cohort[]) => void
+/* ---------------- The season (reads) ---------------- */
+/* The season is written only by POST /api/season (see lib/api.ts): one
+   shared document every mentor edits, so the save needs a transaction with a
+   stale-write check and the orphaned-proof guard. Clients read. */
+
+function normalizeMilestone(raw: unknown): SeasonMilestone {
+  const m = (raw ?? {}) as Record<string, unknown>;
+  return {
+    id: String(m.id ?? ""),
+    title: String(m.title ?? ""),
+    why: String(m.why ?? ""),
+    proof: String(m.proof ?? ""),
+    effort: String(m.effort ?? ""),
+    verifier: normalizeVerifier(m.verifier),
+    sessions: Array.isArray(m.sessions) ? m.sessions.map(String) : [],
+  };
+}
+
+function normalizeSeason(id: string, data: Record<string, unknown>): Season {
+  return {
+    name: "",
+    kind: "",
+    category: "",
+    duration: "",
+    tagline: "",
+    overview: "",
+    outcome: "",
+    state: "draft",
+    ...data,
+    id,
+    milestones: Array.isArray(data.milestones)
+      ? data.milestones.map(normalizeMilestone).filter((m) => m.id)
+      : [],
+  } as Season;
+}
+
+/** The one live season, or null while there isn't one. */
+export function watchLiveSeason(cb: (s: Season | null) => void): Unsubscribe {
+  const q = query(collection(getDb(), "seasons"), where("state", "==", "live"), limit(1));
+  return onSnapshot(q, (snap) => {
+    const d = snap.docs[0];
+    cb(d ? normalizeSeason(d.id, d.data()) : null);
+  }, listenerError("seasons/live"));
+}
+
+/** Every season, newest first — the mentor editor's picker. */
+export function watchSeasons(cb: (seasons: Season[]) => void): Unsubscribe {
+  const q = query(collection(getDb(), "seasons"), limit(20));
+  return onSnapshot(q, (snap) => {
+    cb(
+      snap.docs
+        .map((d) => normalizeSeason(d.id, d.data()))
+        .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0))
+    );
+  }, listenerError("seasons"));
+}
+
+/* ---------------- Proof submissions (reads) ---------------- */
+/* Written only by POST /api/submissions and /api/submissions/review. The
+   read rule is split by the row's snapshotted `verifier`: 'open' rows are
+   readable by every signed-in user, 'mentor' rows only by their author and
+   the mentors. A LIST IS ALL-OR-NOTHING under the rules, so each watcher
+   below carries exactly the filter that makes its whole result readable —
+   drop one and the listener is denied, torn down, and never retries. */
+
+function toSubmission(id: string, data: Record<string, unknown>): Submission {
+  return { id, ...data } as Submission;
+}
+
+function newestFirst(a: Submission, b: Submission): number {
+  return (b.updatedAt?.toMillis() ?? 0) - (a.updatedAt?.toMillis() ?? 0);
+}
+
+/** My own rows, every verifier kind. */
+export function watchMySubmissions(
+  seasonId: string,
+  uid: string,
+  cb: (subs: Submission[]) => void
 ): Unsubscribe {
   const q = query(
-    collection(getDb(), "cohorts"),
-    where("mentorUid", "==", mentorUid)
+    collection(getDb(), "seasons", seasonId, "submissions"),
+    where("uid", "==", uid)
   );
   return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Cohort));
-  });
+    cb(snap.docs.map((d) => toSubmission(d.id, d.data())));
+  }, listenerError(`submissions/mine/${seasonId}`));
 }
 
-/** A mentor adopts an unclaimed squad: they become its mentor, and if the
- *  crew is already ≥3 the squad activates in the same write. Rules refuse
- *  this if the squad already has a mentor — no stealing, no reassigning. */
-export async function adoptCohort(cohort: Cohort, mentor: Profile): Promise<void> {
-  const memberUids = cohort.memberUids ?? [];
-  await updateDoc(doc(getDb(), "cohorts", cohort.id), {
-    mentorUid: mentor.uid,
-    mentorName: mentor.name,
-    ...(cohort.state === "forming" &&
-    canActivate({ memberUids, mentorUid: mentor.uid })
-      ? { state: "active" }
-      : {}),
-  });
-}
-
-/* ---------------- Squad check-ins (what office hours became) --------- */
-
-/** Check-ins are the narrowest read in the app: this squad's members and its
- *  assigned mentor, nobody else. That makes the listener genuinely deniable
- *  (see the adopt race handled in components/mentorData.ts), so `onError` is
- *  worth passing here. */
-export function watchCheckIns(
-  cohortId: string,
-  cb: (checkIns: CheckIn[]) => void,
-  onError?: ListenerErrorHandler
+/** The public proof wall: every 'open' row from everyone. */
+export function watchOpenSubmissions(
+  seasonId: string,
+  cb: (subs: Submission[]) => void
 ): Unsubscribe {
   const q = query(
-    collection(getDb(), "cohorts", cohortId, "checkIns"),
-    orderBy("createdAt", "desc"),
-    limit(30)
-  );
-  return onSnapshot(
-    q,
-    (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as CheckIn)),
-    listenerError(`checkIns/${cohortId}`, onError)
-  );
-}
-
-/** Any member asks the squad's mentor for a check-in. The note is optional
- *  and short by design — it's a nudge to the mentor, not a ticket. */
-export async function requestCheckIn(
-  cohort: Cohort,
-  requester: Profile,
-  note: string
-): Promise<void> {
-  if (!cohort.mentorUid) throw new Error("no-mentor");
-  await addDoc(collection(getDb(), "cohorts", cohort.id, "checkIns"), {
-    cohortId: cohort.id,
-    requestedByUid: requester.uid,
-    requestedByName: requester.name,
-    note,
-    status: "requested",
-    mentorUid: cohort.mentorUid,
-    mentorName: cohort.mentorName ?? "",
-    startsAt: null,
-    durationMins: CHECKIN_DEFAULT_MINS,
-    meetLink: "",
-    createdAt: serverTimestamp(),
-    confirmedAt: null,
-  });
-}
-
-/** Requester withdraws while it's still just a request. */
-export async function withdrawCheckIn(
-  cohortId: string,
-  checkInId: string
-): Promise<void> {
-  await deleteDoc(doc(getDb(), "cohorts", cohortId, "checkIns", checkInId));
-}
-
-/** Most recent confirmed check-in that has already happened — the input to
- *  the squad's bi-weekly nudge. Null when the squad has never had one.
- *  `now` is passed in so callers can hold a stable clock across a render. */
-export function lastCheckInAt(checkIns: CheckIn[], now: number): Date | null {
-  const past = checkIns
-    .filter((c) => c.status === "confirmed" && c.startsAt)
-    .map((c) => c.startsAt!.toDate())
-    .filter((d) => d.getTime() <= now)
-    .sort((a, b) => b.getTime() - a.getTime());
-  return past[0] ?? null;
-}
-
-/* ---------------- Applications ---------------- */
-
-/** Hard cap of 3 live applications. The pendingApplications list on the
- *  applicant's own profile enforces the cap without collection-group
- *  queries; it's reconciled lazily as decisions land. */
-export async function applyToCohort(
-  cohortId: string,
-  applicant: Profile,
-  pitch: string,
-  hours: WeeklyHours
-): Promise<void> {
-  if (applicant.pendingApplications.length >= MAX_PENDING_APPLICATIONS) {
-    throw new Error("max-pending");
-  }
-  const db = getDb();
-  await setDoc(doc(db, "cohorts", cohortId, "applications", applicant.uid), {
-    applicantUid: applicant.uid,
-    applicantName: applicant.name,
-    pitch,
-    hours,
-    status: "pending",
-    declineReason: null,
-    createdAt: serverTimestamp(),
-  });
-  await updateDoc(doc(db, "profiles", applicant.uid), {
-    pendingApplications: arrayUnion(cohortId),
-    updatedAt: serverTimestamp(),
-  });
-}
-
-export async function getMyApplication(
-  cohortId: string,
-  uid: string
-): Promise<CohortApplication | null> {
-  const snap = await getDoc(doc(getDb(), "cohorts", cohortId, "applications", uid));
-  return snap.exists() ? (snap.data() as CohortApplication) : null;
-}
-
-/** Drop decided/dead cohort ids from my pendingApplications so slots
- *  free up. Founders can't write my profile, so I reconcile my own. */
-export async function reconcilePendingApplications(
-  profile: Profile
-): Promise<void> {
-  if (profile.pendingApplications.length === 0) return;
-  const db = getDb();
-  const stale: string[] = [];
-  await Promise.all(
-    profile.pendingApplications.map(async (cohortId) => {
-      const app = await getMyApplication(cohortId, profile.uid).catch(() => null);
-      if (!app || app.status !== "pending") stale.push(cohortId);
-    })
-  );
-  if (stale.length > 0) {
-    await updateDoc(doc(db, "profiles", profile.uid), {
-      pendingApplications: arrayRemove(...stale),
-      updatedAt: serverTimestamp(),
-    });
-  }
-}
-
-export function watchApplications(
-  cohortId: string,
-  cb: (apps: CohortApplication[]) => void
-): Unsubscribe {
-  const q = query(
-    collection(getDb(), "cohorts", cohortId, "applications"),
-    where("status", "==", "pending")
+    collection(getDb(), "seasons", seasonId, "submissions"),
+    where("verifier", "==", "open"),
+    limit(500)
   );
   return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => d.data() as CohortApplication));
-  }, listenerError(`applications/${cohortId}`));
+    cb(snap.docs.map((d) => toSubmission(d.id, d.data())).sort(newestFirst));
+  }, listenerError(`submissions/open/${seasonId}`));
 }
 
-/** Founder decision. Accepting also adds the applicant to the roster and
- *  activates a forming cohort once it clears the activation gate — 3+
- *  members AND an assigned mentor — atomically. A squad that hits 3 with
- *  no mentor stays "forming" until one adopts it (see adoptCohort).
- *  Declines carry a one-tap reason so rejection is informative, not silent. */
-export async function decideApplication(
-  cohort: Cohort,
-  app: CohortApplication,
-  accept: boolean,
-  declineReason: DeclineReason | null = null
-): Promise<void> {
-  const db = getDb();
-  const batch = writeBatch(db);
-  batch.update(doc(db, "cohorts", cohort.id, "applications", app.applicantUid), {
-    status: accept ? "accepted" : "declined",
-    declineReason: accept ? null : declineReason,
-  });
-  if (accept) {
-    const memberUids = [...cohort.memberUids, app.applicantUid];
-    batch.update(doc(db, "cohorts", cohort.id), {
-      memberUids,
-      memberNames: { ...cohort.memberNames, [app.applicantUid]: app.applicantName },
-      ...(cohort.state === "forming" &&
-      canActivate({ memberUids, mentorUid: cohort.mentorUid })
-        ? { state: "active" }
-        : {}),
-    });
-  }
-  await batch.commit();
-}
+/** How many rows the review queue shows at once; the UI says when it's full. */
+export const REVIEW_QUEUE_LIMIT = 200;
 
-/* ---------------- Build log ---------------- */
-
-export function watchBuildLogs(
-  cohortId: string,
-  cb: (logs: BuildLog[]) => void
+/** Mentors only: everything waiting on a review, oldest first. */
+export function watchReviewQueue(
+  seasonId: string,
+  cb: (subs: Submission[]) => void
 ): Unsubscribe {
   const q = query(
-    collection(getDb(), "cohorts", cohortId, "logs"),
-    orderBy("createdAt", "desc"),
-    limit(40)
+    collection(getDb(), "seasons", seasonId, "submissions"),
+    where("status", "==", "submitted"),
+    limit(REVIEW_QUEUE_LIMIT)
   );
+  return onSnapshot(q, (snap) => {
+    cb(
+      snap.docs
+        .map((d) => toSubmission(d.id, d.data()))
+        .sort((a, b) => (a.updatedAt?.toMillis() ?? 0) - (b.updatedAt?.toMillis() ?? 0))
+    );
+  }, listenerError(`submissions/queue/${seasonId}`));
+}
+
+/** Mentors only: every row — the roster's progress column. */
+export function watchAllSubmissions(
+  seasonId: string,
+  cb: (subs: Submission[]) => void
+): Unsubscribe {
+  const q = query(collection(getDb(), "seasons", seasonId, "submissions"), limit(1000));
+  return onSnapshot(q, (snap) => {
+    cb(snap.docs.map((d) => toSubmission(d.id, d.data())));
+  }, listenerError(`submissions/all/${seasonId}`));
+}
+
+/* ---------------- Build log (the season feed) ---------------- */
+/* Posting is a STREAK action, written by the server (POST /api/build-log —
+   see lib/api.ts), so the streak can never be set from a browser. Reads and
+   the author's own delete stay here. */
+
+export function watchBuildLogs(cb: (logs: BuildLog[]) => void): Unsubscribe {
+  const q = query(collection(getDb(), "buildLogs"), orderBy("createdAt", "desc"), limit(40));
   return onSnapshot(q, (snap) => {
     cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BuildLog));
-  }, listenerError(`logs/${cohortId}`));
+  }, listenerError("buildLogs"));
 }
 
-export async function removeBuildLog(cohortId: string, logId: string): Promise<void> {
-  await deleteDoc(doc(getDb(), "cohorts", cohortId, "logs", logId));
+export async function removeBuildLog(logId: string): Promise<void> {
+  await deleteDoc(doc(getDb(), "buildLogs", logId));
 }
 
 /* ---------------- Workshops (reads) ---------------- */
@@ -491,7 +306,7 @@ export async function removeBuildLog(cohortId: string, logId: string): Promise<v
    Route Handlers in app/api/workshops/** (see lib/api.ts), because each one
    may also touch the host mentor's Google Calendar. Clients only read. */
 
-/** Legacy `office_hours` docs predate squad check-ins; hide rather than
+/** Legacy `office_hours` docs predate the current model; hide rather than
  *  delete them. */
 function catalogOnly(docs: Workshop[]): Workshop[] {
   return docs.filter((w) => (w as { kind?: string }).kind !== "office_hours");
@@ -511,8 +326,8 @@ export async function getUpcomingWorkshops(): Promise<Workshop[]> {
   );
 }
 
-/** Finished sessions that have a recording posted — the on-demand shelf
- *  the Learn page promises. Newest first. */
+/** Finished sessions that have a recording posted — the replay shelf.
+ *  Newest first. */
 export async function getPastWorkshops(): Promise<Workshop[]> {
   const q = query(
     collection(getDb(), "workshops"),
@@ -542,7 +357,7 @@ export function watchWorkshopsBetween(
   );
   return onSnapshot(q, (snap) => {
     cb(catalogOnly(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Workshop)));
-  });
+  }, listenerError("workshops/week"));
 }
 
 /** A mentor's own sessions from now forward — the "what am I running" list.
@@ -564,7 +379,7 @@ export function watchMyUpcomingWorkshops(
         (w) => w.mentorUid === mentorUid
       )
     );
-  });
+  }, listenerError("workshops/mine"));
 }
 
 /* ---------------- Admin: member consent (mentors) ---------------- */

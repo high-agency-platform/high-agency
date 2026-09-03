@@ -444,7 +444,12 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .path__body { min-width: 0; padding-top: 4px; }
 .path__top { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .path__name { font-size: 17px; font-weight: 700; letter-spacing: -0.012em; }
+/* `.locked` means NOT STARTED, not unavailable: nothing on the track is
+   gated, any step can be submitted in any order. It's just quieter. */
 .path__item.locked .path__name { color: var(--text-faint); }
+/* The whole collapsed row is one button (the accordion handle). */
+.path__toggle { all: unset; display: block; width: 100%; box-sizing: border-box; cursor: pointer; }
+.path__toggle:focus-visible { outline: 2px solid var(--accent-line); outline-offset: 4px; border-radius: 8px; }
 .path__item.done .path__name { color: var(--text-muted); }
 .path__meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .path__count { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-faint); white-space: nowrap; }
@@ -606,6 +611,26 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 .topbar__logo img { width: 100%; height: 100%; display: block; }
 
+/* Operator shell — one page, no rail, no tab bar. The top bar is the only
+   chrome, at every width: brand, the flame, your avatar (opens your card). */
+.solo { min-height: 100vh; padding-bottom: 48px; }
+.topbar--solo { display: flex; }
+.topbar__right { display: flex; align-items: center; gap: 10px; }
+.topbar__you {
+  width: 40px; height: 40px; padding: 0; border-radius: var(--radius-pill);
+  display: grid; place-items: center; background: var(--surface);
+  border: 2px solid var(--border); box-shadow: 0 3px 0 var(--border-strong);
+  transition: transform var(--t-fast) var(--ease-out), box-shadow var(--t-fast);
+}
+.topbar__you:hover { transform: translateY(-1px); box-shadow: 0 4px 0 var(--border-strong); }
+.topbar__you:active { transform: translateY(3px); box-shadow: none; }
+/* Desktop: the daily move / sessions / feed column stays put beside the track. */
+.side--sticky { position: sticky; top: 24px; align-self: start; }
+/* One column: the daily move comes first under the thumb, then the track. */
+@media (max-width: 1000px) { .side--sticky { position: static; order: -1; } }
+/* The card sheet: room under the close button for the player card. */
+.modal__card--sheet { padding-top: calc(var(--modal-pad) + 20px); }
+
 /* HUD — flame · level ring (XP shows only as ring fill) */
 .hud { display: flex; align-items: center; gap: 8px; }
 .hud--col { flex-direction: column; gap: 10px; max-width: 100%; }
@@ -752,32 +777,6 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 .wcal__act { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px; }
 .wcal__nil { display: block; height: 0; border-top: 2px dotted var(--border); margin-right: 4px; }
-
-/* ============================================================
-   SQUAD CARDS
-   ============================================================ */
-.squads { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
-.sq { display: flex; flex-direction: column; gap: 12px; }
-.sq__top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.sq__id { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
-.sq__name { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
-/* Inline squad icon — a small floating piece, matches the tile language */
-.sq__icon {
-  width: 34px; height: 34px; flex: none;
-  border-radius: 10px; object-fit: cover;
-  border: 2px solid var(--border); background: var(--surface-2);
-  box-shadow: 0 2px 0 var(--border-strong);
-}
-.sq__icon--lg { width: 44px; height: 44px; border-radius: 12px; }
-.sq__link { color: var(--accent); }
-.sq__link:hover { text-decoration: underline; }
-.sq__mission { color: var(--text-muted); font-size: 15px; line-height: 1.45; }
-.sq__tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.sq__foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 12px; border-top: 2px solid var(--border); }
-.sq__slot { display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-faint); }
-.sq__status { font-family: var(--font-mono); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--success); }
-.sq__status--mute { color: var(--text-faint); }
-.apply-box { border-top: 2px dashed var(--border); padding-top: 12px; display: flex; flex-direction: column; gap: 10px; }
 
 /* ============================================================
    MODALS / SHEETS
@@ -1349,17 +1348,17 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .track-row__head { display: flex; align-items: center; gap: 10px; }
 .track-row__title {
   flex: 1; min-width: 0; border: 0; background: transparent;
-  font: 600 16px/1.3 var(--font-body, inherit); color: var(--ink);
+  font: 600 16px/1.3 var(--font); color: var(--text);
   padding: 4px 0; outline: none; border-bottom: 1px solid transparent;
 }
 .track-row__title:focus { border-bottom-color: var(--accent-line); }
-.track-row__title::placeholder { color: var(--ink-3); font-weight: 500; }
+.track-row__title::placeholder { color: var(--text-faint); font-weight: 500; }
 .track-row__body { display: grid; gap: 10px; margin-top: 10px; padding-left: 38px; }
 .track-row__tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .track-row__tools input[type="date"] { margin-left: 6px; font: inherit; }
 .track-row__peek {
   display: block; width: 100%; text-align: left; margin-top: 6px; padding: 0 0 0 38px;
-  border: 0; background: none; color: var(--ink-2); font-size: 14px; line-height: 1.4; cursor: text;
+  border: 0; background: none; color: var(--text-muted); font-size: 14px; line-height: 1.4; cursor: text;
 }
 
 /* ---- Legal pages (/privacy, /terms): plain, readable, public ---- */

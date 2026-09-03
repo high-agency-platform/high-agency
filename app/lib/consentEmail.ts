@@ -20,12 +20,12 @@ function consentHtml(childName: string, approveUrl: string): string {
     <h1 style="font-size:22px;margin:0 0 16px">Approve ${escapeHtml(childName)} to join High Agency</h1>
     <p style="margin:0 0 14px">
       ${escapeHtml(childName)} signed up for <strong>High Agency</strong>, a live cohort
-      program where ambitious young people (13–18) build real projects together in small,
-      mentored squads. Because they're under 18, we need a parent or guardian to approve
-      before they can join a squad and take part in the community.
+      program where ambitious young people (13–18) build real projects together, walking
+      a mentor-written track. Because they're under 18, we need a parent or guardian to approve
+      before they can post work and take part in the community.
     </p>
     <p style="margin:0 0 24px">
-      What they'll do: join a small accountability squad, work through real-world
+      What they'll do: work through a mentor-written track of real-world
       milestones (ship a project, get first users), and attend live expert workshops.
       There is no cost for the founding batch.
     </p>

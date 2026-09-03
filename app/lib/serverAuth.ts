@@ -15,7 +15,10 @@ export interface Caller {
 export class HttpError extends Error {
   constructor(
     public status: number,
-    public code: string
+    public code: string,
+    /** Extra fields for the JSON body, when a bare code isn't enough for the
+     *  client to act (e.g. which milestones blocked a season save). */
+    public detail?: Record<string, unknown>
   ) {
     super(code);
   }
@@ -55,7 +58,7 @@ export async function requireMentor(
  *  detail kept server-side. */
 export function errorResponse(err: unknown, label: string): NextResponse {
   if (err instanceof HttpError) {
-    return NextResponse.json({ error: err.code }, { status: err.status });
+    return NextResponse.json({ error: err.code, ...(err.detail ?? {}) }, { status: err.status });
   }
   console.error(`[${label}] failed:`, err);
   return NextResponse.json({ error: "internal" }, { status: 500 });

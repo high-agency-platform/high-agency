@@ -47,7 +47,7 @@ function approvalHtml(appUrl: string, firstName?: string): string {
     <h1 style="font-size:22px;margin:0 0 16px">${greeting}</h1>
     <p style="margin:0 0 14px">
       You've been accepted into the <strong>High Agency</strong> founding batch —
-      a live cohort program where you join a small squad, ship real milestones,
+      a live cohort program where you work a mentor-written track, ship real proof,
       and learn from people who've actually done it.
     </p>
     <p style="margin:0 0 14px">

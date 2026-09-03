@@ -150,8 +150,10 @@ export interface Profile {
   /** Mirror of workshops/{id}.enrolledUids for cheap per-user reads. */
   enrolledWorkshops: string[];
 
-  /** Cohort ids with a live pending application (hard cap 3). */
-  pendingApplications: string[];
+  /** LEGACY (squad era): cohort ids with a pending application. Nothing
+   *  writes or reads it now; existing docs still carry it and the rules
+   *  tolerate it. Never make this required again. */
+  pendingApplications?: string[];
 
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -413,3 +415,156 @@ export const CHECKIN_DEFAULT_MINS = 30;
 /** Nudge the squad to book one once it's been this long. Nudge only — a
  *  squad is never blocked or penalised for going quiet. */
 export const CHECKIN_NUDGE_WEEKS = 2;
+
+/* ------------------------------------------------------------------ */
+/* The season — ONE shared track, every mentor edits it                */
+/* ------------------------------------------------------------------ */
+
+/** Exactly one season is "live" at a time. The operator page reads it by
+ *  state, never by a fixed id, so season 2 can't collide with season 1's
+ *  submissions (they live in a subcollection under the season). */
+export type SeasonState = "draft" | "live" | "archived";
+
+/** Who closes a milestone out.
+ *  "open"   — posting the proof completes it, and every member can see it.
+ *  "mentor" — a mentor approves or returns it; the proof is private to the
+ *             author and the mentors, and stays private after approval.
+ *  The mentor's source copy says `peer_lead`; normalizeVerifier() maps it. */
+export type Verifier = "open" | "mentor";
+
+export interface SeasonMilestone {
+  /** Stable for the life of the season and NEVER regenerated on edit —
+   *  submission doc ids are built from it (see submissionKey). */
+  id: string;
+  title: string;
+  /** Why it matters — the mentor's paragraph. Longer than the old squad
+   *  track's detail cap on purpose: this is the teaching, not a label. */
+  why: string;
+  /** Exactly what to submit, in the mentor's words. */
+  proof: string;
+  /** "2–3 hours". Free text, never parsed. */
+  effort: string;
+  verifier: Verifier;
+  /** Suggested session TITLES — display-only chips, not links. A season is
+   *  written before its workshops exist; the two are matched by eye. */
+  sessions: string[];
+}
+
+export interface Season {
+  id: string;
+  name: string;
+  kind: string;
+  category: string;
+  duration: string;
+  tagline: string;
+  overview: string;
+  outcome: string;
+  state: SeasonState;
+  milestones: SeasonMilestone[];
+  createdAt?: Timestamp;
+  /** Doubles as the editor's optimistic-concurrency token: a save must quote
+   *  the updatedAt it read, or the server refuses it as stale. */
+  updatedAt?: Timestamp;
+  updatedByUid?: string;
+  updatedByName?: string;
+}
+
+export const SEASON_MAX_MILESTONES = 20;
+export const SEASON_NAME_MAX = 80;
+export const SEASON_KIND_MAX = 40;
+export const SEASON_CATEGORY_MAX = 60;
+export const SEASON_DURATION_MAX = 40;
+export const SEASON_TAGLINE_MAX = 160;
+export const SEASON_OVERVIEW_MAX = 1200;
+export const SEASON_OUTCOME_MAX = 300;
+export const MILESTONE_TITLE_MAX = 80;
+export const MILESTONE_WHY_MAX = 600;
+export const MILESTONE_PROOF_MAX = 300;
+export const MILESTONE_EFFORT_MAX = 40;
+export const MILESTONE_SESSIONS_MAX = 4;
+export const MILESTONE_SESSION_TITLE_MAX = 120;
+
+/** Wire → stored. Anything unrecognised FAILS CLOSED to "mentor": an unknown
+ *  verifier must never become a self-approval. */
+export function normalizeVerifier(raw: unknown): Verifier {
+  return raw === "open" || raw === "peer_lead" ? "open" : "mentor";
+}
+
+/** A fresh milestone id. Minted once, on the server, for rows that arrive
+ *  without one; never re-minted for a row that already has one. */
+export function milestoneId(): string {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+/* ------------------------------------------------------------------ */
+/* Proof submissions — one per operator per milestone                  */
+/* ------------------------------------------------------------------ */
+
+export type SubmissionStatus = "submitted" | "approved" | "returned";
+
+/** Lives at seasons/{seasonId}/submissions/{uid}__{milestoneId}: exactly one
+ *  row per pair, so a resubmit is an overwrite. Written ONLY by the server
+ *  (POST /api/submissions, POST /api/submissions/review). */
+export interface Submission {
+  id: string;
+  seasonId: string;
+  milestoneId: string;
+  /** Denormalized; survives the mentor renaming the milestone. */
+  milestoneTitle: string;
+  uid: string;
+  /** "First L.", denormalized so a queue renders in one read. */
+  name: string;
+  proofUrl: string;
+  note: string;
+  /** Snapshot of the milestone's verifier AT SUBMIT TIME, stamped by the
+   *  server. The read rule keys off this copy, so flipping a milestone
+   *  mentor→open later never retroactively exposes proof made privately. */
+  verifier: Verifier;
+  status: SubmissionStatus;
+  /** 1 on first submit, +1 on every resubmit after a return. */
+  attempt: number;
+  /** "" until a mentor acts; `open` rows never get one. */
+  reviewedByUid: string;
+  reviewedByName: string;
+  reviewedAt: Timestamp | null;
+  /** The mentor's words on a return — specific, never punitive. Carried
+   *  through a resubmit so the operator can still read it while they redo. */
+  reviewNote: string;
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
+}
+
+export const SUBMISSION_URL_MAX = 500;
+export const SUBMISSION_NOTE_MAX = 500;
+export const REVIEW_NOTE_MAX = 300;
+
+export function submissionKey(uid: string, milestoneId: string): string {
+  return `${uid}__${milestoneId}`;
+}
+
+export function byMilestone(subs: Submission[]): Record<string, Submission> {
+  const out: Record<string, Submission> = {};
+  for (const s of subs) out[s.milestoneId] = s;
+  return out;
+}
+
+/** Progress is DERIVED: a shared season has no single "done", only one per
+ *  operator. Approved is the only state that counts, for both verifier kinds. */
+export function seasonProgress(
+  season: Season | null | undefined,
+  mine: Submission[]
+): { done: number; total: number } {
+  const approved = new Set(mine.filter((s) => s.status === "approved").map((s) => s.milestoneId));
+  const list = season?.milestones ?? [];
+  return { done: list.filter((m) => approved.has(m.id)).length, total: list.length };
+}
+
+/** The first milestone this operator hasn't had approved. Visual only —
+ *  nothing is gated; any milestone may be submitted in any order. */
+export function nextMilestone(
+  season: Season | null | undefined,
+  mine: Submission[]
+): SeasonMilestone | null {
+  const approved = new Set(mine.filter((s) => s.status === "approved").map((s) => s.milestoneId));
+  return (season?.milestones ?? []).find((m) => !approved.has(m.id)) ?? null;
+}

@@ -1,5 +1,5 @@
-// Seed pre-formed squads, operator profiles, build logs, and the season
-// workshop calendar into Firestore via the REST API, authenticated with the
+// Seed operator profiles, the workshop calendar, the season feed and a few
+// proof submissions into Firestore via the REST API, authenticated with the
 // firebase CLI's OAuth token (IAM bypasses security rules).
 // Idempotent: fixed document ids, PATCH = upsert. Run: node scripts/seed.js
 const { getAccessToken } = require("./fb-token");
@@ -9,13 +9,12 @@ const BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/
 
 const s = (v) => ({ stringValue: v });
 const n = (v) => ({ integerValue: String(v) });
-const b = (v) => ({ booleanValue: v });
 const ts = (d) => ({ timestampValue: d.toISOString() });
 const arr = (items) => ({ arrayValue: { values: items.length ? items : [] } });
 const map = (fields) => ({ mapValue: { fields } });
 
 // ─── Profiles ──────────────────────────────────────────────────────────────
-// Seed operator profiles for every fake UID used in cohorts below.
+// Seed operator profiles — real teenagers running real ventures.
 // Admin REST API bypasses rules so we can create docs for non-auth UIDs.
 
 function profile({ uid, name, ageBand, country, timezone, headline, building,
@@ -54,7 +53,6 @@ function profile({ uid, name, ageBand, country, timezone, headline, building,
       lastActiveDay: s(today),
       lastBuildLogDay: s(""),
       enrolledWorkshops: arr([]),
-      pendingApplications: arr([]),
       updatedAt: ts(new Date()),
       createdAt: ts(createdAt),
     },
@@ -108,10 +106,8 @@ const profiles = {
     country: "UK", timezone: "Europe/London",
     headline: "Runs Northlight Tutoring — £1,200/month, 9 tutors, zero ad spend",
     building: "Northlight is a student-run tutoring collective for A-level maths and physics. I recruit and vet the tutors, handle scheduling and invoicing, and take a 20% cut. Forty-odd booked hours a month and growing on referrals alone.",
-    // Profile domains stay inside the DOMAINS presets — the /profile editor is
+    // Profile domains stay inside the DOMAINS presets — the card editor is
     // preset-only, so a custom value here would silently vanish on first save.
-    // (Cohort tags *do* take custom values; Northlight's squad is tagged
-    // "Education".)
     stage: "revenue", domains: ["Other"], skills: ["Sales/Outreach", "Ops"],
     hours: "10+", streak: 22, daysAgo: 14,
     proofUrl: "https://northlight-tutoring.co.uk",
@@ -272,229 +268,6 @@ const profiles = {
   }),
 };
 
-// ─── Cohorts ───────────────────────────────────────────────────────────────
-
-// A squad activates only with 3+ members AND an assigned mentor — mirrors
-// canActivate() in app/lib/types.ts and the gate in firestore.rules. Squads
-// seeded without a mentor stay "forming" on purpose: they're what the mentor
-// approval feed at /admin → Squads has to chew on.
-function cohort({ name, mission, tags, lookingFor, meetingSlot, timezone,
-  founderUid, founderName, members, daysAgo, state, mentorUid, mentorName, track }) {
-  const memberNames = {};
-  const memberUids = [founderUid, ...members.map((m) => m.uid)];
-  memberNames[founderUid] = s(founderName);
-  for (const m of members) memberNames[m.uid] = s(m.name);
-  const autoState =
-    state ?? (memberUids.length >= 3 && mentorUid ? "active" : "forming");
-  return {
-    fields: {
-      name: s(name),
-      mission: s(mission),
-      tags: arr(tags.map(s)),
-      lookingFor: arr(lookingFor.map(s)),
-      meetingSlot: s(meetingSlot),
-      timezone: s(timezone),
-      state: s(autoState),
-      founderUid: s(founderUid),
-      founderName: s(founderName),
-      ...(mentorUid
-        ? { mentorUid: s(mentorUid), mentorName: s(mentorName ?? "Josh N.") }
-        : {}),
-      memberUids: arr(memberUids.map(s)),
-      memberNames: map(memberNames),
-      open: b(true),
-      weeklyStreak: n(autoState === "active" ? Math.floor((daysAgo ?? 0) / 7) : 0),
-      lastRitualWeek: s(""),
-      // The mentor-written track: a bounded list of {id,title,detail,dueDay,doneAt}.
-      ...(track ? { track: arr(track.map(trackStep)), trackUpdatedAt: ts(new Date()) } : {}),
-      createdAt: ts(new Date(Date.now() - (daysAgo ?? 0) * 86400000)),
-    },
-  };
-}
-
-/** One track step as a Firestore map value. `done` = days ago it was marked. */
-function trackStep({ title, detail, dueInDays, done }, i) {
-  const due = dueInDays == null ? "" : new Date(Date.now() + dueInDays * 86400000).toISOString().slice(0, 10);
-  return map({
-    id: s(`step-${i + 1}`),
-    title: s(title),
-    detail: s(detail ?? ""),
-    dueDay: s(due),
-    doneAt: done == null ? { nullValue: null } : n(Date.now() - done * 86400000),
-  });
-}
-
-// A squad is the venture and the people building it — named like the company
-// it is, with a mission that says what it does and how far along it is. Not a
-// programme track: "Cold Start — 10 cold asks a day" is a curriculum, not
-// something a 16-year-old tells their friends they're building.
-const cohorts = {
-  "seed-tempo": cohort({
-    name: "Tempo",
-    track: [
-      { title: "Mission locked", detail: "One-pager: the problem, who has it, why you, the season goal.", done: 20 },
-      { title: "20 asks out", detail: "Twenty cold messages to music teachers, one reply minimum.", done: 12 },
-      { title: "10 conversations", detail: "Interview log plus a half-page memo: pivot or persist.", done: 4 },
-      { title: "MVP live", detail: "The practice coach usable by a stranger at a public URL, plus a 60-second demo.", dueInDays: 9 },
-      { title: "First traction", detail: "Ten weekly-active students outside the founding school.", dueInDays: 23 },
-      { title: "One door opened", detail: "A music department that says yes in writing.", dueInDays: 37 },
-      { title: "Demo day", detail: "Three minutes, live, with the numbers.", dueInDays: 51 },
-    ],
-    mission: "AI practice coach for student musicians — 340 weekly users across 6 school music departments.",
-    tags: ["AI", "Web/Apps"],
-    lookingFor: ["Marketing", "Design"],
-    meetingSlot: "Sundays 7pm ET",
-    timezone: "America/Toronto",
-    founderUid: "seed-maya",
-    founderName: "Maya C.",
-    members: [
-      { uid: "seed-dev", name: "Dev P." },
-      { uid: "seed-lena", name: "Lena F." },
-    ],
-    mentorUid: "seed-mentor", mentorName: "Josh N.",
-    daysAgo: 21,
-  }),
-  "seed-shelfware": cohort({
-    name: "Shelfware",
-    mission: "Shopify app that flags dead stock before it eats a small store's cash. 34 paying stores, $646 MRR.",
-    tags: ["E-commerce", "Web/Apps"],
-    lookingFor: ["Marketing", "Sales/Outreach"],
-    meetingSlot: "Mondays 6pm CET",
-    timezone: "Europe/Stockholm",
-    founderUid: "seed-felix",
-    founderName: "Felix A.",
-    members: [
-      { uid: "seed-nina", name: "Nina K." },
-      { uid: "seed-rin", name: "Rin T." },
-    ],
-    mentorUid: "seed-mentor", mentorName: "Josh N.",
-    daysAgo: 30,
-  }),
-  "seed-fieldnote": cohort({
-    name: "Fieldnote",
-    mission: "Offline-first data app for conservation volunteers counting species where there's no signal. 11 groups, 4,200 observations.",
-    tags: ["Science", "Nonprofit"],
-    lookingFor: ["Design", "Writing"],
-    meetingSlot: "Thursdays 8pm IST",
-    timezone: "Asia/Kolkata",
-    founderUid: "seed-priya",
-    founderName: "Priya S.",
-    members: [{ uid: "seed-omar", name: "Omar H." }],
-    mentorUid: "seed-mentor-2", mentorName: "Sarah K.",
-    daysAgo: 26,
-  }),
-  "seed-curbside": cohort({
-    name: "Curbside",
-    mission: "Delivery for the 31 independent restaurants the big apps price out of our county. 214 orders last month at 12%.",
-    tags: ["Web/Apps", "E-commerce"],
-    lookingFor: ["Coding", "Ops"],
-    meetingSlot: "Saturdays 10am ET",
-    timezone: "America/New_York",
-    founderUid: "seed-sam",
-    founderName: "Sam D.",
-    members: [
-      { uid: "seed-grace", name: "Grace L." },
-      { uid: "seed-jules", name: "Jules M." },
-    ],
-    daysAgo: 18,
-  }),
-  "seed-rivet": cohort({
-    name: "Rivet",
-    mission: "Small-batch mechanical keyboard kits, designed and shipped from a bedroom workshop. 120 units sold across 3 batches.",
-    tags: ["Hardware", "E-commerce"],
-    lookingFor: ["Marketing", "Video"],
-    meetingSlot: "Wednesdays 6pm CET",
-    timezone: "Europe/Berlin",
-    founderUid: "seed-tomas",
-    founderName: "Tomas E.",
-    members: [{ uid: "seed-kai", name: "Kai W." }],
-    daysAgo: 12,
-  }),
-  "seed-northlight": cohort({
-    name: "Northlight Tutoring",
-    mission: "Student-run A-level maths and physics tutoring collective. 9 tutors, ~40 booked hours a month, £1,200 revenue.",
-    tags: ["Education", "Other"],
-    lookingFor: ["Marketing", "Ops"],
-    meetingSlot: "Saturdays 11am GMT",
-    timezone: "Europe/London",
-    founderUid: "seed-arjun",
-    founderName: "Arjun M.",
-    members: [{ uid: "seed-sofia", name: "Sofia R." }],
-    daysAgo: 14,
-  }),
-  "seed-cutting-room": cohort({
-    name: "Cutting Room",
-    mission: "Short-form editing studio for creators who film plenty and post nothing. 4 retainers at €400/month.",
-    tags: ["Content"],
-    lookingFor: ["Sales/Outreach", "Design"],
-    meetingSlot: "Fridays 5pm CET",
-    timezone: "Europe/Paris",
-    founderUid: "seed-jules",
-    founderName: "Jules M.",
-    members: [
-      { uid: "seed-sofia", name: "Sofia R." },
-      { uid: "seed-rin", name: "Rin T." },
-    ],
-    daysAgo: 9,
-  }),
-  "seed-bandwidth": cohort({
-    name: "Bandwidth",
-    mission: "Refurbishing dead corporate laptops and placing them with students who don't have one. 60 machines, 4 schools.",
-    tags: ["Hardware", "Nonprofit"],
-    lookingFor: ["Ops", "Writing"],
-    meetingSlot: "Sundays 11am SGT",
-    timezone: "Asia/Singapore",
-    founderUid: "seed-grace",
-    founderName: "Grace L.",
-    members: [
-      { uid: "seed-kai", name: "Kai W." },
-      { uid: "seed-sam", name: "Sam D." },
-    ],
-    daysAgo: 25,
-  }),
-  "seed-ledgerly": cohort({
-    name: "Ledgerly",
-    mission: "Bookkeeping a 17-year-old running a real business can actually do. 40 beta users, first 6 paying this month.",
-    tags: ["Finance", "Web/Apps"],
-    lookingFor: ["Coding", "Design"],
-    meetingSlot: "Tuesdays 7pm CET",
-    timezone: "Europe/Warsaw",
-    founderUid: "seed-nina",
-    founderName: "Nina K.",
-    members: [{ uid: "seed-felix", name: "Felix A." }],
-    daysAgo: 6,
-  }),
-  "seed-palate": cohort({
-    name: "Palate",
-    mission: "Photograph a handwritten menu, get back a clean translated allergen-tagged one. 22 immigrant-run restaurants using it free.",
-    tags: ["AI", "Nonprofit"],
-    lookingFor: ["Design", "Sales/Outreach"],
-    meetingSlot: "Wednesdays 7pm WAT",
-    timezone: "Africa/Lagos",
-    founderUid: "seed-amara",
-    founderName: "Amara O.",
-    members: [],
-    daysAgo: 4,
-  }),
-  // A squad that went quiet — the "stalled" state has to be visible somewhere.
-  "seed-halftone": cohort({
-    name: "Halftone",
-    mission: "Print-on-demand posters for indie musicians. 40 sold, then exam season took all three of us out.",
-    tags: ["E-commerce", "Content"],
-    lookingFor: ["Marketing", "Design"],
-    meetingSlot: "Wednesdays 8pm CET",
-    timezone: "Europe/Berlin",
-    founderUid: "seed-lena",
-    founderName: "Lena F.",
-    members: [
-      { uid: "seed-maya", name: "Maya C." },
-      { uid: "seed-tomas", name: "Tomas E." },
-    ],
-    state: "stalled",
-    daysAgo: 45,
-  }),
-};
-
 // ─── Workshops ─────────────────────────────────────────────────────────────
 
 // Sessions are owned and capped. Seeded ones are stamped with a synthetic
@@ -575,116 +348,85 @@ const workshops = {
   }),
 };
 
-// ─── Build log entries ─────────────────────────────────────────────────────
-// A few realistic entries for active cohorts so the log feeds aren't empty.
+// ─── Build log entries (the season feed) ──────────────────────────────────
+// A few realistic lines so the feed isn't empty on first sign-in.
 
-// Fixed ids (not auto-ids) so re-running the seed overwrites the same entries
-// instead of stacking a fresh copy of every log onto the feed each time.
-let logSeq = 0;
-function logEntry({ uid, name, text, daysAgo, cohortId }) {
-  const d = new Date(Date.now() - daysAgo * 86400000);
-  const day = d.toISOString().slice(0, 10);
+function logEntry({ uid, name, text, daysAgo }) {
+  const at = new Date(Date.now() - daysAgo * 86400000);
+  return { fields: { uid: s(uid), name: s(name), text: s(text), day: s(at.toISOString().slice(0, 10)), createdAt: ts(at) } };
+}
+
+const buildLogs = {
+  "seed-log-1": logEntry({ uid: "seed-maya", name: "Maya C.", daysAgo: 0, text: "Sent 5 cold asks to band directors in Ontario. One replied within the hour." }),
+  "seed-log-2": logEntry({ uid: "seed-lena", name: "Lena F.", daysAgo: 0, text: "Rewrote the schools page headline. 200 emails go out tomorrow." }),
+  "seed-log-3": logEntry({ uid: "seed-dev", name: "Dev P.", daysAgo: 1, text: "Audio pipeline at 38ms on the Pixel 6a. Shipping the build tonight." }),
+  "seed-log-4": logEntry({ uid: "seed-arjun", name: "Arjun M.", daysAgo: 1, text: "Onboarded tutor #10. First one who found us through a parent's referral." }),
+  "seed-log-5": logEntry({ uid: "seed-sofia", name: "Sofia R.", daysAgo: 2, text: "Session plan 20: projectile motion, three worked examples, one trap question." }),
+  "seed-log-6": logEntry({ uid: "seed-tomas", name: "Tomas E.", daysAgo: 2, text: "Batch four PCBs arrived. Two boards short — supplier is reshipping." }),
+};
+
+// ─── Proof submissions (seasons/s1) ────────────────────────────────────────
+// Shaped exactly as POST /api/submissions writes them. Doc id is
+// `${uid}__${milestoneId}`. Open rows are born approved; mentor rows wait.
+// Only seeded when seasons/s1 exists — run `node scripts/season.js` first.
+
+function submission({ uid, name, milestoneId, milestoneTitle, verifier, status, proofUrl, note, daysAgo, reviewNote }) {
+  const at = new Date(Date.now() - daysAgo * 86400000);
   return {
-    cohortId,
-    id: `seed-log-${String(++logSeq).padStart(3, "0")}`,
-    doc: { fields: { uid: s(uid), name: s(name), text: s(text), day: s(day), createdAt: ts(d) } },
+    fields: {
+      seasonId: s("s1"), milestoneId: s(milestoneId), milestoneTitle: s(milestoneTitle),
+      uid: s(uid), name: s(name), proofUrl: s(proofUrl), note: s(note ?? ""),
+      verifier: s(verifier), status: s(status), attempt: n(1),
+      reviewedByUid: s(""), reviewedByName: s(""), reviewedAt: { nullValue: null },
+      reviewNote: s(reviewNote ?? ""), createdAt: ts(at), updatedAt: ts(at),
+    },
   };
 }
 
-const buildLogs = [
-  logEntry({ cohortId: "seed-tempo", uid: "seed-maya", name: "Maya C.", text: "Shipped the 'two bars you keep fumbling' view. Watched a kid use it for 20 minutes without touching anything else.", daysAgo: 0 }),
-  logEntry({ cohortId: "seed-tempo", uid: "seed-dev", name: "Dev P.", text: "Got Android latency from 78ms to 41ms by moving analysis off the UI thread. It finally feels live.", daysAgo: 1 }),
-  logEntry({ cohortId: "seed-tempo", uid: "seed-lena", name: "Lena F.", text: "Sent 34 emails to band directors. Two demos booked, one said 'we already have something' — asked what it was, it's a spreadsheet.", daysAgo: 2 }),
-  logEntry({ cohortId: "seed-tempo", uid: "seed-maya", name: "Maya C.", text: "School #6 signed. Their director wants a report she can show at a budget meeting — building that next.", daysAgo: 3 }),
-  logEntry({ cohortId: "seed-tempo", uid: "seed-dev", name: "Dev P.", text: "Fixed the crash on Samsung devices with the low-latency audio path. Three angry reviews, all updated to 5 stars.", daysAgo: 4 }),
-
-  logEntry({ cohortId: "seed-shelfware", uid: "seed-felix", name: "Felix A.", text: "34th paying store. Churn is 3.8% and the two who left both said the same thing — they want purchase-order suggestions, not just flags.", daysAgo: 0 }),
-  logEntry({ cohortId: "seed-shelfware", uid: "seed-nina", name: "Nina K.", text: "Sent 40 screenshot cold emails. 13 replies, 4 trials. The ones with the screenshot convert 4x the ones without.", daysAgo: 1 }),
-  logEntry({ cohortId: "seed-shelfware", uid: "seed-rin", name: "Rin T.", text: "Killed three charts from the dashboard. Support tickets this week: 2, down from 9. Deleting things works.", daysAgo: 2 }),
-
-  logEntry({ cohortId: "seed-fieldnote", uid: "seed-priya", name: "Priya S.", text: "Wetland count done — 900 records, zero signal for six hours, nothing lost. First time I've fully trusted it.", daysAgo: 0 }),
-  logEntry({ cohortId: "seed-fieldnote", uid: "seed-omar", name: "Omar H.", text: "Wrote the merge test that fails on the bug I've been ignoring for a week. Now I have to fix it.", daysAgo: 1 }),
-  logEntry({ cohortId: "seed-fieldnote", uid: "seed-priya", name: "Priya S.", text: "Forest department asked for our CSV export format. Trying not to read too much into it.", daysAgo: 3 }),
-
-  logEntry({ cohortId: "seed-curbside", uid: "seed-sam", name: "Sam D.", text: "Signed restaurant 31 — walked in at 3pm between services, out with a yes in 11 minutes. In person still beats everything.", daysAgo: 0 }),
-  logEntry({ cohortId: "seed-curbside", uid: "seed-grace", name: "Grace L.", text: "Rebuilt the driver handoff so orders stop sitting on the counter. Average pickup wait: 9 min down to 4.", daysAgo: 1 }),
-  logEntry({ cohortId: "seed-curbside", uid: "seed-jules", name: "Jules M.", text: "Shot a 30-second spot for the Thai place on Main. They put it on their own story and got 6 orders that night.", daysAgo: 2 }),
-
-  logEntry({ cohortId: "seed-rivet", uid: "seed-tomas", name: "Tomas E.", text: "Batch 4 PCBs arrived. Two revisions in one week — the first had the USB footprint mirrored. Expensive lesson, cheap fix.", daysAgo: 0 }),
-  logEntry({ cohortId: "seed-rivet", uid: "seed-kai", name: "Kai W.", text: "New anodiser quote came back 31% under the old one for the same finish. Batch 4 margin goes from 18% to 34%.", daysAgo: 2 }),
-];
-
-// ─── Retired seed data ─────────────────────────────────────────────────────
-// Squads named like programme tracks ("Cold Start", "Lab Notes") rather than
-// like ventures. Fixed doc ids mean a re-seed would leave these sitting in the
-// discovery list forever, so the seeder deletes them explicitly.
-
-const RETIRED_COHORTS = [
-  "seed-night-shift", "seed-first-dollar", "seed-signal", "seed-cold-start",
-  "seed-launch-window", "seed-lab-notes", "seed-hardware-lab", "seed-cash-flow",
-  "seed-deep-south", "seed-word-of-mouth", "seed-stalled-example",
-];
+const submissions = {
+  "seed-maya__cold-ask": submission({ uid: "seed-maya", name: "Maya C.", milestoneId: "cold-ask", milestoneTitle: "The Cold Ask", verifier: "open", status: "approved", daysAgo: 3,
+    proofUrl: "https://tempo.study/asks", note: "5 asks to band directors; screenshots + the one reply that turned into a pilot." }),
+  "seed-lena__cold-ask": submission({ uid: "seed-lena", name: "Lena F.", milestoneId: "cold-ask", milestoneTitle: "The Cold Ask", verifier: "open", status: "approved", daysAgo: 2,
+    proofUrl: "https://tempo.study/schools", note: "Asked 5 music teachers for 15 minutes. Two said yes, one said no, two silent." }),
+  "seed-dev__ship-48h": submission({ uid: "seed-dev", name: "Dev P.", milestoneId: "ship-48h", milestoneTitle: "Ship in 48 Hours", verifier: "open", status: "approved", daysAgo: 1,
+    proofUrl: "https://tempo.study/latency", note: "A one-page latency tracker. Started Tuesday 9pm, live Thursday 7pm." }),
+  "seed-arjun__mission-locked": submission({ uid: "seed-arjun", name: "Arjun M.", milestoneId: "mission-locked", milestoneTitle: "Mission Locked", verifier: "mentor", status: "submitted", daysAgo: 1,
+    proofUrl: "https://northlight-tutoring.co.uk/one-pager", note: "Problem: A-level students can't find vetted tutors. One-pager linked." }),
+};
 
 // ─── Runner ────────────────────────────────────────────────────────────────
 
 async function main() {
   const token = await getAccessToken();
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    "Content-Type": "application/json",
-  };
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
   async function upsert(path, doc) {
-    const res = await fetch(`${BASE}/${path}`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify(doc),
-    });
+    const res = await fetch(`${BASE}/${path}`, { method: "PATCH", headers, body: JSON.stringify(doc) });
     if (!res.ok) throw new Error(`${path}: ${res.status} ${await res.text()}`);
-    console.log("ok", path);
+    console.log("  wrote", path);
   }
-
-  async function del(path) {
-    const res = await fetch(`${BASE}/${path}`, { method: "DELETE", headers });
-    if (res.ok) console.log("removed", path);
+  async function exists(path) {
+    const res = await fetch(`${BASE}/${path}`, { headers });
+    return res.ok;
   }
-
-  async function listIds(path) {
-    const res = await fetch(`${BASE}/${path}?pageSize=300`, { headers });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return (json.documents ?? []).map((d) => d.name.split("/").pop());
-  }
-
-  /** Delete a cohort and everything hanging off it — a bare doc delete would
-   *  strand its subcollections, which stay queryable by id. */
-  async function purgeCohort(id) {
-    for (const sub of ["applications", "submissions", "logs", "checkIns"]) { // submissions: legacy cleanup
-      for (const child of await listIds(`cohorts/${id}/${sub}`)) {
-        await del(`cohorts/${id}/${sub}/${child}`);
-      }
-    }
-    await del(`cohorts/${id}`);
-  }
-
-  console.log("Removing retired squads…");
-  for (const id of RETIRED_COHORTS) await purgeCohort(id);
 
   console.log("Seeding profiles…");
   for (const [id, doc] of Object.entries(profiles)) await upsert(`profiles/${id}`, doc);
 
-  console.log("Seeding cohorts…");
-  for (const [id, doc] of Object.entries(cohorts)) await upsert(`cohorts/${id}`, doc);
-
   console.log("Seeding workshops…");
   for (const [id, doc] of Object.entries(workshops)) await upsert(`workshops/${id}`, doc);
 
-  console.log("Seeding build logs…");
-  for (const { cohortId, id, doc } of buildLogs) {
-    await upsert(`cohorts/${cohortId}/logs/${id}`, doc);
+  console.log("Seeding the feed…");
+  for (const [id, doc] of Object.entries(buildLogs)) await upsert(`buildLogs/${id}`, doc);
+
+  if (await exists("seasons/s1")) {
+    console.log("Seeding proof (seasons/s1/submissions)…");
+    for (const [id, doc] of Object.entries(submissions)) await upsert(`seasons/s1/submissions/${id}`, doc);
+  } else {
+    console.log("No seasons/s1 yet — run `node scripts/season.js` first, then rerun to seed proof.");
   }
 
-  console.log("Seed complete.");
+  console.log("Done.");
 }
 
 main().catch((e) => {

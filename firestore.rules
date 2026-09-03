@@ -3,7 +3,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Data Model (v2 — squads, mentor-owned tracks, streaks, workshops)
+    // Data Model (v3 — one shared season, proof submissions, streaks, workshops)
     // ===============================================================
     //
     // Collection: applications (legacy public waitlist)
@@ -26,7 +26,7 @@ service cloud.firestore {
     //   member to their lead-source code. Deny-all to clients.
     //
     // Collection: profiles/{uid} — the operator profile. Readable by any
-    //   signed-in user (it IS the cohort application artifact). Privacy
+    //   signed-in user (mentors and the proof wall read it). Privacy
     //   by construction: name is "First L.", age is a band, location is
     //   country + timezone. No email/phone/DOB/exact city ever.
     //   role ('operator'|'mentor') and plan ('free'|'pro') are set by
@@ -39,17 +39,24 @@ service cloud.firestore {
     // Collection: privateProfiles/{uid} — DOB, full name, exact city,
     //   parent email. Owner-only, both directions. Never listed.
     //
-    // Collection: cohorts/{id} — accountability squads (3–8 operators).
-    //   Founder manages the doc. The ritual streak is server-written
-    //   (POST /api/ritual). A squad is adopted by exactly one mentor
-    //   (mentorUid), who alone writes the squad's `track` (the ordered list
-    //   of milestones and their done state) and takes its check-ins — and a
-    //   squad cannot reach state 'active' without both 3+ members and that
-    //   mentor.
-    //   Subcollections:
-    //     applications/{applicantUid} — pitch + status + declineReason
-    //     logs/{auto} — build log entries (the squad's pulse; server-written)
-    //     checkIns/{auto} — squad↔mentor sessions, visible to that squad only
+    // Collection: seasons/{id} — THE shared track: one document every
+    //   mentor edits, read by every signed-in user. SERVER-WRITTEN ONLY
+    //   (POST /api/season): the save is a transaction with a stale-write
+    //   check, and it refuses to drop a milestone that already has proof.
+    //   Subcollection:
+    //     submissions/{uid}__{milestoneId} — one operator's proof for one
+    //       milestone. Server-written only (POST /api/submissions, /review):
+    //       whether a row is born approved depends on the milestone's
+    //       verifier, which lives inside a list these rules can't index.
+    //       READ is split by the row's snapshotted `verifier` (see below).
+    //
+    // Collection: buildLogs/{auto} — the season feed, one line a day.
+    //   Server-written (POST /api/build-log) because posting is a streak
+    //   action; readable by every signed-in user; author may delete own.
+    //
+    // PARENTAL CONSENT for these writes is enforced in the routes, not here
+    //   — the rules never see them. (The squad-era consentAllows() helper is
+    //   gone with the squad writes it guarded.)
     //
     // Collection: workshops — mentor-hosted sessions, readable by every
     //   signed-in user and WRITTEN ONLY BY THE SERVER (app/api/workshops/**,
@@ -104,36 +111,11 @@ service cloud.firestore {
       return value is list && value.size() <= maxItems;
     }
 
-    function cohortData(cohortId) {
-      return get(/databases/$(database)/documents/cohorts/$(cohortId)).data;
-    }
-
-    function isCohortMember(cohortId) {
-      return isAuthenticated() && request.auth.uid in cohortData(cohortId).memberUids;
-    }
-
-    function isCohortFounder(cohortId) {
-      return isAuthenticated() && request.auth.uid == cohortData(cohortId).founderUid;
-    }
-
-    // The mentor who adopted this squad. Legacy squads have no mentorUid at
-    // all, so read it defensively — absent means nobody holds the role.
-    function isCohortMentor(cohortId) {
-      return isAuthenticated() &&
-        request.auth.uid == cohortData(cohortId).get('mentorUid', '');
-    }
-
     function isMentor() {
       return isAuthenticated() &&
         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.role == 'mentor';
     }
 
-    // Parental-consent gate for community writes. A minor whose parent hasn't
-    // approved yet has consentStatus == 'pending' and is blocked from all
-    // community writes (cohorts, applications, logs, rituals, check-ins).
-    // Missing profile / missing field (legacy or adult) reads as allowed —
-    // only an explicit 'pending' blocks. Grants are server- or mentor-driven,
-    // never a self-write (consentStatus is immutable on the owner update path).
     // TEMPORARY — founding-batch access gate. True when the caller's verified
     // token email is on the staff-managed allowlist. `approvedMembers` denies
     // all client access, but exists() is evaluated by the rules engine itself,
@@ -145,11 +127,6 @@ service cloud.firestore {
       return isAuthenticated() &&
         request.auth.token.get('email', '') != '' &&
         exists(/databases/$(database)/documents/approvedMembers/$(request.auth.token.email.lower()));
-    }
-
-    function consentAllows(uid) {
-      return !exists(/databases/$(database)/documents/profiles/$(uid)) ||
-        get(/databases/$(database)/documents/profiles/$(uid)).data.get('consentStatus', 'granted') != 'pending';
     }
 
     // ===============================================================
@@ -310,17 +287,17 @@ service cloud.firestore {
                'proofUrl', 'proofNote', 'hours', 'bio', 'links',
                'consentStatus', 'consentEmailSentAt', 'plan', 'role',
                'streak', 'streakFreezes', 'lastActiveDay', 'lastBuildLogDay',
-               'enrolledWorkshops', 'pendingApplications',
+               'enrolledWorkshops',
                'createdAt', 'updatedAt',
-               // Legacy XP-era fields: tolerated on docs that still carry
-               // them so a merge-write of an old profile keeps validating.
-               // Nothing reads them.
-               'xp', 'attendedWorkshops', 'lastRitualWeek']) &&
+               // Legacy fields: tolerated on docs that still carry them so a
+               // merge-write of an old profile keeps validating (an update is
+               // validated as the whole merged doc, not the delta). Nothing
+               // reads them. pendingApplications joined when squads went.
+               'xp', 'attendedWorkshops', 'lastRitualWeek', 'pendingApplications']) &&
              hasRequiredFields(['uid', 'name', 'ageBand', 'country', 'timezone',
                'headline', 'building', 'stage', 'domains', 'skills',
                'consentStatus', 'plan', 'role',
-               'streak', 'streakFreezes', 'lastActiveDay',
-               'pendingApplications', 'updatedAt']) &&
+               'streak', 'streakFreezes', 'lastActiveDay', 'updatedAt']) &&
              data.uid == request.auth.uid &&
              validString(data.name, 1, 80) &&
              data.ageBand in ['13-15', '16-17', '18+'] &&
@@ -347,7 +324,7 @@ service cloud.firestore {
              validString(data.lastActiveDay, 10, 10) &&
              (!('lastBuildLogDay' in data) || validString(data.lastBuildLogDay, 0, 10)) &&
              (!('enrolledWorkshops' in data) || validStringList(data.enrolledWorkshops, 100)) &&
-             validStringList(data.pendingApplications, 3);
+             (!('pendingApplications' in data) || validStringList(data.pendingApplications, 3));
     }
 
     // Mentors (trusted staff) grant parental consent in-app — the only
@@ -387,7 +364,7 @@ service cloud.firestore {
       // which bypasses rules) via the parent-approval link.
       // The STREAK is immutable on a self-update too: streak, streakFreezes,
       // lastActiveDay and lastBuildLogDay are written only by the server
-      // (/api/build-log, /api/ritual — app/lib/streakServer.ts).
+      // (/api/build-log, /api/submissions — app/lib/streakServer.ts).
       allow update: if (isOwner(userId) && isValidProfile(request.resource.data) &&
                         areImmutableFieldsUnchanged(['uid', 'createdAt', 'role', 'plan',
                           'consentStatus', 'consentEmailSentAt',
@@ -413,226 +390,52 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+
     // ===============================================================
-    // Cohorts
+    // The season — ONE shared track, and the proof against it. Both are
+    // server-written (app/api/season, app/api/submissions/**, Admin SDK),
+    // the same posture as workshops: every mentor edits the same document,
+    // so saves need a transaction with a stale-write check; the milestone
+    // list is the authorization input for submissions and rules can't
+    // validate list elements; and removing a milestone that has proof has
+    // to be refused, which needs a query.
     // ===============================================================
 
-    function isValidCohort(data) {
-      return hasOnlyAllowedFields(['name', 'mission', 'tags', 'lookingFor', 'meetingSlot',
-               'link', 'icon', 'timezone', 'state', 'founderUid', 'founderName',
-               'mentorUid', 'mentorName', 'mentorNotifiedAt',
-               'memberUids', 'memberNames', 'open', 'weeklyStreak', 'lastRitualWeek',
-               'track', 'trackUpdatedAt', 'createdAt',
-               // Legacy: the peer-lead role is gone; old docs still carry it.
-               'peerLeadUid']) &&
-             hasRequiredFields(['name', 'mission', 'meetingSlot', 'timezone', 'state',
-               'founderUid', 'founderName',
-               'memberUids', 'memberNames', 'open', 'weeklyStreak', 'createdAt']) &&
-             validString(data.name, 1, 60) &&
-             validString(data.mission, 1, 140) &&
-             // Focus tags may be preset domains or founder-typed free text.
-             // Count is bounded here (mirrors MAX_FOCUS_TAGS in the client);
-             // per-tag length/content is normalized client-side since rules
-             // can't loop a list. Residual free-text risk accepted for v1.
-             (!('tags' in data) || validStringList(data.tags, 6)) &&
-             (!('lookingFor' in data) || validStringList(data.lookingFor, 7)) &&
-             validString(data.meetingSlot, 1, 80) &&
-             // Optional landing page: blank, or an http(s) URL under 200 chars.
-             (!('link' in data) ||
-               (data.link is string && data.link.size() <= 200 &&
-                (data.link == '' || data.link.matches('https?://.*')))) &&
-             // Optional icon: blank, or an inline data:image URL. Bounded to
-             // mirror COHORT_ICON_MAX_CHARS — keeps list reads lean and the doc
-             // under 1MB. It's a data URL, so nothing external loads for viewers.
-             (!('icon' in data) ||
-               (data.icon is string && data.icon.size() <= 40000 &&
-                (data.icon == '' || data.icon.matches('data:image/.*')))) &&
-             validString(data.timezone, 1, 60) &&
-             data.state in ['forming', 'active', 'stalled', 'archived'] &&
-             // ACTIVATION GATE: a squad only goes live with a real crew AND a
-             // mentor who owns it — the mentor runs the track, so activating
-             // unassigned hands a squad a season nobody is running.
-             // Mirrors canActivate() in app/lib/types.ts.
-             (data.state != 'active' ||
-               (data.memberUids.size() >= 3 && data.get('mentorUid', '') != '')) &&
-             data.founderUid is string &&
-             validString(data.founderName, 1, 80) &&
-             (!('mentorUid' in data) || data.mentorUid is string) &&
-             (!('mentorName' in data) || validString(data.mentorName, 0, 80)) &&
-             (!('mentorNotifiedAt' in data) || data.mentorNotifiedAt is timestamp) &&
-             (!('peerLeadUid' in data) || data.peerLeadUid is string) &&
-             // The track: bounded list, mentor-written (see isTrackUpdate).
-             // Rules can't validate each element; the mentor is staff.
-             (!('track' in data) || validStringList(data.track, 20)) &&
-             (!('trackUpdatedAt' in data) || data.trackUpdatedAt is timestamp) &&
-             validStringList(data.memberUids, 8) && data.memberUids.size() >= 1 &&
-             data.memberNames is map && data.memberNames.size() <= 8 &&
-             data.open is bool &&
-             data.weeklyStreak is number && data.weeklyStreak >= 0 && data.weeklyStreak <= 1000 &&
-             (!('lastRitualWeek' in data) || validString(data.lastRitualWeek, 0, 8));
-    }
-
-    // The squad's mentor — and nobody else — writes the track. Only those
-    // two fields may move; everything else on the doc is frozen to them.
-    function isTrackUpdate(cohortId) {
-      return isCohortMentor(cohortId) &&
-             request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['track', 'trackUpdatedAt']) &&
-             request.resource.data.track is list &&
-             request.resource.data.track.size() <= 20 &&
-             request.resource.data.trackUpdatedAt is timestamp;
-    }
-
-    // A mentor adopts an UNCLAIMED squad from the adoption feed: they write
-    // themselves in as its mentor and, if the crew is already ≥3, flip it live
-    // in the same write. Deliberately one-way — the condition is "no mentor
-    // yet", so no client can steal or reassign a squad that already has one,
-    // and a mentor can't hand one off from the app (handoff stays a staff
-    // operation). No cap on squads per mentor.
-    function isMentorAdopt() {
-      return isMentor() &&
-             resource.data.get('mentorUid', '') == '' &&
-             request.resource.data.diff(resource.data).affectedKeys()
-               .hasOnly(['mentorUid', 'mentorName', 'state']) &&
-             request.resource.data.mentorUid == request.auth.uid &&
-             validString(request.resource.data.mentorName, 1, 80) &&
-             (request.resource.data.state == resource.data.state ||
-              (resource.data.state == 'forming' &&
-               request.resource.data.state == 'active' &&
-               resource.data.memberUids.size() >= 3));
-    }
-
-    match /cohorts/{cohortId} {
+    match /seasons/{seasonId} {
       allow read: if isAuthenticated();
+      allow create, update, delete: if false;
 
-      // Creator must be founder and sole initial member; new cohorts start
-      // forming with no streak and no track (the mentor writes that later).
-      allow create: if isAuthenticated() &&
-                       consentAllows(request.auth.uid) &&
-                       isValidCohort(request.resource.data) &&
-                       request.resource.data.founderUid == request.auth.uid &&
-                       request.resource.data.memberUids == [request.auth.uid] &&
-                       request.resource.data.state == 'forming' &&
-                       request.resource.data.weeklyStreak == 0 &&
-                       !('track' in request.resource.data);
-
-      // Founder manages the doc; founder must stay a member. Mentor
-      // assignment, the track and the weekly ritual streak are NOT the
-      // founder's to write — the first moves only through isMentorAdopt (or
-      // the Admin SDK), the second only through isTrackUpdate, and the ritual
-      // (weeklyStreak / lastRitualWeek) only through POST /api/ritual.
-      allow update: if consentAllows(request.auth.uid) &&
-                       ((isCohortFounder(cohortId) &&
-                        isValidCohort(request.resource.data) &&
-                        areImmutableFieldsUnchanged(['founderUid', 'founderName', 'createdAt',
-                          'mentorUid', 'mentorName', 'mentorNotifiedAt',
-                          'track', 'trackUpdatedAt', 'weeklyStreak', 'lastRitualWeek']) &&
-                        request.resource.data.founderUid in request.resource.data.memberUids) ||
-                       isMentorAdopt() ||
-                       isTrackUpdate(cohortId));
-
-      allow delete: if false;
-
-      // ---------------- Applications ----------------
-
-      function isValidApplication(data) {
-        return hasOnlyAllowedFields(['applicantUid', 'applicantName', 'pitch', 'hours', 'status', 'declineReason', 'createdAt']) &&
-               hasRequiredFields(['applicantUid', 'applicantName', 'pitch', 'hours', 'status', 'createdAt']) &&
-               validString(data.applicantName, 1, 80) &&
-               validString(data.pitch, 0, 300) &&
-               data.hours in ['<3', '3-5', '5-10', '10+'];
+      // Doc id is `{uid}__{milestoneId}`: one row per operator per milestone.
+      //
+      // Read scope: the author always; any mentor (the review queue); and,
+      // when the milestone's verifier was 'open' AT SUBMIT TIME, every
+      // signed-in user. `verifier` is stamped server-side from the milestone,
+      // which is what makes it trustworthy here — and it's a snapshot, so a
+      // milestone later flipped mentor→open never exposes proof made
+      // privately. A LIST QUERY IS ALL-OR-NOTHING: the public wall must
+      // filter where('verifier','==','open'), your own rows where('uid',
+      // '==', you); an unfiltered list is denied for anyone but a mentor.
+      // isMentor() costs a get(), so it is evaluated last.
+      match /submissions/{subId} {
+        allow read: if isAuthenticated() &&
+                       (resource.data.uid == request.auth.uid ||
+                        resource.data.get('verifier', 'mentor') == 'open' ||
+                        isMentor());
+        allow create, update, delete: if false;
       }
+    }
 
-      match /applications/{applicantId} {
-        allow read: if isOwner(applicantId) || isCohortMember(cohortId);
+    // ===============================================================
+    // Build log — the season feed. Posting is SERVER-ONLY (POST
+    // /api/build-log): it is a streak action, and the streak is computed and
+    // written alongside it by the Admin SDK. Everyone reads; the author may
+    // delete their own line.
+    // ===============================================================
 
-        // Apply as yourself, always starting pending; members can't
-        // apply to their own cohort.
-        allow create: if isOwner(applicantId) &&
-                         consentAllows(request.auth.uid) &&
-                         isValidApplication(request.resource.data) &&
-                         request.resource.data.applicantUid == applicantId &&
-                         request.resource.data.status == 'pending' &&
-                         request.resource.data.declineReason == null &&
-                         !(request.auth.uid in cohortData(cohortId).memberUids);
-
-        // Only the founder decides, only from pending. Declines need a
-        // one-tap reason; accepts must add the applicant to the roster
-        // in the same batch (getAfter checks the parent cohort).
-        allow update: if isCohortFounder(cohortId) &&
-                         resource.data.status == 'pending' &&
-                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'declineReason']) &&
-                         request.resource.data.status in ['accepted', 'declined'] &&
-                         ((request.resource.data.status == 'declined' &&
-                           request.resource.data.declineReason in ['full', 'different_focus', 'timezone']) ||
-                          (request.resource.data.status == 'accepted' &&
-                           request.resource.data.declineReason == null &&
-                           applicantId in getAfter(/databases/$(database)/documents/cohorts/$(cohortId)).data.memberUids));
-
-        // Applicants may withdraw while pending.
-        allow delete: if isOwner(applicantId) && resource.data.status == 'pending';
-      }
-
-      // ---------------- Squad check-ins ----------------
-      // What "office hours" became. A check-in is squad-scoped, not a catalog
-      // item: any member requests one, the squad's ASSIGNED mentor puts a time
-      // and a link on it, and it is readable ONLY by that squad's members and
-      // that mentor. Note the read rule here is deliberately narrower than the
-      // one on submissions/logs — a check-in is a private conversation with
-      // one squad, so a mentor who doesn't own the squad can't see it either.
-
-      function isValidCheckIn(data) {
-        return hasOnlyAllowedFields(['cohortId', 'requestedByUid', 'requestedByName',
-                 'note', 'status', 'mentorUid', 'mentorName', 'startsAt',
-                 'durationMins', 'meetLink', 'calendarEventId', 'createdAt', 'confirmedAt']) &&
-               hasRequiredFields(['cohortId', 'requestedByUid', 'requestedByName',
-                 'status', 'mentorUid', 'createdAt']) &&
-               data.cohortId == cohortId &&
-               validString(data.requestedByName, 1, 80) &&
-               (!('note' in data) || validString(data.note, 0, 200)) &&
-               data.status in ['requested', 'confirmed'] &&
-               data.mentorUid is string &&
-               (!('mentorName' in data) || validString(data.mentorName, 0, 80)) &&
-               (!('durationMins' in data) ||
-                 (data.durationMins is number && data.durationMins > 0 && data.durationMins <= 600)) &&
-               (!('meetLink' in data) || validString(data.meetLink, 0, 500));
-      }
-
-      match /checkIns/{checkInId} {
-        allow read: if isCohortMember(cohortId) || isCohortMentor(cohortId);
-
-        // Request one as yourself, always starting unscheduled, and only when
-        // the squad actually has a mentor to receive it.
-        allow create: if isCohortMember(cohortId) &&
-                         consentAllows(request.auth.uid) &&
-                         isValidCheckIn(request.resource.data) &&
-                         request.resource.data.requestedByUid == request.auth.uid &&
-                         request.resource.data.status == 'requested' &&
-                         request.resource.data.startsAt == null &&
-                         cohortData(cohortId).get('mentorUid', '') != '' &&
-                         request.resource.data.mentorUid == cohortData(cohortId).mentorUid;
-
-        // Confirming is SERVER-ONLY (POST /api/checkins/confirm, Admin SDK):
-        // it may create a Google Calendar event with a Meet room, so the
-        // mentor never writes the confirmation from the browser.
-        allow update: if false;
-
-        // The requester may withdraw while it's still just a request.
-        allow delete: if isOwner(resource.data.requestedByUid) &&
-                         resource.data.status == 'requested';
-      }
-
-      // ---------------- Build log ----------------
-
-      // Posting is SERVER-ONLY (POST /api/build-log): a build log is a streak
-      // action, and the streak is computed and written alongside it by the
-      // Admin SDK. Members read; the author may delete their own line.
-      match /logs/{logId} {
-        allow read: if isCohortMember(cohortId) || isMentor();
-        allow create: if false;
-        allow update: if false;
-        allow delete: if isOwner(resource.data.uid);
-      }
+    match /buildLogs/{logId} {
+      allow read: if isAuthenticated();
+      allow create, update: if false;
+      allow delete: if isOwner(resource.data.uid);
     }
 
     // ===============================================================

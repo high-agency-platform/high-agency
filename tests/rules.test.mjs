@@ -1,20 +1,23 @@
 /**
- * Firestore security-rules tests: parental-consent enforcement, the
- * founding-batch gate, workshops (server-only writes), squad check-ins,
- * mentor adoption + the activation gate, and the mentor-owned track. Run
- * against the Firestore emulator:
+ * Firestore security-rules tests: the founding-batch gate, the profile
+ * invariants (consent, the server-written streak, tolerated legacy fields),
+ * workshops (server-only writes), THE SEASON and its proof submissions
+ * (server-only writes; reads split by the row's snapshotted verifier), and
+ * the season feed. Run against the Firestore emulator:
  *
  *   npm run test:rules
  *
  * which wraps `node --test` in `firebase emulators:exec --only firestore`, so
  * the emulator is up and FIRESTORE_EMULATOR_HOST is set for us.
  *
- * The core claim under test: a minor whose consentStatus is "pending" is
- * DENIED — at the rules level — from every community write (create cohort,
- * apply, request a check-in), while a "granted"
- * operator succeeds at the identical writes. Plus: a pending minor can't
- * self-grant consent, and the consentTokens collection is fully locked to
- * clients.
+ * The claims that matter most:
+ *  - no client can write a season, a submission or a build log by any path;
+ *  - a 'mentor'-verifier submission is readable by its author and by mentors,
+ *    and by NOBODY else — while an 'open' one is readable by every member;
+ *  - a list over submissions is all-or-nothing: the public wall MUST filter
+ *    on verifier == 'open' or it is denied;
+ *  - a profile that still carries the squad-era `pendingApplications` field
+ *    can still be updated (an update is validated as the merged doc).
  */
 import { readFileSync } from "node:fs";
 import { after, before, beforeEach, test } from "node:test";
@@ -33,13 +36,16 @@ import {
   collection,
   addDoc,
   arrayUnion,
+  query,
+  where,
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
 
 const PROJECT_ID = "highagency-rules-test";
 
-/** A fully rules-valid profile, parameterised by consent state. */
+/** A fully rules-valid profile, parameterised by consent state. Shaped the
+ *  way the app writes one TODAY — no pendingApplications. */
 function profile(uid, consentStatus, role = "operator") {
   return {
     uid,
@@ -58,51 +64,8 @@ function profile(uid, consentStatus, role = "operator") {
     streak: 1,
     streakFreezes: 0,
     lastActiveDay: "2026-07-10",
-    pendingApplications: [],
     updatedAt: serverTimestamp(),
     createdAt: serverTimestamp(),
-  };
-}
-
-/** A rules-valid cohort doc — every required field present, so update tests
- *  exercise the gate under test rather than tripping on shape. */
-function fullCohort(overrides = {}) {
-  return {
-    name: "Test Squad",
-    mission: "Ship something real",
-    tags: ["AI"],
-    lookingFor: ["Coding"],
-    meetingSlot: "Sundays 7pm ET",
-    timezone: "America/Toronto",
-    state: "forming",
-    founderUid: "founder",
-    founderName: "Test O.",
-    memberUids: ["founder", "granted", "minor"],
-    memberNames: { founder: "Test O.", granted: "Test O.", minor: "Test O." },
-    open: true,
-    weeklyStreak: 0,
-    lastRitualWeek: "",
-    createdAt: serverTimestamp(),
-    ...overrides,
-  };
-}
-
-/** A check-in on cohorts/mentored, owned by mentorA and asked for by a member. */
-function checkIn(overrides = {}) {
-  return {
-    cohortId: "mentored",
-    requestedByUid: "granted",
-    requestedByName: "Test O.",
-    note: "Stuck on pricing",
-    status: "requested",
-    mentorUid: "mentorA",
-    mentorName: "Mentor A.",
-    startsAt: null,
-    durationMins: 30,
-    meetLink: "",
-    createdAt: serverTimestamp(),
-    confirmedAt: null,
-    ...overrides,
   };
 }
 
@@ -123,9 +86,27 @@ function workshop(overrides = {}) {
   };
 }
 
-/** One step of a mentor-written track. */
-function step(i, done = false) {
-  return { id: `s${i}`, title: `Step ${i}`, detail: "", dueDay: "", doneAt: done ? Date.now() : null };
+/** A submission, shaped like the server writes it. */
+function submission(uid, milestoneId, verifier, status, overrides = {}) {
+  return {
+    seasonId: "s1",
+    milestoneId,
+    milestoneTitle: milestoneId,
+    uid,
+    name: "Test O.",
+    proofUrl: "https://example.com/proof",
+    note: "",
+    verifier,
+    status,
+    attempt: 1,
+    reviewedByUid: "",
+    reviewedByName: "",
+    reviewedAt: null,
+    reviewNote: "",
+    createdAt: Timestamp.now(),
+    updatedAt: Timestamp.now(),
+    ...overrides,
+  };
 }
 
 let testEnv;
@@ -143,27 +124,23 @@ after(async () => {
 
 beforeEach(async () => {
   await testEnv.clearFirestore();
-  // Seed with rules bypassed: two operators (one pending minor, one granted),
-  // a squad they both belong to, and a separate open squad to apply into.
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
+    // Operators: a pending minor, two granted adults, and a legacy doc that
+    // still carries the squad-era field.
     await setDoc(doc(db, "profiles/minor"), profile("minor", "pending"));
     await setDoc(doc(db, "profiles/granted"), profile("granted", "granted"));
-    await setDoc(doc(db, "profiles/founder"), profile("founder", "granted"));
-    // Two mentors: mentorA owns things, mentorB is the "other mentor" every
-    // ownership test needs to be denied.
+    await setDoc(doc(db, "profiles/other"), profile("other", "granted"));
+    await setDoc(doc(db, "profiles/legacy"), {
+      ...profile("legacy", "granted"),
+      pendingApplications: ["oldSquad"],
+      xp: 250,
+    });
+    // Two mentors, so "another mentor" is always available to a test.
     await setDoc(doc(db, "profiles/mentorA"), profile("mentorA", "granted", "mentor"));
     await setDoc(doc(db, "profiles/mentorB"), profile("mentorB", "granted", "mentor"));
 
-    // A squad both test users are members of (so membership-gated writes reach
-    // the consent check). Only the fields the rules read are needed.
-    await setDoc(doc(db, "cohorts/squad"), {
-      founderUid: "founder",
-      memberUids: ["founder", "minor", "granted"],
-      weeklyStreak: 2,
-      lastRitualWeek: "2026-W27",
-    });
-    // TEMPORARY — founding-batch access gate. Profile CREATE now also requires
+    // TEMPORARY — founding-batch access gate. Profile CREATE also requires
     // the caller's token email to be on this allowlist. Seeded with rules
     // bypassed, exactly as staff writes it (Console / scripts/approve.js).
     await setDoc(doc(db, "approvedMembers/approved@example.com"), {
@@ -176,123 +153,46 @@ beforeEach(async () => {
       role: "operator",
     });
 
-    // A different squad neither is a member of, to apply into.
-    await setDoc(doc(db, "cohorts/openSquad"), {
-      founderUid: "founder",
-      memberUids: ["founder"],
-      weeklyStreak: 0,
+    // The live season: one open step, one mentor-reviewed step.
+    await setDoc(doc(db, "seasons/s1"), {
+      name: "Developing High Agency",
+      state: "live",
+      milestones: [
+        { id: "cold-ask", title: "The Cold Ask", why: "", proof: "", effort: "", verifier: "open", sessions: [] },
+        { id: "mission", title: "Mission Locked", why: "", proof: "", effort: "", verifier: "mentor", sessions: [] },
+      ],
+      updatedAt: Timestamp.now(),
     });
+    // granted: an open row (public) and a mentor row (private, in review).
+    await setDoc(doc(db, "seasons/s1/submissions/granted__cold-ask"), submission("granted", "cold-ask", "open", "approved"));
+    await setDoc(doc(db, "seasons/s1/submissions/granted__mission"), submission("granted", "mission", "mentor", "submitted"));
+    // other: a mentor row that was returned.
+    await setDoc(doc(db, "seasons/s1/submissions/other__mission"), submission("other", "mission", "mentor", "returned", { reviewNote: "Add the who" }));
 
-    /* ---- mentor-sessions fixtures ---- */
-
-    // Fully rules-valid squads for the activation-gate + adoption tests.
-    await setDoc(doc(db, "cohorts/unclaimed"), fullCohort()); // 3 members, no mentor
-    await setDoc(doc(db, "cohorts/tiny"), fullCohort({ memberUids: ["founder"] }));
-    await setDoc(
-      doc(db, "cohorts/claimed"),
-      fullCohort({ mentorUid: "mentorA", mentorName: "Mentor A." })
-    );
-    // Squad with a mentor, used for the check-in flow.
-    await setDoc(
-      doc(db, "cohorts/mentored"),
-      fullCohort({ mentorUid: "mentorA", mentorName: "Mentor A.", state: "active" })
-    );
-    await setDoc(doc(db, "cohorts/mentored/checkIns/req1"), checkIn());
-    // A confirmed one, to prove it can't be re-edited.
-    await setDoc(
-      doc(db, "cohorts/mentored/checkIns/done1"),
-      checkIn({ status: "confirmed", startsAt: Timestamp.now(), meetLink: "https://m/x" })
-    );
+    // The season feed.
+    await setDoc(doc(db, "buildLogs/l1"), {
+      uid: "granted",
+      name: "Test O.",
+      text: "Shipped the landing page",
+      day: "2026-07-10",
+      createdAt: Timestamp.now(),
+    });
 
     // mentorA's session with two seats, one already taken.
     await setDoc(doc(db, "workshops/owned"), workshop({ enrolledUids: ["someone"] }));
   });
 });
 
-/* ---- shared write attempts, parameterised by the acting uid ---- */
+const asUser = (uid, opts) => testEnv.authenticatedContext(uid, opts).firestore();
+const subs = (db) => collection(db, "seasons/s1/submissions");
 
-function createCohort(db, uid) {
-  return addDoc(collection(db, "cohorts"), {
-    name: "New Squad",
-    mission: "Ship something",
-    meetingSlot: "Sundays 7pm ET",
-    timezone: "America/Toronto",
-    state: "forming",
-    founderUid: uid,
-    founderName: "Test O.",
-    memberUids: [uid],
-    memberNames: { [uid]: "Test O." },
-    open: true,
-    weeklyStreak: 0,
-    createdAt: serverTimestamp(),
-  });
-}
-
-function applyToOpenSquad(db, uid) {
-  return setDoc(doc(db, "cohorts/openSquad/applications", uid), {
-    applicantUid: uid,
-    applicantName: "Test O.",
-    pitch: "Let me in",
-    hours: "3-5",
-    status: "pending",
-    declineReason: null,
-    createdAt: serverTimestamp(),
-  });
-}
-
-function postBuildLog(db, uid) {
-  return addDoc(collection(db, "cohorts/squad/logs"), {
-    uid,
-    name: "Test O.",
-    text: "Shipped the landing page",
-    day: "2026-07-10",
-    createdAt: serverTimestamp(),
-  });
-}
-
-function tickRitual(db) {
-  return updateDoc(doc(db, "cohorts/squad"), {
-    weeklyStreak: 3,
-    lastRitualWeek: "2026-W28",
-  });
-}
-
-/* ================= pending minor: every community write DENIED ============ */
-
-test("pending minor is denied: create cohort", async () => {
-  const db = testEnv.authenticatedContext("minor").firestore();
-  await assertFails(createCohort(db, "minor"));
-});
-
-test("pending minor is denied: create application", async () => {
-  const db = testEnv.authenticatedContext("minor").firestore();
-  await assertFails(applyToOpenSquad(db, "minor"));
-});
-
-test("STREAK: nobody posts a build log from the browser (server route only)", async () => {
-  await assertFails(postBuildLog(testEnv.authenticatedContext("granted").firestore(), "granted"));
-  await assertFails(postBuildLog(testEnv.authenticatedContext("minor").firestore(), "minor"));
-});
-
-test("STREAK: nobody ticks the ritual from the browser (server route only)", async () => {
-  await assertFails(tickRitual(testEnv.authenticatedContext("granted").firestore()));
-  await assertFails(tickRitual(testEnv.authenticatedContext("founder").firestore()));
-});
-
-/* ================= granted operator: identical writes SUCCEED ============= */
-
-test("granted operator is allowed: create cohort", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertSucceeds(createCohort(db, "granted"));
-});
-
-test("granted operator is allowed: create application", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertSucceeds(applyToOpenSquad(db, "granted"));
-});
+/* ========================================================================= *
+ *  Profiles — the streak is server-written, consent can't be self-granted,
+ *  legacy fields are tolerated, the gate holds on create
+ * ========================================================================= */
 
 test("STREAK: an operator cannot raise their own streak", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
+  const db = asUser("granted");
   await assertFails(updateDoc(doc(db, "profiles/granted"), { streak: 400, updatedAt: serverTimestamp() }));
   await assertFails(updateDoc(doc(db, "profiles/granted"), { streakFreezes: 3, updatedAt: serverTimestamp() }));
   await assertFails(updateDoc(doc(db, "profiles/granted"), { lastActiveDay: "2026-07-11", updatedAt: serverTimestamp() }));
@@ -300,490 +200,274 @@ test("STREAK: an operator cannot raise their own streak", async () => {
 });
 
 test("STREAK: an operator can still edit their card with the streak untouched", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
+  const db = asUser("granted");
   await assertSucceeds(updateDoc(doc(db, "profiles/granted"), { headline: "New line", updatedAt: serverTimestamp() }));
 });
 
 test("STREAK: a new profile cannot start with a banked streak", async () => {
-  const db = testEnv.authenticatedContext("approved", { email: "approved@example.com" }).firestore();
+  const db = asUser("approved", { email: "approved@example.com" });
   await assertFails(setDoc(doc(db, "profiles/approved"), { ...profile("approved", "granted"), streak: 30 }));
   await assertFails(setDoc(doc(db, "profiles/approved"), { ...profile("approved", "granted"), streakFreezes: 2 }));
   await assertSucceeds(setDoc(doc(db, "profiles/approved"), profile("approved", "granted")));
 });
 
-/* ================= consent can't be self-granted ========================= */
+test("LEGACY: a profile that still carries pendingApplications can be updated", async () => {
+  // An update is validated as the merged document, not the delta. If the
+  // squad-era field ever leaves the allowed list, every existing profile
+  // becomes silently unupdatable. This pins it.
+  const db = asUser("legacy");
+  await assertSucceeds(updateDoc(doc(db, "profiles/legacy"), { headline: "Still here", updatedAt: serverTimestamp() }));
+});
+
+test("LEGACY: a new profile is not required to carry pendingApplications", async () => {
+  const db = asUser("newbie", { email: "approved@example.com" });
+  await assertSucceeds(setDoc(doc(db, "profiles/newbie"), profile("newbie", "granted")));
+});
 
 test("pending minor cannot self-grant consent via profile update", async () => {
-  const db = testEnv.authenticatedContext("minor").firestore();
-  await assertFails(
-    updateDoc(doc(db, "profiles/minor"), {
-      consentStatus: "granted",
-      updatedAt: serverTimestamp(),
-    })
-  );
+  const db = asUser("minor");
+  await assertFails(updateDoc(doc(db, "profiles/minor"), { consentStatus: "granted", updatedAt: serverTimestamp() }));
 });
 
-test("operator can still edit their own profile (consent unchanged)", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertSucceeds(
-    updateDoc(doc(db, "profiles/granted"), {
-      headline: "New headline",
-      updatedAt: serverTimestamp(),
-    })
-  );
+test("a mentor can grant consent (the manual override)", async () => {
+  const db = asUser("mentorA");
+  await assertSucceeds(updateDoc(doc(db, "profiles/minor"), { consentStatus: "granted", updatedAt: serverTimestamp() }));
 });
 
-/* ================= consentTokens are server-only ========================= */
+test("an operator cannot grant someone else's consent", async () => {
+  const db = asUser("granted");
+  await assertFails(updateDoc(doc(db, "profiles/minor"), { consentStatus: "granted", updatedAt: serverTimestamp() }));
+});
 
 test("clients cannot read or write consentTokens", async () => {
-  const authed = testEnv.authenticatedContext("minor").firestore();
+  const authed = asUser("minor");
   await assertFails(getDoc(doc(authed, "consentTokens/abc")));
   await assertFails(setDoc(doc(authed, "consentTokens/abc"), { uid: "minor" }));
-
   const anon = testEnv.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(anon, "consentTokens/abc")));
 });
 
 test("clients cannot read or write mentorInvites", async () => {
-  const authed = testEnv.authenticatedContext("minor").firestore();
+  const authed = asUser("minor");
   await assertFails(getDoc(doc(authed, "mentorInvites/abc")));
   await assertFails(setDoc(doc(authed, "mentorInvites/abc"), { used: false }));
-
   const anon = testEnv.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(anon, "mentorInvites/abc")));
 });
 
 test("client cannot create a profile with role mentor (invite route only)", async () => {
-  // Allowlisted, so the ONLY thing under test here is the role restriction —
-  // otherwise the access gate would fail this write for the wrong reason.
-  const db = testEnv
-    .authenticatedContext("wannabe", { email: "wannabe@example.com" })
-    .firestore();
-  await assertFails(
-    setDoc(doc(db, "profiles/wannabe"), {
-      ...profile("wannabe", "granted"),
-      role: "mentor",
-    })
-  );
+  // Allowlisted, so the ONLY thing under test here is the role restriction.
+  const db = asUser("wannabe", { email: "wannabe@example.com" });
+  await assertFails(setDoc(doc(db, "profiles/wannabe"), profile("wannabe", "granted", "mentor")));
 });
 
-/* ============ TEMPORARY: founding-batch access gate ====================== *
- * Delete this block together with approvedMembers / isApprovedMember().
- * ========================================================================= */
+test("client cannot promote themselves to mentor on update", async () => {
+  const db = asUser("granted");
+  await assertFails(updateDoc(doc(db, "profiles/granted"), { role: "mentor", updatedAt: serverTimestamp() }));
+});
+
+/* ---- TEMPORARY — the founding-batch gate ---- */
 
 test("GATE: an allowlisted user can create their own profile", async () => {
-  const db = testEnv
-    .authenticatedContext("newbie", { email: "approved@example.com" })
-    .firestore();
-  await assertSucceeds(
-    setDoc(doc(db, "profiles/newbie"), profile("newbie", "granted"))
-  );
+  const db = asUser("newbie", { email: "approved@example.com" });
+  await assertSucceeds(setDoc(doc(db, "profiles/newbie"), profile("newbie", "granted")));
 });
 
 test("GATE: the allowlist is matched case-insensitively", async () => {
-  // Doc ids are lowercased; a token carrying the address as typed must still
-  // match, or anyone who signed up with a capital letter is locked out.
-  const db = testEnv
-    .authenticatedContext("shouty", { email: "Approved@Example.com" })
-    .firestore();
-  await assertSucceeds(
-    setDoc(doc(db, "profiles/shouty"), profile("shouty", "granted"))
-  );
+  const db = asUser("shouty", { email: "Approved@Example.com" });
+  await assertSucceeds(setDoc(doc(db, "profiles/shouty"), profile("shouty", "granted")));
 });
 
 test("GATE: a non-allowlisted user cannot create a profile", async () => {
-  const db = testEnv
-    .authenticatedContext("stranger", { email: "stranger@example.com" })
-    .firestore();
-  await assertFails(
-    setDoc(doc(db, "profiles/stranger"), profile("stranger", "granted"))
-  );
+  const db = asUser("stranger", { email: "stranger@example.com" });
+  await assertFails(setDoc(doc(db, "profiles/stranger"), profile("stranger", "granted")));
 });
 
 test("GATE: a caller with no email on the token cannot create a profile", async () => {
-  const db = testEnv.authenticatedContext("tokenless").firestore();
-  await assertFails(
-    setDoc(doc(db, "profiles/tokenless"), profile("tokenless", "granted"))
-  );
+  const db = asUser("tokenless");
+  await assertFails(setDoc(doc(db, "profiles/tokenless"), profile("tokenless", "granted")));
 });
 
 test("GATE: an allowlisted user still cannot create somebody else's profile", async () => {
-  const db = testEnv
-    .authenticatedContext("newbie", { email: "approved@example.com" })
-    .firestore();
-  await assertFails(
-    setDoc(doc(db, "profiles/someoneelse"), profile("someoneelse", "granted"))
-  );
+  const db = asUser("newbie", { email: "approved@example.com" });
+  await assertFails(setDoc(doc(db, "profiles/someoneelse"), profile("someoneelse", "granted")));
 });
 
 test("GATE: the gate does not block profile UPDATES for existing members", async () => {
-  // Only create is gated. An operator seeded before the gate existed (no email
-  // on their context at all) must still be able to edit their own profile.
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertSucceeds(
-    updateDoc(doc(db, "profiles/granted"), {
-      headline: "Still building",
-      updatedAt: serverTimestamp(),
-    })
-  );
+  const db = asUser("granted");
+  await assertSucceeds(updateDoc(doc(db, "profiles/granted"), { headline: "Still building", updatedAt: serverTimestamp() }));
 });
 
 test("GATE: clients cannot read or write approvedMembers", async () => {
-  const authed = testEnv
-    .authenticatedContext("newbie", { email: "approved@example.com" })
-    .firestore();
+  const authed = asUser("newbie", { email: "approved@example.com" });
   await assertFails(getDoc(doc(authed, "approvedMembers/approved@example.com")));
-  await assertFails(
-    setDoc(doc(authed, "approvedMembers/self@example.com"), { role: "mentor" })
-  );
-  await assertFails(
-    deleteDoc(doc(authed, "approvedMembers/approved@example.com"))
-  );
-  // Not even listable — the list is a roster of real people's addresses.
+  await assertFails(setDoc(doc(authed, "approvedMembers/self@example.com"), { role: "mentor" }));
+  await assertFails(deleteDoc(doc(authed, "approvedMembers/approved@example.com")));
   await assertFails(getDocs(collection(authed, "approvedMembers")));
-
   const anon = testEnv.unauthenticatedContext().firestore();
   await assertFails(getDoc(doc(anon, "approvedMembers/approved@example.com")));
-  await assertFails(
-    setDoc(doc(anon, "approvedMembers/x@example.com"), { role: "mentor" })
-  );
+  await assertFails(setDoc(doc(anon, "approvedMembers/x@example.com"), { role: "mentor" }));
 });
 
-/* ================= sanity: reads stay open while pending ================= */
-
 test("pending minor can still READ (sees the waiting-on-consent state)", async () => {
-  const db = testEnv.authenticatedContext("minor").firestore();
+  const db = asUser("minor");
   await assertSucceeds(getDoc(doc(db, "profiles/minor")));
-  await assertSucceeds(getDoc(doc(db, "cohorts/squad")));
+  await assertSucceeds(getDoc(doc(db, "seasons/s1")));
 });
 
 /* ========================================================================= *
- *  A. Workshops — readable by everyone signed in, written only by the server
+ *  Workshops — readable by everyone signed in, written only by the server
  * ========================================================================= */
 
 test("WORKSHOPS: a signed-in operator can read the catalog", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertSucceeds(getDoc(doc(db, "workshops/owned")));
+  await assertSucceeds(getDoc(doc(asUser("granted"), "workshops/owned")));
 });
 
 test("WORKSHOPS: a signed-out visitor cannot read it", async () => {
-  const db = testEnv.unauthenticatedContext().firestore();
-  await assertFails(getDoc(doc(db, "workshops/owned")));
+  await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "workshops/owned")));
 });
 
 test("WORKSHOPS: an operator cannot enroll from the browser (server route only)", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertFails(
-    updateDoc(doc(db, "workshops/owned"), { enrolledUids: arrayUnion("granted") })
-  );
+  await assertFails(updateDoc(doc(asUser("granted"), "workshops/owned"), { enrolledUids: arrayUnion("granted") }));
 });
 
 test("WORKSHOPS: a mentor cannot author a session from the browser", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertFails(addDoc(collection(db, "workshops"), workshop()));
+  await assertFails(addDoc(collection(asUser("mentorA"), "workshops"), workshop()));
 });
 
 test("WORKSHOPS: a mentor cannot edit or delete their own session from the browser", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
+  const db = asUser("mentorA");
   await assertFails(updateDoc(doc(db, "workshops/owned"), { title: "v2" }));
   await assertFails(deleteDoc(doc(db, "workshops/owned")));
 });
 
 test("GOOGLE TOKENS: clients cannot read or write a mentor's calendar token", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
+  const db = asUser("mentorA");
   await assertFails(getDoc(doc(db, "googleTokens/mentorA")));
   await assertFails(setDoc(doc(db, "googleTokens/mentorA"), { refreshTokenEnc: "x" }));
 });
 
 /* ========================================================================= *
- *  B. Squad check-ins — squad-scoped, mentor-confirmed
+ *  The season — readable by everyone signed in, written only by the server
  * ========================================================================= */
 
-const requestCheckIn = (db, uid) =>
-  addDoc(collection(db, "cohorts/mentored/checkIns"), {
-    ...checkIn(),
-    requestedByUid: uid,
-  });
-
-test("CHECK-IN: a member of a mentored squad can request one", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertSucceeds(requestCheckIn(db, "granted"));
+test("SEASON: every signed-in user can read it; a visitor cannot", async () => {
+  await assertSucceeds(getDoc(doc(asUser("granted"), "seasons/s1")));
+  await assertSucceeds(getDoc(doc(asUser("minor"), "seasons/s1")));
+  await assertSucceeds(getDocs(query(collection(asUser("granted"), "seasons"), where("state", "==", "live"))));
+  await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "seasons/s1")));
 });
 
-test("CHECK-IN: a pending minor cannot request one", async () => {
-  const db = testEnv.authenticatedContext("minor").firestore();
-  await assertFails(requestCheckIn(db, "minor"));
+test("SEASON: not even a mentor can write it from the browser (server route only)", async () => {
+  const db = asUser("mentorA");
+  await assertFails(updateDoc(doc(db, "seasons/s1"), { name: "Renamed", updatedAt: serverTimestamp() }));
+  await assertFails(setDoc(doc(db, "seasons/s2"), { name: "Season 2", state: "draft", milestones: [], updatedAt: serverTimestamp() }));
+  await assertFails(deleteDoc(doc(db, "seasons/s1")));
 });
 
-test("CHECK-IN: a non-member cannot request one", async () => {
-  const db = testEnv.authenticatedContext("outsider").firestore();
-  await assertFails(requestCheckIn(db, "outsider"));
-});
-
-test("CHECK-IN: you cannot request one in someone else's name", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertFails(requestCheckIn(db, "founder"));
-});
-
-test("CHECK-IN: a squad with no mentor cannot request one", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertFails(
-    addDoc(collection(db, "cohorts/unclaimed/checkIns"), {
-      ...checkIn(),
-      cohortId: "unclaimed",
-      mentorUid: "mentorA",
-    })
-  );
-});
-
-test("READ SCOPING: squad members and their own mentor can read check-ins", async () => {
-  const member = testEnv.authenticatedContext("granted").firestore();
-  const mentor = testEnv.authenticatedContext("mentorA").firestore();
-  await assertSucceeds(getDoc(doc(member, "cohorts/mentored/checkIns/req1")));
-  await assertSucceeds(getDoc(doc(mentor, "cohorts/mentored/checkIns/req1")));
-  await assertSucceeds(getDocs(collection(member, "cohorts/mentored/checkIns")));
-});
-
-test("READ SCOPING: an unrelated mentor cannot read another squad's check-ins", async () => {
-  const db = testEnv.authenticatedContext("mentorB").firestore();
-  await assertFails(getDoc(doc(db, "cohorts/mentored/checkIns/req1")));
-  await assertFails(getDocs(collection(db, "cohorts/mentored/checkIns")));
-});
-
-test("READ SCOPING: a random operator cannot read a squad's check-ins", async () => {
-  const db = testEnv.authenticatedContext("outsider").firestore();
-  await assertFails(getDoc(doc(db, "cohorts/mentored/checkIns/req1")));
-});
-
-const confirm = (db) =>
-  updateDoc(doc(db, "cohorts/mentored/checkIns/req1"), {
-    status: "confirmed",
-    startsAt: Timestamp.fromMillis(Date.now() + 86400000),
-    durationMins: 30,
-    meetLink: "https://meet.example/checkin",
-    confirmedAt: serverTimestamp(),
-  });
-
-test("CONFIRM: even the assigned mentor cannot confirm from the browser (server route only)", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertFails(confirm(db));
-});
-
-test("CONFIRM: another mentor cannot confirm it either", async () => {
-  const db = testEnv.authenticatedContext("mentorB").firestore();
-  await assertFails(confirm(db));
-});
-
-test("CONFIRM: a squad member cannot confirm their own request", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertFails(confirm(db));
-});
-
-test("CHECK-IN: the requester may withdraw while it is still a request", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertSucceeds(deleteDoc(doc(db, "cohorts/mentored/checkIns/req1")));
-});
-
-test("CHECK-IN: another member cannot delete someone's request", async () => {
-  const db = testEnv.authenticatedContext("founder").firestore();
-  await assertFails(deleteDoc(doc(db, "cohorts/mentored/checkIns/req1")));
+test("SEASON: an operator cannot write it either", async () => {
+  const db = asUser("granted");
+  await assertFails(updateDoc(doc(db, "seasons/s1"), { state: "archived" }));
 });
 
 /* ========================================================================= *
- *  C. Mentor adoption + the activation gate
+ *  Submissions — server-written; read split by the snapshotted verifier
  * ========================================================================= */
 
-const adopt = (db, cohortId, extra = {}) =>
-  updateDoc(doc(db, `cohorts/${cohortId}`), {
-    mentorUid: "mentorA",
-    mentorName: "Mentor A.",
-    ...extra,
-  });
-
-test("ADOPT: a mentor may claim an unassigned squad", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertSucceeds(adopt(db, "unclaimed"));
+test("PROOF: nobody writes a submission from the browser — not the author, not a mentor", async () => {
+  const me = asUser("granted");
+  await assertFails(setDoc(doc(me, "seasons/s1/submissions/granted__ship"), submission("granted", "ship", "open", "approved")));
+  await assertFails(updateDoc(doc(me, "seasons/s1/submissions/granted__mission"), { status: "approved" }));
+  await assertFails(deleteDoc(doc(me, "seasons/s1/submissions/granted__mission")));
+  const mentor = asUser("mentorA");
+  await assertFails(updateDoc(doc(mentor, "seasons/s1/submissions/granted__mission"), { status: "approved" }));
+  await assertFails(deleteDoc(doc(mentor, "seasons/s1/submissions/granted__mission")));
 });
 
-test("ADOPT: claiming a ready squad activates it in the same write", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertSucceeds(adopt(db, "unclaimed", { state: "active" }));
+test("PROOF: the author reads their own mentor-reviewed row", async () => {
+  await assertSucceeds(getDoc(doc(asUser("granted"), "seasons/s1/submissions/granted__mission")));
 });
 
-test("ADOPT: a squad under 3 members cannot be activated on adoption", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertFails(adopt(db, "tiny", { state: "active" }));
-  // …but adopting it without activating is fine — it activates on the 3rd member.
-  await assertSucceeds(adopt(db, "tiny"));
+test("PROOF: a third operator CANNOT read someone's mentor-reviewed row", async () => {
+  await assertFails(getDoc(doc(asUser("other"), "seasons/s1/submissions/granted__mission")));
+  await assertFails(getDoc(doc(asUser("minor"), "seasons/s1/submissions/granted__mission")));
 });
 
-test("ADOPT: a mentor cannot steal a squad that already has one", async () => {
-  const db = testEnv.authenticatedContext("mentorB").firestore();
-  await assertFails(
-    updateDoc(doc(db, "cohorts/claimed"), {
-      mentorUid: "mentorB",
-      mentorName: "Mentor B.",
-    })
-  );
+test("PROOF: any mentor reads a mentor-reviewed row", async () => {
+  await assertSucceeds(getDoc(doc(asUser("mentorA"), "seasons/s1/submissions/granted__mission")));
+  await assertSucceeds(getDoc(doc(asUser("mentorB"), "seasons/s1/submissions/other__mission")));
 });
 
-test("ADOPT: a mentor cannot assign someone else as the mentor", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertFails(
-    updateDoc(doc(db, "cohorts/unclaimed"), {
-      mentorUid: "mentorB",
-      mentorName: "Mentor B.",
-    })
-  );
+test("PROOF: every signed-in member reads an open row — it's the accountability", async () => {
+  await assertSucceeds(getDoc(doc(asUser("other"), "seasons/s1/submissions/granted__cold-ask")));
+  await assertSucceeds(getDoc(doc(asUser("minor"), "seasons/s1/submissions/granted__cold-ask")));
+  await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "seasons/s1/submissions/granted__cold-ask")));
 });
 
-test("ADOPT: an operator cannot appoint themselves mentor of a squad", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertFails(
-    updateDoc(doc(db, "cohorts/unclaimed"), {
-      mentorUid: "granted",
-      mentorName: "Test O.",
-    })
-  );
+test("PROOF LIST: the public wall — where verifier == 'open' — is readable by an operator", async () => {
+  const db = asUser("other");
+  const snap = await assertSucceeds(getDocs(query(subs(db), where("verifier", "==", "open"))));
+  if (snap.size !== 1) throw new Error(`expected exactly the one open row, got ${snap.size}`);
 });
 
-test("ADOPT: the founder cannot write a mentor onto their own squad", async () => {
-  const db = testEnv.authenticatedContext("founder").firestore();
-  await assertFails(
-    updateDoc(doc(db, "cohorts/unclaimed"), {
-      mentorUid: "founder",
-      mentorName: "Test O.",
-    })
-  );
+test("PROOF LIST: your own rows — where uid == you — are readable, every verifier kind", async () => {
+  const db = asUser("granted");
+  const snap = await assertSucceeds(getDocs(query(subs(db), where("uid", "==", "granted"))));
+  if (snap.size !== 2) throw new Error(`expected both of granted's rows, got ${snap.size}`);
 });
 
-test("ADOPT: the founder cannot drop the mentor off a claimed squad", async () => {
-  const db = testEnv.authenticatedContext("founder").firestore();
-  await assertFails(
-    updateDoc(doc(db, "cohorts/claimed"), { mentorUid: "", mentorName: "" })
-  );
+test("PROOF LIST: an UNFILTERED list is denied for an operator (all-or-nothing)", async () => {
+  // Pins the query semantics the watchers rely on: drop the where() from
+  // watchOpenSubmissions and the whole listener is denied.
+  await assertFails(getDocs(subs(asUser("other"))));
+  await assertFails(getDocs(subs(asUser("granted"))));
 });
 
-test("GATE: a founder cannot activate a mentorless squad", async () => {
-  const db = testEnv.authenticatedContext("founder").firestore();
-  await assertFails(updateDoc(doc(db, "cohorts/unclaimed"), { state: "active" }));
+test("PROOF LIST: someone else's uid filter is denied for an operator", async () => {
+  await assertFails(getDocs(query(subs(asUser("other")), where("uid", "==", "granted"))));
 });
 
-test("GATE: a founder CAN activate once the squad has 3 members and a mentor", async () => {
-  const db = testEnv.authenticatedContext("founder").firestore();
-  await assertSucceeds(updateDoc(doc(db, "cohorts/claimed"), { state: "active" }));
+test("PROOF LIST: the review queue — where status == 'submitted' — is mentors only", async () => {
+  await assertSucceeds(getDocs(query(subs(asUser("mentorA")), where("status", "==", "submitted"))));
+  await assertFails(getDocs(query(subs(asUser("other")), where("status", "==", "submitted"))));
 });
 
-test("GATE: a mentored squad under 3 members still cannot activate", async () => {
-  await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(
-      doc(ctx.firestore(), "cohorts/tiny"),
-      fullCohort({ memberUids: ["founder"], mentorUid: "mentorA", mentorName: "Mentor A." })
-    );
-  });
-  const db = testEnv.authenticatedContext("founder").firestore();
-  await assertFails(updateDoc(doc(db, "cohorts/tiny"), { state: "active" }));
-});
-
-test("GATE: a new squad still cannot be created straight into 'active'", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertFails(
-    addDoc(collection(db, "cohorts"), {
-      ...fullCohort({
-        founderUid: "granted",
-        memberUids: ["granted"],
-        memberNames: { granted: "Test O." },
-        state: "active",
-        mentorUid: "mentorA",
-        mentorName: "Mentor A.",
-      }),
-    })
-  );
+test("PROOF LIST: a mentor reads everything (the roster)", async () => {
+  const snap = await assertSucceeds(getDocs(subs(asUser("mentorB"))));
+  if (snap.size !== 3) throw new Error(`expected all 3 rows, got ${snap.size}`);
 });
 
 /* ========================================================================= *
- *  D. The track — written by the squad's mentor, read by the squad
+ *  Build log — the season feed. Server-written; author may delete own.
  * ========================================================================= */
 
-const writeTrack = (db, cohortId, track) =>
-  updateDoc(doc(db, `cohorts/${cohortId}`), { track, trackUpdatedAt: serverTimestamp() });
-
-test("TRACK: the assigned mentor can write the squad's track", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertSucceeds(writeTrack(db, "mentored", [step(1), step(2)]));
+test("FEED: every signed-in user reads it", async () => {
+  await assertSucceeds(getDoc(doc(asUser("other"), "buildLogs/l1")));
+  await assertSucceeds(getDocs(collection(asUser("minor"), "buildLogs")));
 });
 
-test("TRACK: the assigned mentor can mark a step done", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertSucceeds(writeTrack(db, "mentored", [step(1, true), step(2)]));
+test("FEED: nobody posts a build log from the browser (server route only)", async () => {
+  const line = { uid: "granted", name: "Test O.", text: "Shipped", day: "2026-07-11", createdAt: serverTimestamp() };
+  await assertFails(addDoc(collection(asUser("granted"), "buildLogs"), line));
+  await assertFails(addDoc(collection(asUser("mentorA"), "buildLogs"), { ...line, uid: "mentorA" }));
+  await assertFails(updateDoc(doc(asUser("granted"), "buildLogs/l1"), { text: "edited" }));
 });
 
-test("TRACK: another mentor cannot write it", async () => {
-  const db = testEnv.authenticatedContext("mentorB").firestore();
-  await assertFails(writeTrack(db, "mentored", [step(1)]));
+test("FEED: the author may delete their own line; nobody else may", async () => {
+  await assertFails(deleteDoc(doc(asUser("other"), "buildLogs/l1")));
+  await assertFails(deleteDoc(doc(asUser("mentorA"), "buildLogs/l1")));
+  await assertSucceeds(deleteDoc(doc(asUser("granted"), "buildLogs/l1")));
 });
 
-test("TRACK: the founder cannot write it", async () => {
-  const db = testEnv.authenticatedContext("founder").firestore();
-  await assertFails(writeTrack(db, "mentored", [step(1)]));
-});
+/* ========================================================================= *
+ *  Nothing squad-shaped is reachable any more
+ * ========================================================================= */
 
-test("TRACK: a member cannot write it", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertFails(writeTrack(db, "mentored", [step(1)]));
-});
-
-test("TRACK: a mentor cannot write a track onto a squad nobody has adopted", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertFails(writeTrack(db, "unclaimed", [step(1)]));
-});
-
-test("TRACK: more than 20 steps is denied", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  const many = Array.from({ length: 21 }, (_, i) => step(i + 1));
-  await assertFails(writeTrack(db, "mentored", many));
-});
-
-test("TRACK: the mentor cannot smuggle other fields in with the track", async () => {
-  const db = testEnv.authenticatedContext("mentorA").firestore();
-  await assertFails(
-    updateDoc(doc(db, "cohorts/mentored"), {
-      track: [step(1)],
-      trackUpdatedAt: serverTimestamp(),
-      name: "Renamed",
-    })
-  );
-});
-
-test("TRACK: the founder's own edits leave the track untouched", async () => {
+test("SQUADS: the old cohorts collection is sealed (no rule = deny)", async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
-    await setDoc(
-      doc(ctx.firestore(), "cohorts/mentored"),
-      fullCohort({ mentorUid: "mentorA", mentorName: "Mentor A.", state: "active", track: [step(1)] })
-    );
+    await setDoc(doc(ctx.firestore(), "cohorts/old"), { name: "Old Squad", memberUids: ["granted"] });
   });
-  const db = testEnv.authenticatedContext("founder").firestore();
-  await assertSucceeds(updateDoc(doc(db, "cohorts/mentored"), { mission: "New mission" }));
-  await assertFails(updateDoc(doc(db, "cohorts/mentored"), { mission: "New mission", track: [] }));
-});
-
-test("TRACK: a new squad cannot be created with a track already on it", async () => {
-  const db = testEnv.authenticatedContext("granted").firestore();
-  await assertFails(
-    addDoc(collection(db, "cohorts"), {
-      name: "New Squad",
-      mission: "Ship something",
-      meetingSlot: "Sundays 7pm ET",
-      timezone: "America/Toronto",
-      state: "forming",
-      founderUid: "granted",
-      founderName: "Test O.",
-      memberUids: ["granted"],
-      memberNames: { granted: "Test O." },
-      open: true,
-      weeklyStreak: 0,
-      createdAt: serverTimestamp(),
-      track: [step(1)],
-    })
-  );
+  await assertFails(getDoc(doc(asUser("granted"), "cohorts/old")));
+  await assertFails(getDoc(doc(asUser("mentorA"), "cohorts/old")));
+  await assertFails(updateDoc(doc(asUser("granted"), "cohorts/old"), { name: "x" }));
 });

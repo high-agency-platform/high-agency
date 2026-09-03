@@ -1,3 +1,16 @@
+> **Revision note (2026-09-03) — Season 1.** The platform was rebuilt on the
+> `season-1` branch: **no squads**. Operators get **one page** (`/dashboard`):
+> the season header, "Ship one line", the track as an accordion with proof
+> submission per step, next sessions, the feed, and their card as a sheet from
+> the avatar. Mentors keep four tabs: **Home** (review queue + roster + consent
+> queue), **Track** (the one shared season, `/mentor/track`), **Workshops**,
+> **You**. Proof on an *open* step is done on post and visible to everyone; a
+> *mentor* step is approved or returned with a note and stays private. Where a
+> checklist below mentions squads, cohorts, check-ins, "adopt", "peer lead" or
+> `/cohorts`, read it against `CLAUDE.md` → Domain model instead. `docs/qa-e2e.md`
+> is current. **Email-link sign-in is now ENABLED** (verified 2026-09-02) — the
+> ⚠️ blocker in §1c below is historical.
+
 > **Revision note (2026-09-01).** The platform was revamped after this handoff was
 > written: **no XP, levels or gates** (streaks only); **workshops are any-topic mentor
 > sessions** with seats, scheduled from the mentor home screen or calendar, with
@@ -84,10 +97,10 @@ redemption — 500s without them.
 
 **Firebase Console → Authentication → Sign-in method:**
 
-- ⚠️ **Enable "Email link (passwordless sign-in)".** *This is currently DISABLED
-  and it is a hard blocker* — `/api/access/request` fails with
-  `auth/operation-not-allowed` and nobody can sign in at all. Verified against the
-  live project on 2026-08-03.
+- **"Email link (passwordless sign-in)" must be enabled.** It was disabled until
+  2026-09 (a hard blocker — `/api/access/request` fails with
+  `auth/operation-not-allowed`); it is **enabled now** (verified 2026-09-02).
+  If sign-in ever fails that way again, this is the switch.
 - Leave email/password enabled — `/mentor/join?code=…` (break-glass) still uses it.
 
 **Firebase Console → Authentication → Settings → Authorized domains:**

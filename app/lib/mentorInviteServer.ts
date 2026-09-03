@@ -68,7 +68,7 @@ function str(v: unknown, max: number): string {
 }
 
 /** Mentors are niche experts: expertise/coach tags may be presets OR free
- *  text (the join form's "add your own"). Same treatment as squad focus tags:
+ *  text (the join form's "add your own"). Same treatment as any user-typed tag:
  *  normalize each entry, fold a typed preset name onto its canonical chip,
  *  dedupe case-insensitively, drop what doesn't survive, cap the count
  *  (mirrors validStringList in the rules). */
@@ -151,7 +151,6 @@ export function buildMentorProfile(
     lastActiveDay: localDay,
     lastBuildLogDay: "",
     enrolledWorkshops: [],
-    pendingApplications: [],
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
@@ -212,7 +211,7 @@ export async function redeemMentorInvite(
         return { status: "already-mentor" } as const;
       }
       // An operator followed a mentor invite: promote the existing account
-      // in place (profile, XP, squads all survive).
+      // in place (profile and streak survive).
       tx.update(profileRef, {
         role: "mentor",
         updatedAt: FieldValue.serverTimestamp(),

@@ -91,6 +91,18 @@ export function CalendarIcon({ size = 22 }: IconProps) {
   );
 }
 
+/** The track — a spine of steps. Mentor nav. */
+export function PathIcon({ size = 22 }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="6" cy="5" r="2.5" />
+      <circle cx="18" cy="12" r="2.5" />
+      <circle cx="6" cy="19" r="2.5" />
+      <path d="M8.5 5h5a3 3 0 010 6h-3a3 3 0 000 6h5" />
+    </svg>
+  );
+}
+
 export function PlusIcon({ size = 16 }: IconProps) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">

@@ -1,3 +1,11 @@
+> **Branches.** `season-1` is the platform that ships: one shared season track,
+> proof submissions, no squads. `main` is frozen at the squad-based platform
+> (tag `v2-squads`) — a working checkout, not the thing in production. Vercel's
+> Production Branch points at `season-1`. **Firestore rules are global to the
+> project:** the rules on `season-1` are what's deployed, and running
+> `firebase deploy --only firestore:rules` from a `main` checkout would revert
+> production to the squad rules. Don't. See `CLAUDE.md` for the model.
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started

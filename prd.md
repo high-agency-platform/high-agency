@@ -1,3 +1,11 @@
+> **Revision note (2026-09-03) — Season 1.** Squads, per-squad tracks, squad
+> applications, check-ins and the peer-lead role are gone. The product is one
+> shared **season track** written by the mentors, with **proof submission** per
+> milestone (`open`: done on post, visible to every member; `mentor`: approved or
+> returned with a note, private). The streak stays, fed by a build log (now one
+> season-wide feed) or a submission. Operators use a single page. `CLAUDE.md`
+> is the current source of truth where this document still describes squads.
+
 > **Revision note (2026-09-01).** The platform diverges from this document in four places,
 > by decision: (1) there is **no XP, no levels and no level gating** — the only game
 > mechanic is the streak; (2) **workshops are independent of the track** and are any-topic

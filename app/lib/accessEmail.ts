@@ -37,7 +37,7 @@ function signInHtml(signInUrl: string, name?: string): string {
     <h1 style="font-size:22px;margin:0 0 16px">${greeting}</h1>
     <p style="margin:0 0 14px">
       You're on the list for the <strong>High Agency</strong> founding batch — a live
-      cohort program where you join a small squad, ship real milestones, and learn
+      cohort program where you work a mentor-written track, ship real proof, and learn
       from people who've done it. Use the button below to sign in.
     </p>
     <p style="margin:0 0 28px">

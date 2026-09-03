@@ -1,0 +1,49 @@
+{
+  "id": "s1",
+  "name": "Developing High Agency",
+  "kind": "foundation",
+  "category": "Mindset & Judgment",
+  "duration": "~1 month",
+  "tagline": "Ambition is common. Agency is rare. This is where the second one is built.",
+  "overview": "Everyone starts here. Two months that rewire your default setting: you stop waiting, for permission, for resources, for the perfect moment… and start moving, asking, shipping, iterating. You'll make bold asks, ship in public, lock a mission worth chasing, and build a squad rhythm that compounds week over week. By the end you'll have your own operating model for agency, be comfortable being uncomfortable, and have put something real into the world before you felt ready.",
+  "outcome": "An operator who has asked a stranger for something real, shipped something public before they felt ready, or locked a mission worth chasing.",
+  "state": "live",
+  "milestones": [
+    {
+      "id": "cold-ask",
+      "title": "The Cold Ask",
+      "why": "High agency starts with asking for things you are \"not supposed to\" get. Most people never ask; the ones who do get answers surprisingly often. Send 5 real asks to people genuinely out of reach — advice from a founder you admire, an intro, feedback on an idea, a small favor from someone with an audience. The worst case is silence, and even a \"no\" is proof you asked.",
+      "proof": "Screenshots of 5 sent asks + at least 1 reply (a \"no\" counts — silence doesn't).",
+      "effort": "2–3 hours",
+      "verifier": "peer_lead",
+      "sessions": [
+        "How to write a cold message that actually gets answered",
+        "Finding the right 5 people to ask"
+      ]
+    },
+    {
+      "id": "ship-48h",
+      "title": "Ship in 48 Hours",
+      "why": "Done beats perfect. Make something small and put it on the public internet within 48 hours of starting: a one-page site, a short video, a post with a point of view, a tiny tool. The constraint is the lesson — scoping something shippable in 48 hours is the skill you will reuse on every track after this one.",
+      "proof": "Public URL anyone can open + a build log entry marking when you started (the 48-hour clock).",
+      "effort": "3–5 hours",
+      "verifier": "peer_lead",
+      "sessions": [
+        "Scoping tiny ships: what fits in 48 hours",
+        "Zero-to-live: fastest ways to put something on the internet"
+      ]
+    },
+    {
+      "id": "mission-locked",
+      "title": "Mission Locked",
+      "why": "You can't ship what you haven't scoped. Write the one-pager for what you will pursue on your first mastery track: the problem, who has it, why you (or your squad) are the ones to take it on, and what done looks like. This is the document your mentor uses to pick your squad's track progression — make it honest, not impressive.",
+      "proof": "One-pager link: the problem, who has it, why you, and your goal for the next track.",
+      "effort": "2–3 hours",
+      "verifier": "mentor",
+      "sessions": [
+        "Picking problems worth your season",
+        "Writing a one-pager that survives contact with reality"
+      ]
+    }
+  ]
+}

@@ -2,10 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "../../../components/AuthProvider";
-import {
-  useMentorGate,
-  useMentoredSquadList,
-} from "../../../components/mentorData";
+import { useMentorGate } from "../../../components/mentorData";
 import { saveProfile, watchMyUpcomingWorkshops } from "../../../lib/db";
 import { localDay } from "../../../lib/streaks";
 import { CalendarConnect } from "../../../components/CalendarConnect";
@@ -32,7 +29,6 @@ export default function MentorYouPage() {
  *  nothing has to copy the profile into state afterwards. */
 function MentorCard({ uid, profile }: { uid: string; profile: Profile }) {
   const { logout } = useAuth();
-  const { mine } = useMentoredSquadList(uid);
 
   const [sessions, setSessions] = useState<Workshop[]>([]);
 
@@ -92,7 +88,6 @@ function MentorCard({ uid, profile }: { uid: string; profile: Profile }) {
             profile.lastActiveDay?.length === 10 ? profile.lastActiveDay : localDay(),
           lastBuildLogDay: profile.lastBuildLogDay ?? "",
           enrolledWorkshops: profile.enrolledWorkshops,
-          pendingApplications: profile.pendingApplications,
         },
         false
       );
@@ -122,17 +117,13 @@ function MentorCard({ uid, profile }: { uid: string; profile: Profile }) {
         </div>
         <div className="creds" style={{ marginTop: 16 }}>
           <div className="cred">
-            <span className="cred__k">Squads</span>
-            <span className="cred__v">{mine.length}</span>
-          </div>
-          <div className="cred">
             <span className="cred__k">Sessions ahead</span>
             <span className="cred__v">{sessions.length}</span>
           </div>
         </div>
       </section>
 
-      {/* ---- Google Calendar: where sessions and check-ins get their Meet room ---- */}
+      {/* ---- Google Calendar: where sessions get their Meet room ---- */}
       <section className="screen__block" style={{ maxWidth: 640 }}>
         <CalendarConnect returnTo="/mentor/you" />
       </section>

@@ -10,405 +10,256 @@
 
 High Agency is a live cohort coaching program that teaches ambitious students (13–19,
 "Operators") "what school can't teach" — agency, real skill, and a network. This repo is
-the **platform that productizes that program**: a gamified, cohort-based launchpad where
-Operators join a tight squad, progress a track of real-world milestones (ship an MVP,
-land first users, reach first revenue), attend live expert workshops, and keep momentum
-through streaks and accountability between sessions.
+the **platform that productizes that program**: everyone in the batch walks **one
+mentor-written season track** together, submits **proof** for each milestone, attends
+live expert workshops, and keeps momentum through a streak and a shared daily feed.
 
-The product thesis: **progress is earned by doing real things, and a human — the squad's
-mentor — decides what progress is.** The only game mechanic is the streak; there is no XP,
-no levels, and nothing is gated by points. Logins and lurking earn nothing.
+The product thesis: **progress is earned by doing real things, and proof of the thing is
+the unit of progress.** The only game mechanic is the streak; there is no XP, no levels,
+and nothing is gated by points. Logins and lurking earn nothing.
 
-**Canonical product spec:** [`prd.md`](prd.md) (PRD v1.0, 2026-06-06). When code and PRD
-disagree, that's a flag to raise — except where this file explicitly records a decision or
-an open question that supersedes the PRD.
+**Canonical product spec:** [`prd.md`](prd.md) carries a revision note — where it still
+describes squads, this file wins.
 
-## Current status — Phase 1 MVP, free founding batch
+## Current status — Season 1, free founding batch
 
-- **Where we are:** building the Phase 1 MVP for a **free founding batch of ~50 students**.
-  Both the public waitlist site (`/`) and the authenticated platform (`app/(platform)/...`)
-  are substantially built and wired to live Firebase — nearly every screen reads/writes real
-  Firestore data (no mock-UI screens), all against the `highagency-62e67` Firebase project.
-- **Deployment — waitlist-only, live.** The site is deployed on **Vercel** (project
-  `high-agency`, production alias `highagencyio.vercel.app`; custom domain `high-agency.io`
-  pending GoDaddy DNS). **Production is intentionally a marketing/waitlist page only** — the
-  authenticated platform (`/login` + everything under `app/(platform)/`) is gated OFF in
-  production and ON in local `next dev`, via the `PLATFORM_ENABLED` flag
-  ([`app/lib/flags.ts`](app/lib/flags.ts)) enforced by [`proxy.ts`](proxy.ts). Flip it on by
-  setting `NEXT_PUBLIC_PLATFORM_ENABLED=true` in the Vercel project.
-  **This is changing:** the platform is being opened in production for the founding
-  batch, made safe for strangers by the temporary access gate below. See
-  [`QA-HANDOFF.md`](QA-HANDOFF.md) §1 for the go-live checklist — note that
-  **Email link (passwordless) sign-in is still disabled** in the Firebase Console,
-  which blocks the gate entirely until someone enables it.
-- **Scale target:** low hundreds of concurrent users for v1; architecture shouldn't
-  preclude low thousands without a rewrite.
-- **This is a small team.** The platform reflects considered product decisions — some of which
-  **deliberately diverge from `prd.md`** (see Open questions). Read the code as intentional
-  unless flagged otherwise.
+- **Branch:** `season-1` is the platform that ships; `main` is frozen at the previous
+  squad-based platform (tag `v2-squads`). Vercel's Production Branch is `season-1`.
+  **Firestore rules are global to the project** — the rules on this branch are the
+  deployed ones; never deploy rules from a `main` checkout.
+- **Where we are:** ~30 applicants, **one primary mentor** plus a few guests dropping
+  in for workshops, one pre-written curriculum for the first month. Squads — cohorts,
+  applications, matching, check-ins, the adoption feed, the unassigned-squad cron —
+  were removed on 2026-09-03 because none of it earned its keep at this size.
+  Old `cohorts/*` documents still exist in Firestore, inert: no rule matches them.
+- **Deployment.** Vercel project `high-agency` (production alias
+  `highagencyio.vercel.app`; custom domain `high-agency.io`). The authenticated
+  platform is gated behind `PLATFORM_ENABLED` ([`app/lib/flags.ts`](app/lib/flags.ts),
+  enforced by [`proxy.ts`](proxy.ts)): on in `next dev`, off in production unless
+  `NEXT_PUBLIC_PLATFORM_ENABLED=true`. Strangers are kept out by the temporary access
+  gate below. See [`QA-HANDOFF.md`](QA-HANDOFF.md) §1 for the go-live checklist
+  (email-link sign-in is **enabled** now; the doc's ⚠️ is historical).
+- **This is a small team.** Read the code as intentional unless flagged otherwise.
 
 ## ⏳ TEMPORARY: the founding-batch access gate
 
 Production is open to strangers, but **accounts are not**. Only an email on the
-`approvedMembers` allowlist can get in. `/login` is not a sign-in form — it takes one
-email and either mails a single-use Firebase sign-in link or says "not in the batch
-yet" and points at the waitlist. There is deliberately **no Google button, no password
-field and no create-account toggle** there; any of them would mint an account for
-someone who isn't approved.
+`approvedMembers` allowlist can get in. `/login` takes one email and either mails a
+single-use Firebase sign-in link or says "not in the batch yet". No Google button, no
+password field, no create-account toggle there.
 
-- **`approvedMembers/{email}`** — doc id is the email *trimmed and lowercased* (so staff
-  can add one by hand in the Firebase Console). Fields: `role: "operator" | "mentor"`
-  (required), optional `name` / `addedAt` (epoch ms) / `note`. **Client access is
-  deny-all** — it's read only through the Admin SDK. `exists()` still resolves against
-  it in rules, which is what makes the gate enforceable rather than cosmetic.
-- **Enforced in two places:** `/api/access/*` (server) and `firestore.rules` — creating
-  a `profiles/{uid}` doc requires `isApprovedMember()`. The Admin-SDK mentor paths
-  bypass rules, so both mentor flows are unaffected.
-- **Two ways to become a mentor**, sharing one onboarding component
-  (`app/components/MentorOnboarding.tsx`) and one profile builder
-  (`buildMentorProfile`): the allowlist (`/login` → `/login/verify` →
+- **`approvedMembers/{email}`** — doc id is the email *trimmed and lowercased*. Fields:
+  `role: "operator" | "mentor"` (required), optional `name` / `addedAt` / `note`.
+  **Client access is deny-all**; `exists()` still resolves against it in rules.
+- **Enforced in two places:** `/api/access/*` (server) and `firestore.rules` —
+  creating a `profiles/{uid}` doc requires `isApprovedMember()`.
+- **Two ways to become a mentor**, sharing `app/components/MentorOnboarding.tsx` and
+  `buildMentorProfile`: the allowlist (`/login` → `/login/verify` →
   `/api/access/mentor-profile`) and the break-glass invite code
   (`/mentor/join?code=…` → `/api/mentor/redeem`). **Keep the invite path working.**
-- **Ops:** `node scripts/approve.js <email> operator|mentor ["Name"]`, `--remove` to
-  revoke. Or the Console click-path in [`QA-HANDOFF.md`](QA-HANDOFF.md) §1a.
+- **Ops:** `node scripts/approve.js <email> operator|mentor ["Name"]`, `--remove`.
 
-**This is meant to be deleted in one commit when the batch ends.** Everything
-gate-specific is named `access*` (`app/lib/accessGate.ts`, `accessEmail.ts`,
-`accessClient.ts`, `app/api/access/**`, `app/(platform)/login/verify/`,
-`scripts/approve.js`) plus the `approvedMembers` rules block and the
-`isApprovedMember()` clause on profile create. The removal checklist lives at the top
-of [`app/lib/accessGate.ts`](app/lib/accessGate.ts). **Don't entangle new product code
-with it** — if you need gate behaviour, import from those modules rather than
-spreading allowlist checks around.
+**Meant to be deleted in one commit.** Everything gate-specific is named `access*`
+(`app/lib/accessGate.ts`, `accessEmail.ts`, `accessClient.ts`, `app/api/access/**`,
+`app/(platform)/login/verify/`, `scripts/approve.js`) plus the `approvedMembers` rules
+block and the `isApprovedMember()` clause on profile create. Removal checklist at the top
+of [`app/lib/accessGate.ts`](app/lib/accessGate.ts).
 
 ## ⚠️ Monetization is deferred until after the MVP ships
 
-This is a standing constraint. The freemium model (free core + paid mentorship tier) is
-**designed but not implemented**, and we are **not building it now**:
-
-- **DO NOT** add Stripe, checkout, billing, subscriptions, dunning, refunds, paywall UI,
-  or pricing pages. There is no payment integration and none should appear during the MVP.
-- **DO** preserve the one piece of *entitlement scaffolding* that exists:
-  `Profile.plan: "free" | "pro"` is on every profile (and in the rules) but **nothing reads
-  it**. When pricing lands, gate on it; until then leave it dormant.
-- **Everything ships free** for the founding batch. The point of batch 1 is to validate the
-  engagement loop and harvest proof (testimonials, shipped outcomes), *then* turn on pricing.
-- Tagging a feature as eventually-paid is fine and encouraged (keeps the line movable);
-  *implementing the wall* is out of scope.
-
-Nothing in the MVP is gated by anything but role and squad membership. The XP/level ladder
-that used to gate workshops was removed in September 2026 — don't reintroduce a points gate.
+**DO NOT** add Stripe, checkout, billing, subscriptions, paywall UI, or pricing pages.
+`Profile.plan: "free" | "pro"` exists on every profile and **nothing reads it**; leave it
+dormant. Everything ships free for the founding batch. Nothing in the MVP is gated by
+anything but role. Don't reintroduce a points gate.
 
 ## Stack & architecture
 
-- **Next.js 16.2.7** (App Router) · **React 19** · **TypeScript 5** · **Tailwind CSS v4**
-  (via `@tailwindcss/postcss`). Deployed on **Vercel** (waitlist-only in production — see the
-  `PLATFORM_ENABLED` gate in Current status).
-- **Firebase 12** (client SDK): **Firestore** for data, **Firebase Auth** (Google SSO +
-  email/password) for identity. Firebase project id is **`highagency-62e67`** (display name
-  "HighAgency", project number `273177671346`, support email `info@high-agency.io`). The app
-  config (`app/lib/firebase.ts`), `.firebaserc`, `firebase.json`, and every `scripts/*` all
-  target this one project. (An older `canary-os` project was reused infra during early dev and
-  has been fully retired from the config — if you see `canary-os` anywhere, it's stale.)
-- **No separate backend service. No Python/Flask. No Vertex AI service.** The PRD's old
-  Python assumption is dropped (and `prd.md` is updated to match).
-- **Firestore security rules *are* the backend** for squad data. Squads, applications, build
-  logs, check-in requests, the ritual and the mentor's track are written by the browser
-  through the client SDK, and [`firestore.rules`](firestore.rules) is the authoritative
-  enforcement layer (validation, ownership, immutability). Treat the rules as
-  production-critical code — when you change a data shape or a write path, update the rules
-  in the same change.
-- **Workshops and check-in confirmations are server-authoritative.** Every workshop write
-  (authoring, enrolling, leaving) and every check-in confirmation goes through a Route
-  Handler under `app/api/**` using `firebase-admin`, because each may also touch the host
-  mentor's **Google Calendar**. Clients only read `workshops/*`; the rules deny all client
-  writes there. Server logic lives in `app/lib/workshopServer.ts`, `checkinServer.ts`,
-  `googleCalendar.ts`, `serverAuth.ts`; the browser reaches it via `app/lib/api.ts`.
-- **Google Calendar (per mentor).** A mentor connects their own Google account once
-  (`/mentor/you` or the home-screen prompt → `/api/google/connect` → Google →
-  `/api/google/callback`). The refresh token is stored AES-256-GCM encrypted in
-  `googleTokens/{uid}` (deny-all to clients). From then on every session they schedule and
-  every check-in they confirm gets a Calendar event with a **Meet room**; enrolled operators
-  are invited as guests with the guest list hidden (`guestsCanSeeOtherGuests: false`), so
-  they get reminders and the mentor sees who's coming, but operators never see each other's
-  emails. Unconnected mentors paste a link instead — nothing breaks without Google.
-  Env: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY` (32 bytes hex).
-- **Nothing game-related is client-trusted any more.** The streak moved server-side in
-  September 2026 (see Domain model → Streaks). What the browser still writes directly is
-  squad membership data the rules can fully validate.
-- **Mentors get their own app, not the operator app plus an admin tab.** There is no `/admin`
-  route. `role == "mentor"` swaps the entire shell: the rail becomes **Home · Workshops ·
-  Squads · You** (`app/(platform)/mentor/**`), the streak HUD is hidden, and every operator
-  surface (`/dashboard`, `/learn`, `/cohorts`, `/profile`) redirects a mentor to its mentor
-  equivalent. The one genuinely shared screen is `/cohorts/[id]` — that's where a mentor
-  writes and advances the squad's track — and it hides the operator-only affordances
-  (build-log composer, ritual button) from them. Mentor screens read their queues through
-  `app/components/mentorData.ts`, so Home and Squads can't disagree about what's outstanding.
-  **Break-glass / bootstrap operations still run as local Node scripts** (`scripts/`) — they
-  authenticate with the firebase-tools CLI OAuth token (IAM bypasses security rules), which is
-  how seed/cleanup run and how a mentor can be promoted directly (`admin-set.js <uid> mentor`).
-- **Mentors onboard via single-use invite links, not the operator funnel.** Staff mints a code
-  with `scripts/mentor-invite.js "<label>" [days]` and shares the printed
-  `/mentor/join?code=…` URL 1:1. The join page (deliberately unlinked from any nav) validates
-  the code, signs the mentor in, and runs a **mentor-shaped onboarding** (identity + expertise;
-  no DOB/parent email — mentors attest 18+, `ageBand: "18+"`, consent `granted`, no
-  privateProfiles doc). Redemption is server-authoritative: `POST /api/mentor/redeem` verifies
-  the Firebase ID token and, in one Admin-SDK transaction, consumes the invite and mints
-  `role: "mentor"` — or **promotes an existing operator account in place**. Invites live in
-  `mentorInvites/{sha256(code)}` (server-only, rules deny-all, mirrors `consentTokens`); the
-  raw code is printed once at mint and never stored. Clients remain rules-blocked from ever
-  writing `role: "mentor"`.
+- **Next.js 16.2.7** (App Router) · **React 19** · **TypeScript 5** · **Tailwind CSS v4**.
+  Deployed on **Vercel**.
+- **Firebase 12** (client SDK): Firestore + Firebase Auth. Project **`highagency-62e67`**
+  (support email `info@high-agency.io`). `app/lib/firebase.ts`, `.firebaserc`,
+  `firebase.json` and every `scripts/*` target this one project.
+- **No separate backend service.** Route Handlers under `app/api/**` (`firebase-admin`,
+  bypass rules) are the server; [`firestore.rules`](firestore.rules) is the enforcement
+  layer for the little that clients still write (their own `profiles` /
+  `privateProfiles`, deleting their own feed line). **Treat the rules as
+  production-critical code** — a data-shape or write-path change is incomplete until the
+  rules and `tests/rules.test.mjs` reflect it.
+- **Server-authoritative writes** (all via `app/lib/api.ts` from the browser):
+  - `POST /api/season` — the one shared track (`app/lib/seasonServer.ts`).
+  - `POST /api/submissions`, `POST /api/submissions/review` — proof (same file).
+  - `POST /api/build-log` — the feed (`app/lib/streakServer.ts`).
+  - `app/api/workshops/**`, `app/api/google/**` — sessions + Google Calendar
+    (`workshopServer.ts`, `googleCalendar.ts`). Unchanged from the squad era.
+  - `app/api/consent/**`, `app/api/mentor/**`, `app/api/access/**`, `app/api/hubspot/**`,
+    `app/api/cron/hubspot-sync`.
+  Server-only libs: `firebaseAdmin.ts`, `serverAuth.ts` (`requireUser`, `requireMentor`,
+  `HttpError`, `errorResponse`), `seasonServer.ts`, `streakServer.ts`, `workshopServer.ts`,
+  `googleCalendar.ts`, `consentServer.ts`, `mentorInviteServer.ts`, `accessGate.ts`,
+  `accessEmail.ts`, `hubspot*.ts`. **Never import these from client components.**
+- **Parental consent is enforced in the routes**, not the rules (`consentStatus ===
+  "pending"` → 403 `consent-pending` on submit and build-log). The squad-era
+  `consentAllows()` rule helper is gone with the squad writes it guarded.
+- **Google Calendar (per mentor).** Connect once (`/mentor/you` or the home prompt →
+  `/api/google/connect` → `/api/google/callback`); refresh token AES-256-GCM encrypted in
+  `googleTokens/{uid}` (deny-all). Every session the mentor schedules gets a Calendar
+  event with a Meet room; enrolled operators are invited with the guest list hidden.
+  Env: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_TOKEN_KEY`.
+- **Two shells, one layout** ([`app/(platform)/layout.tsx`](app/(platform)/layout.tsx)).
+  `role == "mentor"` → rail + tab bar with **Home · Track · Workshops · You**
+  (`app/(platform)/mentor/**`). Operators → **no rail, no tab bar**: a top bar (brand ·
+  flame · avatar → card sheet) over **one page**, `/dashboard`. `/mentor/*` redirects
+  operators to `/dashboard`; `/dashboard` redirects mentors to `/mentor`.
+- **Break-glass / bootstrap operations run as local Node scripts** (`scripts/`, CLI
+  OAuth token, IAM bypasses rules).
 
 ## Domain model (the vocabulary)
 
-Types live in [`app/lib/types.ts`](app/lib/types.ts); data access in
-[`app/lib/db.ts`](app/lib/db.ts).
+Types in [`app/lib/types.ts`](app/lib/types.ts); client reads in [`app/lib/db.ts`](app/lib/db.ts);
+server writes in `app/lib/api.ts` → `app/api/**`.
 
-- **Operator** — an ambitious student member (primary persona). **Mentor** — staff/expert
-  who verifies advanced milestones and runs workshops (`Role` is `operator | mentor`;
-  mentors join via invite link — `scripts/mentor-invite.js` → `/mentor/join?code=…` — or
-  by admin script).
-- **Profile** (`profiles/{uid}`) — the public artifact cohorts evaluate. **Privacy by
-  construction:** display name is `"First L."`, age is an `AgeBand` (`13-15 | 16-17 | 18+`),
-  location is country + IANA timezone. **No email/phone/DOB/exact city ever.** Readable by
-  any signed-in user (it *is* the cohort application).
-- **PrivateProfile** (`privateProfiles/{uid}`) — DOB, full name, exact city, parent email.
-  **Owner-only, both directions, never listed.** This split is a hard minor-PII requirement.
-- **Cohort / "squad"** (`cohorts/{id}`) — an accountability squad of **3–8** operators
-  (`COHORT_MIN_TO_ACTIVATE = 3`, `COHORT_MAX_MEMBERS = 8`). States: `forming → active →
-  stalled → archived`. A founder commits a weekly **ritual** slot (deliberate friction).
-  Members share one mentor, one track and a weekly ritual streak. Subcollections:
-  `applications/`, `logs/`, `checkIns/`. (The old `peerLeadUid` field is tolerated on legacy
-  docs and read by nothing.)
-- **Track** (`cohorts/{id}.track: TrackMilestone[]`) — **written by the squad's mentor,
-  from scratch, per squad.** An ordered list of up to 20 steps, each `{ id, title, detail,
-  dueDay, doneAt }`. The mentor is the sole authority on progress: they mark a step done
-  **for the whole squad** (`doneAt`), and the squad reads it. There is no operator
-  submission, no evidence spec, no peer verification. Templates in
-  [`app/lib/trackTemplates.ts`](app/lib/trackTemplates.ts) ("Ignition", "Launch sprint")
-  are starting points a mentor can edit freely. Rules: only `isCohortMentor` may write
-  `track`/`trackUpdatedAt`, and nothing else in the same write.
-- **BuildLog** (`logs/`) — daily one-line "what I shipped" updates; described in code as
-  "the sleeper feature." The cheapest qualifying action that keeps a streak alive.
-- **Workshop** (`workshops/`) — a live Google-Meet session a mentor hosts on **any topic**.
-  Independent of tracks. Capped (`capacity` 2–200, default 15); the roster lives on the doc
-  (`enrolledUids`), mirrored to `profile.enrolledWorkshops`. Written only by the server
-  (`app/api/workshops/**`), which creates/updates/cancels the Calendar event and keeps the
-  guest list equal to the roster. `calendarEventId` is present when linked. Operators can
-  enroll and **leave** until the session starts. No attendance tracking.
-- **Check-in** (`cohorts/{id}/checkIns/`) — a squad-scoped session with the squad's own
-  mentor: any member requests one, the mentor confirms it via `POST /api/checkins/confirm`,
-  which creates the Calendar event + Meet room with the whole squad invited (or takes a
-  pasted link when the mentor isn't connected). Readable by that squad and that mentor only.
-- **Streaks** (`app/lib/streaks.ts` for the math, `app/lib/streakServer.ts` for the
-  writes) — the only game mechanic, and **server-authoritative**. A personal daily streak
-  kept alive by two qualifying actions, each a Route Handler: `POST /api/build-log` and
-  `POST /api/ritual`. Banked freezes (earn 1 per 7-day run, max 3; a freeze covers exactly
-  one missed day). "Today" is computed on the server from the profile's own IANA timezone.
-  The squad `weeklyStreak` ticks once per ISO week from the same ritual route. Rules freeze
-  `streak` / `streakFreezes` / `lastActiveDay` / `lastBuildLogDay` on every client path, deny
-  client build-log creates, and deny client writes to the cohort ritual fields.
-- **Matching** ([`app/lib/match.ts`](app/lib/match.ts)) — tag overlap + timezone band +
-  skills-wanted scoring with "why matched" chips. No embeddings yet (deliberate).
+- **Operator** — a student member. **Mentor** — staff/expert who writes the season,
+  reviews proof, runs workshops. `Role` is `operator | mentor`.
+- **Profile** (`profiles/{uid}`) — public, readable by any signed-in user. **Privacy by
+  construction:** name is `"First L."`, age is an `AgeBand`, location is country + IANA
+  timezone. **No email/phone/DOB/exact city ever.** `pendingApplications` is a
+  tolerated legacy field (rules allow it, nothing writes it) — **never make it required
+  again**: an update is validated as the whole merged doc.
+- **PrivateProfile** (`privateProfiles/{uid}`) — DOB, full name, city, parent email.
+  Owner-only, both directions.
+- **Season** (`seasons/{id}`) — **THE shared track.** One document, every mentor edits
+  it, exactly one is `state: "live"`. `name`, `kind`, `category`, `duration`, `tagline`,
+  `overview`, `outcome`, and `milestones: SeasonMilestone[]` (≤20). Each milestone:
+  `{ id, title, why, proof, effort, verifier, sessions[] }`. **`id` is stable and never
+  regenerated** — submission ids embed it. `updatedAt` is the editor's optimistic-
+  concurrency token (a save quotes it; mismatch → `409 stale-write`). Removing a
+  milestone that has proof → `409 milestone-has-submissions`. Server-written only.
+- **Verifier** — `"open"`: posting proof completes the step and **every member can see
+  it** (that *is* the accountability). `"mentor"`: a mentor approves or returns it with
+  a note; the proof is private to author + mentors. The mentor's copy says `peer_lead`;
+  `normalizeVerifier()` maps it to `open` and **fails closed to `mentor`** on anything else.
+- **Submission** (`seasons/{id}/submissions/{uid}__{milestoneId}`) — one per operator per
+  milestone; a resubmit overwrites. `status: submitted | approved | returned`. An `open`
+  row is born `approved`; a `mentor` row is born `submitted`. **`verifier` is snapshotted
+  onto the row at submit time** and the read rule keys off that copy — so flipping a
+  milestone mentor→open later never exposes proof made privately. Progress everywhere is
+  `status === "approved"` (`seasonProgress`, `nextMilestone`). Any mentor may review any
+  row. A return **requires** a note. Nothing is gated: any step in any order.
+- **BuildLog** (`buildLogs/{auto}`) — one line a day, one **season-wide feed**. Server-
+  written; author may delete own.
+- **Streak** (`app/lib/streaks.ts` math, `streakServer.ts` writes) — server-authoritative;
+  two qualifying actions: a build log or a proof submission (both call `bumpStreak()`
+  inside the same transaction). Freezes: 1 per 7-day run, max 3. "Today" is computed from
+  the profile's own timezone. Rules freeze every streak field on every client path.
+- **Workshop** (`workshops/`) — any-topic live session with seats (2–200, default 15),
+  `enrolledUids` on the doc mirrored to `profile.enrolledWorkshops`. Server-written;
+  Calendar-linked when the host is connected. Operators enroll/leave until it starts.
+  No attendance tracking.
+
+**Firestore read rules for submissions are split, and a list query is all-or-nothing:**
+the public wall must `where("verifier","==","open")`, your own rows `where("uid","==",you)`,
+the review queue `where("status","==","submitted")` (mentors). An unfiltered list is
+denied for a non-mentor. Every watcher in `db.ts` carries exactly its filter; drop one
+and the listener is torn down permanently (`listenerError`). `tests/rules.test.mjs` pins
+this.
 
 ## Waitlist referrals
 
-The public waitlist has a referral loop: share your link, and every person who
-applies through it moves you up the queue — up to **5 of them**, **10 places each**
-([`app/lib/referral.ts`](app/lib/referral.ts) `REFERRAL_MAX` / `REFERRAL_JUMP`).
-
-**The whole design is "arithmetic on one document, never a re-sort of the queue."**
-Every applicant gets one public counter at **`referrals/{code}`** — a random 6-character
-code (doc id), the public `opId`, `basePos`, `confirmed`, `credited`, and a denormalised
-`pos`. Displayed position is always `max(1, basePos − credited × 10)`, so crediting a
-referral is a single increment on a single doc: no fan-out, no query, nobody else's row
-moves. Cost is flat as the list grows — **2 reads (3 when referred) and 4 writes per
-signup**, one read to resolve an incoming `?ref=`, one read to render the share screen.
-
-- **"Confirmed" means the referred person completed the application**, credited inside the
-  same transaction as their own signup. There is no pending state and no confirmation
-  email; if double opt-in is wanted later, the hook is a `pending → confirmed` transition
-  on the counter.
-- **The counter is PII-free and world-readable** — a signed-out visitor on a `?ref=` link
-  has to resolve it. Attribution (`referralCode` / `referredBy`) lives on the create-only
-  `applications` doc instead, so who referred whom is never a readable graph.
-- **Positions are per-operator arithmetic, so two people can show the same number** once
-  referrals land. That is the deliberate trade for O(1) writes.
-- **Staff lead-source codes share the same collection.** Five team members have a
-  `referrals/{code}` counter with `kind: "staff"` and `basePos: 1` — the fixed
-  point of the position arithmetic, so their position never drifts and the shared
-  rules need no branch. Clients can't forge one (the create rule takes an exact
-  field list without `kind`); only `scripts/staff-referrals.js` (Admin SDK) mints
-  them, keyed for idempotency by the deny-all `staffReferralCodes/{slug}`. They
-  get a link, never an account. See `app/lib/staffReferrals.ts` and
-  [`docs/hubspot-integration.md`](docs/hubspot-integration.md) → Staff referral codes.
-- **The application carries an optional, unchecked marketing opt-in**
-  (`app/lib/marketingConsent.ts`): `marketingConsent` always, plus
-  `marketingConsentAt`/`marketingConsentSource` only when granted. It gates
-  nothing and **nothing sends off it** — no list, sender, subscription or
-  campaign is configured anywhere. Absent ≠ `false`: legacy applications were
-  never asked.
-- **Three implementations of the position model must agree**: `app/lib/referral.ts`,
-  the `referralPos()`/`referralCounted()` helpers in [`firestore.rules`](firestore.rules)
-  (rules have no `min`/`max`, so they spell it out in ternaries), and the mirror in
-  `tests/referral.test.mts`. The first test in that file pins all three together — change
-  the cap or the jump in one place and it fails.
+Unchanged by the rebuild. The public waitlist has a referral loop
+([`app/lib/referral.ts`](app/lib/referral.ts), `REFERRAL_MAX` / `REFERRAL_JUMP`):
+`referrals/{code}` public PII-free counters, positions computed as arithmetic on one doc,
+staff lead-source codes with `kind: "staff"` (`app/lib/staffReferrals.ts`,
+`scripts/staff-referrals.js`), optional marketing opt-in
+(`app/lib/marketingConsent.ts`). `applications` is create-only, never readable. Three
+implementations of the position model must agree: `referral.ts`, the rules helpers,
+`tests/referral.test.mts`.
 
 ## Codebase map
 
-- `app/page.tsx` + `app/Waitlist.tsx` + `app/components/*` — the public **waitlist /
-  marketing** site at `/` (outside the platform shell; writes to the `applications`
-  collection via [`app/lib/firebase.ts`](app/lib/firebase.ts) `submitApplication`).
-  It also carries the **referral loop**: `?ref=CODE` → banner on the hero →
-  `ApplyModal` → `ReferralShare` on the success step. See Waitlist referrals below.
-- `app/(platform)/` — the authenticated **product**, wrapped by
-  [`app/(platform)/layout.tsx`](app/(platform)/layout.tsx) (AuthProvider + role-aware Shell;
-  only `/login`, `/onboarding`, and `/mentor/join` render "bare"). **Operator routes:**
-  `/dashboard`, `/cohorts`, `/cohorts/[id]`, `/learn`, `/profile`. **Mentor routes:**
-  `/mentor` (home queues), `/mentor/workshops` (month calendar of every session + authoring),
-  `/mentor/squads` (verify queue, check-in requests, adoption feed, consent queue),
-  `/mentor/you` (mentor profile + Google Calendar connect). Plus `/login` + `/login/verify` (the temporary
-  founding-batch access gate — see below), `/onboarding`, and `/mentor/join`
-  (invite-only mentor signup, unlinked from nav).
-- `app/api/` — the server-authoritative Route Handlers (Node, `firebase-admin`, bypass rules):
-  `consent/send` + `consent/approve` (parental consent; approval page at `/consent/[token]`),
-  `mentor/peek` + `mentor/redeem` (mentor invites), `cron/unassigned-squads` (daily
-  ops sweep, `CRON_SECRET`-gated, scheduled in `vercel.json`), `workshops` +
-  `workshops/[id]` + `workshops/[id]/enroll` (authoring, seats), `checkins/confirm`,
-  `google/{connect,callback,status,disconnect}` (per-mentor Calendar OAuth), and
-  `access/request` + `access/claim` + `access/mentor-profile` (the temporary access gate).
-  Server logic lives in `app/lib/firebaseAdmin.ts`, `serverAuth.ts`, `googleCalendar.ts`,
-  `workshopServer.ts`, `checkinServer.ts`, `consentServer.ts`, `mentorInviteServer.ts`,
-  `accessGate.ts`, `accessEmail.ts` — **never import these from client components.**
-  The browser-side wrappers are in `app/lib/api.ts`.
-- `app/styleguide/page.tsx` — the living design-system reference (top-level route, `noindex`).
-- `app/privacy/page.tsx` + `app/terms/page.tsx` — public legal pages, linked from the waitlist
-  footer. `/privacy` is the URL on the Google OAuth consent screen (Google requires one for
-  the Calendar scope), so keep it live and keep the Google Calendar section accurate.
-- `app/components/AuthProvider.tsx` — client auth context (`useAuth()` → `{ user, profile,
-  logout }`); `user`/`profile` are `undefined` while resolving, `null` when absent.
-- `app/components/mentorData.ts` — the mentor app's guard + queues (`useMentorGate`,
-  `useMentoredSquads` — check-in requests, upcoming check-ins, squads with no track —
-  `useUnassignedSquads`, `useConsentQueue`). `app/components/Track.tsx` holds the track
-  editor (mentor) and read-only view (squad); `CalendarConnect.tsx` the Google connect card. Every mentor screen reads
-  its counts from here; the queues are bounded on purpose (see `CONSENT_QUEUE_LIMIT` and
-  `UNASSIGNED_SCAN_LIMIT` in `db.ts`) and the UI says so when a list is truncated.
-- `app/lib/` — `types.ts`, `firebase.ts` (config + waitlist), `db.ts` (all Firestore CRUD +
-  live `watch*` subscriptions; workshops are read-only here), `api.ts` (fetch wrappers for
-  the server routes), `streaks.ts` (local day / ISO week / the streak), `trackTemplates.ts`
-  (starting points for a mentor's track), `match.ts` (cohort matching), `referral.ts` (waitlist referral constants +
-  position arithmetic, shared by the browser, the write path and the rules tests),
-  `flags.ts` (`PLATFORM_ENABLED` build-time flag), `marketingConsent.ts` (the
-  optional opt-in vocabulary), `staffReferrals.ts` + `staffReferralsServer.ts`
-  (staff lead-source codes: roster/decisions, then the Admin-SDK provisioning).
-  Plus the deletable gate trio: `accessGate.ts` (server: allowlist lookup + rate limit),
-  `accessEmail.ts` (server: sign-in-link mail), `accessClient.ts` (browser: fetch wrappers).
-- `proxy.ts` (repo root) — Next 16 `proxy` (the renamed `middleware`). When `PLATFORM_ENABLED`
-  is false (production), it redirects every platform route back to the waitlist at `/`.
-- `scripts/` — local admin/dev tooling (Node, REST + firebase CLI OAuth):
-  `seed.js` (squads, profiles, workshops, build logs — the Learn page's content is these
-  workshops), `admin-set.js` (`<uid> consent|mentor|pro`), `mentor-invite.js` (mint a
-  single-use mentor invite link), `approve.js` (add/remove a founding-batch allowlist
-  entry), `cleanup-test.js`, `qa-setup.js` (local E2E QA fixture + sign-in links —
-  see [`docs/qa-e2e.md`](docs/qa-e2e.md)), `test-applicant.js` (exercises the
-  security rules as a real client), `fb-token.js` (token helper). There is no
-  `seed-courses.js`.
-- `firestore.rules` — the enforcement backend. `design-system.md` — visual SoT (read before
-  any UI). `prd.md` — product spec. `High Agency Waitlist (standalone).html` — a standalone
-  export of the waitlist (reference artifact).
-
-## Open product questions (record, don't silently resolve)
-
-- **Track model — RESOLVED (2026-09-01).** One track per squad, authored and advanced by
-  the squad's mentor; progress is per squad, not per operator. `prd.md` carries a revision
-  note; the per-operator submission model and the peer-lead role are gone.
-- **Attendance is not tracked.** Workshops have seats and calendar invites, nothing else.
-  If attendance ever matters again, it should come from Calendar/Meet data, not self-report.
+- `app/page.tsx` + `app/Waitlist.tsx` + marketing components — the public waitlist at `/`.
+- `app/(platform)/` — the product. `layout.tsx` (AuthProvider + role-branched shell).
+  **Operator:** `/dashboard` — the whole app (season header, `ShipLine`, `SeasonPath`,
+  `WorkshopList`, the feed; `ProfileSheet` from the top-bar avatar or `?you=1`).
+  **Mentor:** `/mentor` (review queue, roster, consent queue, sessions, workshop
+  composer), `/mentor/track` (`SeasonEditor`), `/mentor/workshops`, `/mentor/you`.
+  Bare: `/login`, `/login/verify` (gate), `/onboarding`, `/mentor/join`.
+- `app/components/` — `Season.tsx` (`SeasonPath`: the operator accordion + proof form +
+  public proof), `SeasonEditor.tsx`, `ReviewQueue.tsx` (`ProofRow`, `ReviewQueue`),
+  `ShipLine.tsx`, `ProfileCard.tsx` + `ProfileSheet.tsx`, `mentorData.ts`
+  (`useMentorGate`, `useLiveSeason`, `useReviewQueue`, `useRoster`, `useConsentQueue`),
+  `ui.tsx` (icons incl. `PathIcon`, `Hud`, `Avatar`, `AvStack`, `Bar`), `WorkshopForm`,
+  `WorkshopList`, `CalendarConnect`, `ConsentResend`, `ProfileModal`, `TagField`,
+  `MentorOnboarding`, `AuthProvider`.
+- `app/lib/` — `types.ts`, `db.ts` (reads + the few client writes), `api.ts`, the server
+  libs above, `streaks.ts`, `referral.ts`, `flags.ts`, `countries.ts`.
+- `app/styleguide/`, `app/privacy/`, `app/terms/`, `app/consent/[token]/` — public pages.
+- `scripts/` — `season.js` + `season-content.json` (load the mentor's track into
+  `seasons/s1`; refuses to overwrite without `--force`), `seed.js` (profiles, workshops,
+  feed, a few proof rows), `qa-setup.js` (QA fixture + sign-in links —
+  [`docs/qa-e2e.md`](docs/qa-e2e.md)), `approve.js`, `mentor-invite.js`, `admin-set.js`,
+  `staff-referrals.js`, `hubspot-*.js`, `cleanup-test.js`, `fb-token.js`.
+- `firestore.rules`, `design-system.md` (visual SoT — **read before any UI**),
+  `prd.md`, `QA-HANDOFF.md`.
 
 ## Conventions
 
-- **UI:** [`design-system.md`](design-system.md) ("Operator OS", **light-mode only**) is the
-  visual source of truth — read it before touching UI; a living reference renders at
-  `/styleguide`. Warm paper canvas with a gentle abstract wash; white cards that **float** on
-  soft warm shadows by default. Two accents with one job each: **ember** = action, **lime/green**
-  = earned/verified (lime as fill, deep green `--signal-text` for verified text). The primary
-  CTA is a tactile **3D push button** (base edge + travel-on-click). **Fraunces** display /
-  **Schibsted Grotesk** body / **Geist Mono** for data. Gradients only as same-hue tonal depth
-  on small functional surfaces. Left-aligned, asymmetric, body ≥16px, monochrome-outline icons,
-  colors via CSS variables in `app/globals.css` (never hardcode hex).
-- **Privacy is structural, not incidental.** Never put minor PII (email, DOB, full name,
-  exact city) on the public `Profile` or anywhere client-readable; it lives only in
-  `privateProfiles/{uid}`. Any new community/cross-cohort surface needs moderation/reporting.
-- **Keep the rules in lockstep with the data model.** A data-shape or write-path change is
-  incomplete until `firestore.rules` reflects it.
-- **Path alias:** `@/*` → repo root (e.g. `@/app/lib/db`).
-- **Real-content placeholders** in seed/test data — never striped boxes or lorem.
+- **UI:** [`design-system.md`](design-system.md) ("Operator OS v2 · Arcade Paper",
+  **light-mode only**); living reference at `/styleguide`. Warm paper canvas, white tiles
+  with a hard bottom edge, two accents with one job each: **ember** = action, **lime** =
+  earned. Physical push buttons that travel on press. **Gabarito** for everything, **Geist
+  Mono** for numbers (`app/layout.tsx`). Student surfaces carry no paragraphs of chrome —
+  the mentor's `why` text is content, not chrome. Colors via CSS variables in
+  `app/globals.css` (`--text`, `--text-muted`, `--text-faint`, `--accent`, `--signal` …);
+  never hardcode hex. `.path__item.locked` means *not started*, never gated.
+- **Privacy is structural.** Minor PII lives only in `privateProfiles/{uid}`. Open proof is
+  readable by every member by design; the consent email and `/consent/[token]` say so.
+- **Keep the rules and `tests/rules.test.mjs` in lockstep with the data model.**
+- **Patterns the lint rules enforce:** no `setState` in effects — tagged snapshots
+  (`{ seasonId, subs }`), fallback-until-touched (`edits ?? live`), keyed child components
+  that seed at mount, `useSyncExternalStore` + module latch for one-time URL reads.
+- **Path alias:** `@/*` → repo root. **Real-content placeholders** in seed data.
 
 ## Commands
 
 ```bash
-npm run dev      # next dev (localhost:3000)
-npm run build    # next build
-npm run lint     # eslint
+npm run dev      # next dev (localhost:3000) — check port 3000 first; never pkill by pattern
+npm run build
+npm run lint
 
 # Local admin / data tooling (need `firebase login` as info@high-agency.io first):
-node scripts/seed.js                        # seed squads, profiles, workshops, build logs
-node scripts/admin-set.js <uid> mentor      # promote a mentor directly (also: consent | pro)
-node scripts/mentor-invite.js "<label>" 30  # mint a single-use mentor invite link (days opt.)
-node scripts/approve.js <email> mentor      # founding-batch allowlist (also: operator | --remove)
-node scripts/staff-referrals.js             # staff lead-source codes: DRY RUN (add --apply, --json)
-node scripts/cleanup-test.js <cohortId>     # remove smoke-test artifacts
-node scripts/qa-setup.js [--link mentor]   # local QA fixture + sign-in links (see docs/qa-e2e.md)
+node scripts/season.js [--force]           # load the mentor's track into seasons/s1
+node scripts/seed.js                        # profiles, workshops, feed, proof rows
+node scripts/qa-setup.js [--status|--link operator|mentor]
+node scripts/approve.js <email> operator|mentor ["Name"]   # founding-batch allowlist
+node scripts/mentor-invite.js "<label>" 30  # single-use mentor invite link
+node scripts/admin-set.js <uid> mentor      # promote directly (also: consent | pro)
+node scripts/cleanup-test.js                # remove smoke-test accounts + their proof
 
 # Tests (wrap the Firestore emulator; pinned firebase-tools@13 devDep):
 npm test              # rules + referral + consent + mentor-invite + hubspot + staff-code suites
 npm run test:rules    # firestore.rules enforcement (tests/rules.test.mjs)
-npm run test:referral # waitlist referral counters, rules + model (tests/referral.test.mts)
-npm run test:consent  # server consent-token logic (tests/consent.test.mts)
-npm run test:mentor   # server mentor-invite logic (tests/mentorInvite.test.mts)
-npm run test:hubspot  # CRM sync logic (tests/hubspot.test.mts)
-npm run test:staff    # staff lead-source code provisioning (tests/staffReferrals.test.mts)
 ```
-
-Beyond those suites, `scripts/` are manual smoke-test + seed/admin helpers.
 
 ## Gotchas
 
-- **Firebase project is `highagency-62e67`, support email `info@high-agency.io`.** The account
-  that owns it is `info@high-agency.io` — `firebase login` as that identity before running any
-  `scripts/*`. The old `canary-os` project is retired; treat any lingering `canary-os` reference
-  as a stale bug to fix, not as expected infra.
-- **App and tooling now target the same project** (`highagency-62e67`). This was *not* true
-  historically — a mid-June config change left `.firebaserc`/scripts on `canary-os` while the app
-  moved to `highagency-62e67`; that split has been reconciled. If you re-point the app to a new
-  project, re-point `.firebaserc`, `firebase.json`, and every `scripts/*` in the same change.
-- **Nothing is deployed.** `firestore.rules` lives in the repo but confirm it's actually
-  **deployed** to `highagency-62e67` (`firebase deploy --only firestore:rules`) before trusting
-  the live security posture — a repo rules file is not a deployed rules file.
-- **The `app/api/**` routes need Firebase Admin credentials in their runtime env.** Locally,
-  Application Default Credentials or the emulator suffice; on Vercel, set
-  `FIREBASE_SERVICE_ACCOUNT` (or `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY`) or every
-  server-authoritative flow — parental consent, mentor-invite redemption, workshops,
-  check-in confirmation, Calendar connect — 500s. Same secret serves all of them.
-- **Firebase web config keys are public by design** (committed in `app/lib/firebase.ts`);
-  security comes from Firestore rules, not from hiding keys. Don't "fix" this by removing
-  them. They're overridable via `NEXT_PUBLIC_FIREBASE_*` env vars.
-- **Build logs and the ritual go through the server.** `POST /api/build-log` and
-  `POST /api/ritual` are the only writers of `cohorts/*/logs`, the cohort's
-  `weeklyStreak`/`lastRitualWeek`, and every streak field on a profile. If you add a new
-  qualifying action, add it to `app/lib/streakServer.ts` and reuse `nextStreak()`.
-- **Google Calendar needs three env vars** (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`,
-  `GOOGLE_TOKEN_KEY`) in the server runtime. Without them `/api/google/status` reports
-  `configured: false`, the connect card explains itself, and sessions fall back to a pasted
-  Meet link. Never rotate `GOOGLE_TOKEN_KEY` casually: it decrypts every stored token.
-- **Legacy XP-era fields** (`xp`, `attendedWorkshops`, `lastRitualWeek` on profiles;
-  `peerLeadUid`, `submissions/` on cohorts; `open`/`levelGate`/`milestoneId`/`kind` on
-  workshops) are tolerated by the rules and ignored by the app. Nothing writes them.
-- **`applications`** (waitlist) is a create-only, never-readable collection (applicant PII);
-  the only public readables are the `meta/waitlist` counter and the `referrals/{code}`
-  counters. Don't add read paths to `applications` — referral attribution lives on the
-  application doc precisely so the referral graph is never client-readable.
-- **Referral counters are written unauthenticated** (the waitlist is public). The rules
-  bound the *shape* of a write, not who makes it: +1 confirmed per write, `credited`
-  capped, `pos` recomputed exactly. A determined caller can still replay the +1 — same
-  client-trusted v1 posture as `meta/waitlist`, not an oversight.
+- **Firebase project is `highagency-62e67`.** `firebase login` as `info@high-agency.io`
+  before any `scripts/*`. **Deploy rules only from this branch**, only with
+  `npm run test:rules` green: `firebase deploy --only firestore:rules`.
+- **`app/api/**` needs Admin credentials in the runtime env** (`FIREBASE_SERVICE_ACCOUNT`
+  or `FIREBASE_CLIENT_EMAIL` + `FIREBASE_PRIVATE_KEY`) or every server flow — sign-in
+  links, consent, the season, proof, build logs, workshops, Calendar — 500s.
+- **Firebase web config keys are public by design** (committed). Don't "fix" this.
+- **The season editor is last-write-wins without its token.** `SeasonEditor` forks a
+  draft with `base = updatedAt` on first edit and sends it as `expectedUpdatedAt`;
+  a mismatch is surfaced as a sentence, not a silent clobber. Keep it.
+- **Milestone id churn erases progress.** Submission ids embed `milestoneId`. The editor
+  round-trips ids; the server mints only for rows without one and refuses to drop an id
+  that has proof. Never regenerate ids on save.
+- **Legacy fields** (`xp`, `attendedWorkshops`, `lastRitualWeek`, `pendingApplications`,
+  `hours` on profiles; `kind` on workshops) are tolerated by the rules and ignored by the
+  app. Nothing writes them.
+- **`applications`** (waitlist) is create-only, never-readable; the only public readables
+  are `meta/waitlist` and `referrals/{code}`.
+- **`WeekCal`, `Track.tsx`, `SquadRoster`, `SquadModal`, `match.ts`, `trackTemplates.ts`,
+  `checkinServer.ts`, `/api/ritual`, `/api/checkins`, `/cohorts`, `/learn`, `/profile`,
+  `/mentor/squads`** no longer exist. If a doc or memory mentions them, it's from `main`.

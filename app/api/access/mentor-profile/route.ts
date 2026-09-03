@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
       if (snap.exists) {
         if (snap.data()?.role === "mentor") return "already-mentor" as const;
         // An operator account whose email was later allowlisted as a mentor:
-        // promote in place so profile, XP and squads all survive.
+        // promote in place so profile and streak survive.
         tx.update(profileRef, {
           role: "mentor",
           updatedAt: FieldValue.serverTimestamp(),

@@ -116,7 +116,7 @@ export default function OnboardingPage() {
   const isMinor = age !== null && age < 18;
   // The stage picker ("Where's it at?") only makes sense once there's a
   // venture to place — asking it of someone with no project is nonsensical
-  // and shouldn't gate them out of finding a squad.
+  // and shouldn't gate them out of the season.
   const hasBuilding = building.trim().length > 0;
 
   function toggle(list: string[], set: (v: string[]) => void, item: string) {
@@ -147,7 +147,7 @@ export default function OnboardingPage() {
       return;
     }
     if (domains.length === 0 || skills.length === 0) {
-      setError("Pick at least one domain and one interest so squads can find you.");
+      setError("Pick at least one domain and one interest.");
       return;
     }
     setBusy(true);
@@ -197,7 +197,6 @@ export default function OnboardingPage() {
           lastActiveDay: localDay(),
           lastBuildLogDay: "",
           enrolledWorkshops: [],
-          pendingApplications: [],
         },
         true
       );
@@ -213,7 +212,7 @@ export default function OnboardingPage() {
       }
       // Never land on an empty dashboard — straight into discovery
       // with matches pre-loaded.
-      router.replace("/cohorts");
+      router.replace("/dashboard");
     } catch {
       submitted.current = false;
       setError("Couldn't save. Try again.");
@@ -233,7 +232,7 @@ export default function OnboardingPage() {
       <h1 className="h1">{step === 1 ? "Who are you?" : "What's your thing?"}</h1>
       <p className="ob__sub">
         {step === 1
-          ? "Squads only ever see “First L.” and an age band."
+          ? "Other members only ever see “First L.” and an age band."
           : "No idea yet is a valid answer. Edit anytime."}
       </p>
 
@@ -460,7 +459,7 @@ export default function OnboardingPage() {
               Back
             </button>
             <button className="btn btn--primary" onClick={submit} disabled={busy}>
-              {busy ? "…" : "Find my squad"}
+              {busy ? "…" : "Start the season"}
             </button>
           </div>
         </>

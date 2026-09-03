@@ -1,21 +1,17 @@
 "use client";
 
-/* Full public-profile overlay — the artifact an operator is judged by.
-   Used by the squad roster (reading members before applying) and by the
-   founder's application review on the cohort page. Renders only Profile
-   fields (privacy-lean by construction — never PrivateProfile data). */
+/* Full public-profile overlay — the card a mentor reads from the roster or
+   the review queue. Renders only Profile fields (privacy-lean by
+   construction — never PrivateProfile data). */
 
-import type { Profile, WeeklyHours } from "../lib/types";
+import type { Profile } from "../lib/types";
 import { Avatar } from "./ui";
 
 export function ProfileModal({
   profile,
-  hours,
   onClose,
 }: {
   profile: Profile;
-  /** Squad-specific weekly commitment (from an application), if known. */
-  hours?: WeeklyHours;
   onClose: () => void;
 }) {
   return (
@@ -32,8 +28,7 @@ export function ProfileModal({
           <div>
             <h3 style={{ marginBottom: 0 }}>{profile.name}</h3>
             <span className="micro">
-              {profile.ageBand} · {profile.country}
-              {hours ? ` · ${hours}h/wk` : ""} · {profile.stage}
+              {profile.ageBand} · {profile.country} · {profile.stage}
             </span>
           </div>
         </div>

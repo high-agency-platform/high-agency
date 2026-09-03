@@ -69,7 +69,7 @@ export function StyleguideBody() {
             Body is Gabarito 400–500, never below 16px. Copy stays short:
             headings ≤ 4 words, buttons ≤ 2.
           </p>
-          <span className="num" style={{ fontSize: 28 }}>1,250 <span className="signal">XP</span></span>
+          <span className="num" style={{ fontSize: 28 }}>14 <span className="signal">day streak</span></span>
         </div>
       </section>
 
@@ -148,8 +148,8 @@ export function StyleguideBody() {
               <span className="path__node"><CheckIcon size={18} /></span>
               <div className="path__body">
                 <div className="path__top">
-                  <span className="path__name">Mission locked</span>
-                  <span className="path__count">5/6</span>
+                  <span className="path__name">The Cold Ask</span>
+                  <span className="path__count">approved</span>
                 </div>
               </div>
             </div>
@@ -157,16 +157,30 @@ export function StyleguideBody() {
               <span className="path__node">2</span>
               <div className="path__body">
                 <div className="path__top">
-                  <span className="path__name">20 asks out</span>
+                  <span className="path__name">Ship in 48 Hours</span>
                   <div className="path__meta">
-                    <span className="path__count">due Fri</span>
+                    <span className="path__count">3–5 hours</span>
                   </div>
                 </div>
                 <div className="path__detail">
                   <p className="path__evidence">
-                    Twenty sent messages and at least one reply.
+                    <b>Proof:</b> Public URL anyone can open + a build log entry marking when you started.
                   </p>
-                  <button className="btn btn--verify btn--sm">Mark done</button>
+                  <div className="path__form">
+                    <input className="input" placeholder="Link your proof" readOnly />
+                    <div className="row-actions" style={{ marginTop: 0 }}>
+                      <button className="btn btn--ghost btn--sm">Cancel</button>
+                      <button className="btn btn--primary btn--sm">Post it</button>
+                    </div>
+                  </div>
+                  <div className="path__queue">
+                    <div className="path__queue-row">
+                      <div className="path__queue-who">
+                        <Avatar name="Maya C." size="sm" /> Maya C. <a href="#proof">proof</a>
+                      </div>
+                      <p className="path__queue-note">Started Tuesday 9pm, live Thursday 7pm.</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -174,8 +188,8 @@ export function StyleguideBody() {
               <span className="path__node">3</span>
               <div className="path__body">
                 <div className="path__top">
-                  <span className="path__name">MVP live</span>
-                  <span className="path__count">locked</span>
+                  <span className="path__name">Mission Locked</span>
+                  <span className="path__count">2–3 hours</span>
                 </div>
               </div>
             </div>

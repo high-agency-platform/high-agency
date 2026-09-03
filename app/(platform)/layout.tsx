@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useSyncExternalStore } from "react";
 import { AuthProvider, useAuth } from "../components/AuthProvider";
+import { ProfileSheet } from "../components/ProfileSheet";
+import type { Profile } from "../lib/types";
 import {
   Hud,
+  Avatar,
   HomeIcon,
-  SquadIcon,
-  ZapIcon,
+  PathIcon,
   UserIcon,
   CalendarIcon,
 } from "../components/ui";
@@ -16,76 +19,36 @@ type Tab = {
   href: string;
   label: string;
   icon: (p: { size?: number }) => React.ReactElement;
-  /** Which other routes light this tab up. */
-  owns?: (pathname: string) => boolean;
 };
 
-/** Operators: the game. Home → squads → learn → your card. */
-const OPERATOR_TABS: Tab[] = [
-  { href: "/dashboard", label: "Home", icon: HomeIcon },
-  {
-    href: "/cohorts",
-    label: "Squads",
-    icon: SquadIcon,
-    owns: (p) => p.startsWith("/cohorts"),
-  },
-  { href: "/learn", label: "Learn", icon: ZapIcon },
-  { href: "/profile", label: "You", icon: UserIcon },
-];
-
-/** Mentors: the job. A mentor is not an operator with an extra page — none of
- *  the operator surfaces (the streak, the build log, squad discovery) are
- *  things they do, so they don't get them. Squad detail pages are shared,
- *  because that's where a mentor writes and advances the squad's track. */
+/** Mentors: the job. Home is the queue, Track is the season they write,
+ *  Workshops is the calendar, You is their card + Google connection. */
 const MENTOR_TABS: Tab[] = [
   { href: "/mentor", label: "Home", icon: HomeIcon },
+  { href: "/mentor/track", label: "Track", icon: PathIcon },
   { href: "/mentor/workshops", label: "Workshops", icon: CalendarIcon },
-  {
-    href: "/mentor/squads",
-    label: "Squads",
-    icon: SquadIcon,
-    owns: (p) => p.startsWith("/cohorts"),
-  },
   { href: "/mentor/you", label: "You", icon: UserIcon },
 ];
 
-function useTabs() {
-  const { profile } = useAuth();
-  const pathname = usePathname();
-  const tabs = profile?.role === "mentor" ? MENTOR_TABS : OPERATOR_TABS;
-  const isOn = (t: Tab) => pathname === t.href || !!t.owns?.(pathname);
-  return { tabs, isOn };
-}
+/* ------------------------------------------------------------------ */
+/* Mentor shell — rail on desktop, top bar + tab bar on mobile          */
+/* ------------------------------------------------------------------ */
 
-/** Desktop: slim left rail — logo, icon tabs, HUD at the bottom. */
 function Rail() {
-  const { profile, logout } = useAuth();
-  const { tabs, isOn } = useTabs();
-  // The HUD is the operator's streak. Mentors have no streak, so the rail
-  // just ends after the tabs for them.
-  const showHud = profile && profile.role !== "mentor";
-
+  const { logout } = useAuth();
+  const pathname = usePathname();
   return (
     <aside className="rail">
-      <Link
-        href={profile?.role === "mentor" ? "/mentor" : "/dashboard"}
-        className="rail__logo"
-        aria-label="High Agency home"
-      >
+      <Link href="/mentor" className="rail__logo" aria-label="High Agency home">
         <img src="/brand/high-agency-mark.svg" alt="" />
       </Link>
-      {tabs.map((t) => (
-        <Link
-          key={t.href}
-          href={t.href}
-          className={`rail__tab ${isOn(t) ? "rail__tab--on" : ""}`}
-        >
+      {MENTOR_TABS.map((t) => (
+        <Link key={t.href} href={t.href} className={`rail__tab ${pathname === t.href ? "rail__tab--on" : ""}`}>
           <t.icon />
           {t.label}
         </Link>
       ))}
       <div className="rail__foot">
-        {showHud && <Hud profile={profile} col />}
         <button className="rail__out" onClick={logout}>
           Exit
         </button>
@@ -94,31 +57,22 @@ function Rail() {
   );
 }
 
-/** Mobile: sticky top bar with brand + HUD. */
-function TopBar() {
-  const { profile } = useAuth();
-  const home = profile?.role === "mentor" ? "/mentor" : "/dashboard";
+function MentorTopBar() {
   return (
     <header className="topbar">
-      <Link href={home} className="topbar__logo" aria-label="High Agency home">
+      <Link href="/mentor" className="topbar__logo" aria-label="High Agency home">
         <img src="/brand/high-agency-mark.svg" alt="" />
       </Link>
-      {profile && profile.role !== "mentor" && <Hud profile={profile} />}
     </header>
   );
 }
 
-/** Mobile: fixed bottom tab bar — the game console controls. */
 function TabBar() {
-  const { tabs, isOn } = useTabs();
+  const pathname = usePathname();
   return (
     <nav className="tabbar">
-      {tabs.map((t) => (
-        <Link
-          key={t.href}
-          href={t.href}
-          className={`tabbar__tab ${isOn(t) ? "tabbar__tab--on" : ""}`}
-        >
+      {MENTOR_TABS.map((t) => (
+        <Link key={t.href} href={t.href} className={`tabbar__tab ${pathname === t.href ? "tabbar__tab--on" : ""}`}>
           <t.icon />
           {t.label}
         </Link>
@@ -127,31 +81,97 @@ function TabBar() {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Operator shell — one page, no navigation                            */
+/* ------------------------------------------------------------------ */
+
+// `?you=1` opens the card sheet on arrival (onboarding and the consent flow
+// deep-link to it). Read once, at first render, through a module latch — a
+// store, not an effect writing state.
+let landedYou: boolean | null = null;
+function readLandedYou(): boolean {
+  if (landedYou === null) {
+    landedYou = new URL(window.location.href).searchParams.get("you") === "1";
+  }
+  return landedYou;
+}
+
+/** The only chrome an operator gets: brand, the flame, their avatar. Shown at
+ *  every width — there is no rail and no tab bar, because there is nowhere
+ *  else to go. */
+function OperatorShell({
+  uid,
+  profile,
+  children,
+}: {
+  uid: string;
+  profile: Profile;
+  children: React.ReactNode;
+}) {
+  const landed = useSyncExternalStore(() => () => {}, readLandedYou, () => false);
+  const [youEdit, setYouEdit] = useState<boolean | null>(null);
+  const you = youEdit ?? landed;
+
+  function close() {
+    setYouEdit(false);
+    const u = new URL(window.location.href);
+    if (u.searchParams.has("you")) {
+      u.searchParams.delete("you");
+      window.history.replaceState(null, "", u.pathname + u.search + u.hash);
+    }
+  }
+
+  return (
+    <div className="solo">
+      <header className="topbar topbar--solo">
+        <Link href="/dashboard" className="topbar__logo" aria-label="High Agency home">
+          <img src="/brand/high-agency-mark.svg" alt="" />
+        </Link>
+        <div className="topbar__right">
+          <Hud profile={profile} />
+          <button type="button" className="topbar__you" onClick={() => setYouEdit(true)} aria-label="Your card">
+            <Avatar name={profile.name} />
+          </button>
+        </div>
+      </header>
+      <main>{children}</main>
+      {you && <ProfileSheet uid={uid} profile={profile} onClose={close} />}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+
 function Shell({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const pathname = usePathname();
-  // Only the invite-only mentor signup renders bare — the rest of /mentor/*
-  // is the mentor's app and wants the shell around it. `/login/verify` is bare
-  // for the same reason as `/login`: it completes sign-in and may run mentor
-  // onboarding, and the shell must not wrap either (it would appear mid-flow,
-  // the moment the magic link resolves a user).
+  // Sign-in, onboarding and the invite-only mentor signup render bare: each
+  // completes a flow the shell would otherwise appear in the middle of.
   const bare =
     pathname === "/login" ||
     pathname === "/login/verify" ||
     pathname === "/onboarding" ||
     pathname === "/mentor/join";
 
-  if (bare || !user) return <main>{children}</main>;
+  if (bare || !user || !profile) return <main>{children}</main>;
+
+  if (profile.role === "mentor") {
+    return (
+      <div className="shell">
+        <Rail />
+        <div className="shell__main">
+          <MentorTopBar />
+          <main>{children}</main>
+        </div>
+        <TabBar />
+      </div>
+    );
+  }
 
   return (
-    <div className="shell">
-      <Rail />
-      <div className="shell__main">
-        <TopBar />
-        <main>{children}</main>
-      </div>
-      <TabBar />
-    </div>
+    <OperatorShell uid={user.uid} profile={profile}>
+      {children}
+    </OperatorShell>
   );
 }
 

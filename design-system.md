@@ -1,3 +1,12 @@
+> **Revision note (2026-09-03) — Season 1.** The `.path` quest spine is now an
+> **accordion** on a single operator page (one step open at a time, the current
+> step open by default); `.locked` means *not started*, not gated — nothing on the
+> track is gated. `.path__form` / `.path__queue*` / `.path__state--ok|--warn` are
+> live again for proof submission and review. Operators have **no rail and no tab
+> bar**: the top bar (brand · flame · avatar → card sheet) is their only chrome.
+> XP, levels and squad cards are gone; anything below that mentions them is
+> historical.
+
 # High Agency — Design System
 
 **"Operator OS v2 · Arcade Paper"** — a game console for shipping real things.

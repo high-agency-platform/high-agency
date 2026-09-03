@@ -1,6 +1,6 @@
-// Dev-only: remove the artifacts created while smoke-testing the platform
-// (test cohort + subdocs, test profiles/privateProfiles, and the test
-// email/password accounts). Run: node scripts/cleanup-test.js <cohortId>
+// Dev-only: remove the artifacts created while smoke-testing the platform —
+// the test accounts, their profiles/privateProfiles, their proof under the
+// season, and their feed lines. Run: node scripts/cleanup-test.js
 const { getAccessToken } = require("./fb-token");
 
 const PROJECT = "highagency-62e67";
@@ -13,7 +13,6 @@ const TEST_EMAILS = [
 ];
 
 async function main() {
-  const cohortId = process.argv[2];
   const token = await getAccessToken();
   const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
 
@@ -22,46 +21,43 @@ async function main() {
     console.log(res.ok ? "deleted" : "skip", path);
   }
 
-  async function listIds(path) {
-    const res = await fetch(`${BASE}/${path}?pageSize=100`, { headers });
+  async function listDocs(path) {
+    const res = await fetch(`${BASE}/${path}?pageSize=300`, { headers });
     if (!res.ok) return [];
     const json = await res.json();
-    return (json.documents ?? []).map((d) => d.name.split("/").pop());
+    return (json.documents ?? []).map((d) => ({
+      id: d.name.split("/").pop(),
+      uid: d.fields?.uid?.stringValue,
+    }));
   }
 
-  if (cohortId) {
-    for (const sub of ["goals", "applications", "submissions", "logs"]) {
-      for (const id of await listIds(`cohorts/${cohortId}/${sub}`))
-        await del(`cohorts/${cohortId}/${sub}/${id}`);
-    }
-    await del(`cohorts/${cohortId}`);
+  async function listSeasons() {
+    const res = await fetch(`${BASE}/seasons?pageSize=50`, { headers });
+    if (!res.ok) return [];
+    return ((await res.json()).documents ?? []).map((d) => d.name.split("/").pop());
   }
 
   // find the test users by email and remove their docs + accounts
   const lookup = await fetch(
     `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:query`,
-    {
-      method: "POST",
-      headers,
-      body: JSON.stringify({ expression: [], limit: "50" }),
-    }
+    { method: "POST", headers, body: JSON.stringify({ expression: [], limit: "50" }) }
   );
-  const users = ((await lookup.json()).userInfo ?? []).filter((u) =>
-    TEST_EMAILS.includes(u.email)
-  );
+  const users = ((await lookup.json()).userInfo ?? []).filter((u) => TEST_EMAILS.includes(u.email));
+  const seasons = await listSeasons();
   for (const u of users) {
     await del(`profiles/${u.localId}`);
     await del(`privateProfiles/${u.localId}`);
-    // their pending/decided applications on seed cohorts
-    const seeds = await listIds("cohorts");
-    for (const c of seeds) await del(`cohorts/${c}/applications/${u.localId}`);
+    for (const sid of seasons) {
+      for (const row of await listDocs(`seasons/${sid}/submissions`)) {
+        if (row.uid === u.localId || row.id.startsWith(`${u.localId}__`)) await del(`seasons/${sid}/submissions/${row.id}`);
+      }
+    }
+    for (const row of await listDocs("buildLogs")) {
+      if (row.uid === u.localId) await del(`buildLogs/${row.id}`);
+    }
     const res = await fetch(
       `https://identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:delete`,
-      {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ localId: u.localId }),
-      }
+      { method: "POST", headers, body: JSON.stringify({ localId: u.localId }) }
     );
     console.log(res.ok ? "deleted account" : "account delete failed", u.email);
   }

@@ -5,9 +5,10 @@
 
 import { getFirebaseAuth } from "./firebase";
 import type { WorkshopWire } from "./workshopServer";
-import type { ConfirmWire } from "./checkinServer";
+import type { SeasonWire, SubmitWire, ReviewWire } from "./seasonServer";
+import type { SubmissionStatus } from "./types";
 
-export type { WorkshopWire };
+export type { WorkshopWire, SeasonWire, SubmitWire, ReviewWire };
 
 async function authed<T>(path: string, init: RequestInit = {}): Promise<{ ok: boolean; status: number; data: T }> {
   const user = getFirebaseAuth().currentUser;
@@ -69,33 +70,50 @@ export async function leaveWorkshop(id: string): Promise<SeatResult> {
   return r.data.status;
 }
 
-/* ---------------- Streak actions ---------------- */
+/* ---------------- The season ---------------- */
 
-/** One line to the squad's build log. The server writes the log and the
- *  streak together; the live profile listener moves the flame. */
-export async function postBuildLog(cohortId: string, text: string): Promise<void> {
-  const r = await authed<{ error?: string }>("/api/build-log", {
-    method: "POST",
-    body: JSON.stringify({ cohortId, text }),
-  });
-  if (!r.ok) throw new Error(r.data.error ?? "failed");
-}
-
-/** "We met" — once per ISO week per squad, counts the day for the caller. */
-export async function markRitual(cohortId: string): Promise<void> {
-  const r = await authed<{ error?: string }>("/api/ritual", {
-    method: "POST",
-    body: JSON.stringify({ cohortId }),
-  });
-  if (!r.ok) throw new Error(r.data.error ?? "failed");
-}
-
-/* ---------------- Check-ins ---------------- */
-
-export async function confirmCheckIn(input: ConfirmWire): Promise<{ calendar: "linked" | "manual" }> {
-  const r = await authed<{ calendar: "linked" | "manual"; error?: string }>("/api/checkins/confirm", {
+/** Create or save the shared season. Throws with the server's code:
+ *  "stale-write" (someone saved first — reload) or
+ *  "milestone-has-submissions" (a removed step already has proof). */
+export async function saveSeason(input: SeasonWire): Promise<{ id: string; updatedAt: number }> {
+  const r = await authed<{ id: string; updatedAt: number; error?: string }>("/api/season", {
     method: "POST",
     body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(r.data.error ?? "failed");
+  return r.data;
+}
+
+/* ---------------- Proof (streak action) ---------------- */
+
+export async function submitProof(
+  input: SubmitWire
+): Promise<{ status: SubmissionStatus; attempt: number; streak: number }> {
+  const r = await authed<{ status: SubmissionStatus; attempt: number; streak: number; error?: string }>(
+    "/api/submissions",
+    { method: "POST", body: JSON.stringify(input) }
+  );
+  if (!r.ok) throw new Error(r.data.error ?? "failed");
+  return r.data;
+}
+
+export async function reviewProof(input: ReviewWire): Promise<{ status: SubmissionStatus }> {
+  const r = await authed<{ status: SubmissionStatus; error?: string }>("/api/submissions/review", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(r.data.error ?? "failed");
+  return r.data;
+}
+
+/* ---------------- Build log (streak action) ---------------- */
+
+/** One line to the season feed. The server writes the log and the streak
+ *  together; the live profile listener moves the flame. */
+export async function postBuildLog(text: string): Promise<{ streak: number; day: string }> {
+  const r = await authed<{ streak: number; day: string; error?: string }>("/api/build-log", {
+    method: "POST",
+    body: JSON.stringify({ text }),
   });
   if (!r.ok) throw new Error(r.data.error ?? "failed");
   return r.data;

@@ -69,7 +69,7 @@ export const PROFILES = "profiles";
 /**
  * Firestore cannot query for an ABSENT field, and "never synced" is exactly
  * that. So a reconcile reads a bounded page of each collection and decides in
- * memory — the same trade-off the unassigned-squads sweep makes. Batch 1 is a
+ * memory — a deliberate trade-off. Batch 1 is a
  * few dozen records; if either collection ever outgrows this the summary says
  * `truncated` rather than silently syncing a subset.
  */

@@ -142,12 +142,12 @@ function ConsentBody({
         <h1 className="h2">Approve {state.childName} to join High Agency</h1>
         <p className="lead consent__lead">
           {state.childName} signed up for High Agency — a live cohort program where
-          ambitious young people (13–18) build real projects together in small,
-          mentored squads. Because they&apos;re under 18, we need your approval
-          before they can join a squad and take part in the community.
+          ambitious young people (13–18) build real projects together, walking
+          a mentor-written track. Because they&apos;re under 18, we need your approval
+          before they can post work and take part in the community.
         </p>
         <ul className="consent__list">
-          <li>Join a small accountability squad of other young builders.</li>
+          <li>Post proof of work that other members of the program can see.</li>
           <li>Work through real-world milestones — ship a project, get first users.</li>
           <li>Attend live expert workshops. Free for the founding batch.</li>
         </ul>
