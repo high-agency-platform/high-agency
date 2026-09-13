@@ -19,6 +19,7 @@ import {
   type ReferralCounter,
 } from "./referral";
 import { marketingConsentFields } from "./marketingConsent";
+import { applicationsClosed, APPLICATIONS_CLOSED_MESSAGE } from "./applicationWindow";
 
 // Applicants notionally ahead of #1, so early queue numbers don't read
 // "#1, #2" while the founding batch fills. Set to 0 for a true raw count.
@@ -242,6 +243,7 @@ export async function submitApplication(
   /** Raw `?ref=` value; anything that isn't a well-formed code is ignored. */
   referredByRaw = ""
 ): Promise<ApplicationRecord> {
+  if (applicationsClosed()) throw new Error(APPLICATIONS_CLOSED_MESSAGE);
   const db = getDb();
   const referredBy = normalizeReferralCode(referredByRaw);
 
@@ -258,14 +260,12 @@ export async function submitApplication(
         ts: Date.now(),
       };
     } catch (err) {
+      if (applicationsClosed()) throw new Error(APPLICATIONS_CLOSED_MESSAGE);
       if (err instanceof CodeCollision && attempt < CODE_ATTEMPTS - 1) continue;
 
       // The referral collection is newer than the rest of this write path, so
-      // the one failure worth surviving is a ruleset that predates it: without
-      // this, a rules file that hasn't been deployed yet would turn every
-      // application into a local-only fallback record. Drop the referral half
-      // and keep the signup — the success screen already hides the share block
-      // when there's no code behind it.
+      // a ruleset that predates it can reject the referral half. Retry without
+      // referrals; the application's deadline rule still applies.
       if (isPermissionDenied(err)) {
         console.warn(
           "[waitlist] referral write denied — is firestore.rules deployed? " +

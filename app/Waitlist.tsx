@@ -6,15 +6,15 @@ import Counter from "./components/Counter";
 import Marquee from "./components/Marquee";
 import Faq from "./components/Faq";
 import ApplyModal from "./components/ApplyModal";
-import { CheckIcon, FlameIcon, SquadIcon, ZapIcon } from "./components/ui";
+import LearningGraphic from "./components/LearningGraphic";
 import AsciiCanvas from "./components/ascii/AsciiCanvas";
-import VideoAscii from "./components/ascii/VideoAscii";
-import rocketLaunch from "./components/ascii/programs/rocketLaunch";
+import HeroLaunch from "./components/HeroLaunch";
 import waitingRoom from "./components/ascii/programs/waitingRoom";
-import trajectory from "./components/ascii/programs/trajectory";
 import engineBurn from "./components/ascii/programs/engineBurn";
 import { PLATFORM_ENABLED } from "./lib/flags";
 import { fetchReferralCounter } from "./lib/firebase";
+import { APPLICATION_DEADLINE_ISO } from "./lib/applicationWindow";
+import { useApplicationsClosed } from "./lib/useApplicationsClosed";
 import {
   REFERRAL_JUMP,
   REFERRAL_PARAM,
@@ -130,11 +130,21 @@ function ReferralBanner({ code, staff }: IncomingReferral) {
 function CaptureForm({
   label,
   onApply,
+  closed,
+  applied,
 }: {
   label: string;
   onApply: (email: string) => void;
+  closed: boolean;
+  applied: boolean;
 }) {
   const [email, setEmail] = useState("");
+  if (applied) {
+    return <button className="btn btn--ghost" onClick={() => onApply("")}>View application</button>;
+  }
+  if (closed) {
+    return <p className="application-closed" role="status">Applications are closed <span>Online kickoff · September 21</span></p>;
+  }
   return (
     <form
       className="capture"
@@ -164,7 +174,8 @@ function CaptureForm({
   );
 }
 
-export default function Waitlist() {
+export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean }) {
+  const closed = useApplicationsClosed(initiallyClosed);
   const [modalOpen, setModalOpen] = useState(false);
   const [prefillEmail, setPrefillEmail] = useState("");
   const [justApplied, setJustApplied] = useState(false);
@@ -185,12 +196,21 @@ export default function Waitlist() {
     setModalOpen(true);
   }, []);
 
-  const applyLabel = applied ? "Applied" : "Apply";
+  const applyLabel = applied ? "View application" : closed ? "Applications closed" : "Apply";
+  const captureStatus = { closed, applied };
 
   return (
     <>
       {/* ===================== NAV ===================== */}
       <header className="nav">
+        <aside className="announcements" aria-label="Application dates">
+          <p className="announcements__item">
+            {closed ? <>Applications for Founding Batch 01 are closed.</> : <>
+              Applications close <time dateTime={APPLICATION_DEADLINE_ISO}><strong>September 14 · 7 PM ET</strong></time><span className="announcements__firm">. No extensions.</span>
+            </>}
+          </p>
+          <p className="announcements__item announcements__item--second">Official kickoff (online) is September 21st.</p>
+        </aside>
         <div className="wrap nav__inner">
           <a className="brand" href="#top">
             <span className="brand__mark" />
@@ -206,8 +226,9 @@ export default function Waitlist() {
             <button
               className="btn btn--primary nav__cta"
               onClick={() => openModal()}
+              disabled={closed && !applied}
             >
-              {applyLabel}
+              {closed && !applied ? "Closed" : applyLabel}
             </button>
           </nav>
         </div>
@@ -216,15 +237,7 @@ export default function Waitlist() {
       <main id="top">
         {/* ===================== HERO ===================== */}
         <section className="hero hero--launch">
-          {/* Generative launch loop. If a licensed clip exists at
-              /public/video/launch.mp4 it plays as luminance-mapped ASCII;
-              otherwise the procedural rocketLaunch program runs. */}
-          <VideoAscii
-            src="/video/launch.mp4"
-            fallback={rocketLaunch}
-            className="hero__ascii"
-          />
-          <div className="wrap">
+          <div className="wrap hero__grid">
             <div className="hero__copy">
               <Reveal className="eyebrow hero__tag">
                 <span className="dot" />
@@ -236,16 +249,17 @@ export default function Waitlist() {
                 You weren&apos;t built to wait.
               </Reveal>
               <Reveal as="p" className="lead hero__sub" d={2}>
-                Empowering teens who&apos;d rather <b>build</b>.
+                Teaching what schools can&apos;t.
               </Reveal>
               <Reveal d={2}>
-                <CaptureForm label="Request access" onApply={openModal} />
+                <CaptureForm label="Request access" onApply={openModal} {...captureStatus} />
               </Reveal>
-              <Reveal className="capture__note" d={3}>
+              {!closed && <Reveal className="capture__note" d={3}>
                 <span><b>By application</b> · Free · Ages 13–19</span>
-              </Reveal>
-              <ReferralBanner {...incoming} />
+              </Reveal>}
+              {!closed && <ReferralBanner {...incoming} />}
             </div>
+            <HeroLaunch />
           </div>
         </section>
 
@@ -299,144 +313,48 @@ export default function Waitlist() {
         <div className="divider" />
 
         {/* ===================== WHAT YOU JOIN ===================== */}
-        <section className="section section--chart" id="system">
-          <AsciiCanvas
-            program={trajectory}
-            cell={13}
-            className="chart__ascii"
-          />
-          <div className="wrap">
+        <section className="section" id="system" aria-labelledby="mentorship-heading">
+          <div className="wrap value-section">
             <div className="shead">
-              <Reveal className="eyebrow eyebrow--accent">
-                <span className="dot" />
-                What you join
+              <Reveal className="eyebrow eyebrow--accent">What you join</Reveal>
+              <Reveal as="h2" className="h2" id="mentorship-heading" d={1}>
+                A direct line<br />
+                <span className="accent">to great mentors.</span>
               </Reveal>
-              <Reveal as="h2" className="h2" d={1}>
-                Not school. A launchpad.
-              </Reveal>
-            </div>
-
-            <div className="loop">
-              <Reveal as="article" className="tile loop__card" d={1}>
-                <span className="loop__n">
-                  <SquadIcon size={20} />
-                </span>
-                <h3 className="h3">Your squad</h3>
-                <p>3–8 builders, one weekly ritual. They notice when you ghost.</p>
-              </Reveal>
-
-              <Reveal as="article" className="tile loop__card" d={2}>
-                <span className="loop__n">
-                  <CheckIcon size={20} />
-                </span>
-                <h3 className="h3">Real milestones</h3>
-                <p>Ship an MVP, land users, get paid — verified by a human, never a quiz.</p>
-              </Reveal>
-
-              <Reveal as="article" className="tile loop__card" d={3}>
-                <span className="loop__n">
-                  <ZapIcon size={20} />
-                </span>
-                <h3 className="h3">Live mentors</h3>
-                <p>Workshops and office hours with operators who&apos;ve done it.</p>
+              <Reveal as="p" className="lead" d={2}>
+                Direct access to operators leading Fortune 500 companies
+                and scaling startups. Bring your questions.
               </Reveal>
             </div>
+            <Reveal d={2}><LearningGraphic kind="mentorship" /></Reveal>
           </div>
         </section>
 
         <div className="divider" />
 
         {/* ===================== HOW IT WORKS ===================== */}
-        <section className="section">
-          <div className="wrap how">
+        <section className="section" id="how-you-learn" aria-labelledby="learning-heading">
+          <div className="wrap value-section value-section--build">
             <div>
-              <div className="shead" style={{ marginBottom: 24 }}>
+              <div className="shead">
                 <Reveal className="eyebrow">
-                  <span className="dot" />
-                  The loop
+                  How you learn
                 </Reveal>
-                <Reveal as="h2" className="h2" d={1}>
-                  Ambition in.
-                  <br />
-                  Momentum out.
+                <Reveal as="h2" className="h2" id="learning-heading" d={1}>
+                  Learn it.<br />
+                  <span className="accent">Build with it.</span>
                 </Reveal>
                 <Reveal as="p" className="lead" d={2}>
-                  A track your mentor writes for your squad. Every step is a
-                  real-world win — and the only score is the streak you keep by shipping.
+                  Build something real, with a mentor in your corner.
+                  Try it. Get feedback. Make it better.
                 </Reveal>
               </div>
               <Reveal d={2}>
-                <CaptureForm label={applyLabel} onApply={openModal} />
+                <CaptureForm label={applyLabel} onApply={openModal} {...captureStatus} />
               </Reveal>
             </div>
 
-            {/* the actual product visual: a quest path */}
-            <Reveal className="tile demo-path" d={2} aria-hidden="true">
-              <div className="micro">
-                <span>The Ignition Track</span>
-                <span className="live">
-                  <span className="blip" />
-                  live
-                </span>
-              </div>
-              <div className="path">
-                <div className="path__item done">
-                  <span className="path__node"><CheckIcon size={18} /></span>
-                  <div className="path__body">
-                    <div className="path__top">
-                      <span className="path__name">Mission locked</span>
-                      <span className="path__count">week 1</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="path__item done">
-                  <span className="path__node"><CheckIcon size={18} /></span>
-                  <div className="path__body">
-                    <div className="path__top">
-                      <span className="path__name">20 cold asks out</span>
-                      <span className="path__count">week 2</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="path__item active">
-                  <span className="path__node">3</span>
-                  <div className="path__body">
-                    <div className="path__top">
-                      <span className="path__name">MVP live</span>
-                      <div className="path__meta">
-                        <span className="badge badge--earned">you are here</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="path__item locked">
-                  <span className="path__node">4</span>
-                  <div className="path__body">
-                    <div className="path__top">
-                      <span className="path__name">First users</span>
-                      <span className="path__count">locked</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="path__item locked">
-                  <span className="path__node">5</span>
-                  <div className="path__body">
-                    <div className="path__top">
-                      <span className="path__name">First revenue</span>
-                      <span className="path__count">locked</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 14, flexWrap: "wrap" }}>
-                <span className="hud__stat hud__stat--fire">
-                  <FlameIcon size={14} /> 12
-                </span>
-                <span className="badge badge--earned">
-                  <CheckIcon size={11} /> verified by a human
-                </span>
-              </div>
-            </Reveal>
+            <Reveal d={2}><LearningGraphic kind="build" /></Reveal>
           </div>
         </section>
 
@@ -516,20 +434,20 @@ export default function Waitlist() {
               <div className="final__inner">
                 <Reveal className="eyebrow eyebrow--accent">
                   <span className="dot" />
-                  Applications open
+                  {closed ? "Founding Batch 01" : "Applications open"}
                 </Reveal>
                 <Reveal as="h2" className="h2" d={1}>
-                  Ambition is the only prerequisite.
+                  {closed ? "Applications are closed." : "Ambition is the only prerequisite."}
                 </Reveal>
                 <Reveal as="p" className="lead" d={2}>
-                  Stop rehearsing. Start building.
+                  {closed ? "Thank you for your interest. The online kickoff is September 21." : "Stop rehearsing. Start building."}
                 </Reveal>
                 <Reveal d={2}>
-                  <CaptureForm label="Apply now" onApply={openModal} />
+                  {(!closed || applied) && <CaptureForm label="Apply now" onApply={openModal} {...captureStatus} />}
                 </Reveal>
-                <Reveal className="capture__note" d={3}>
+                {!closed && <Reveal className="capture__note" d={3}>
                   <span><b>By application</b> · Free</span>
-                </Reveal>
+                </Reveal>}
               </div>
               <div className="final__pad" aria-hidden="true">
                 <AsciiCanvas
@@ -557,15 +475,15 @@ export default function Waitlist() {
               <a href="#problem">Problem</a>
               <a href="#system">What you join</a>
               <a href="#faq">FAQ</a>
-              <a
+              {closed && !applied ? <span>Applications closed</span> : <a
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
                   openModal();
                 }}
               >
-                Apply
-              </a>
+                {applyLabel}
+              </a>}
               <a href="/privacy">Privacy</a>
               <a href="/terms">Terms</a>
             </div>
@@ -576,6 +494,7 @@ export default function Waitlist() {
 
       <ApplyModal
         open={modalOpen}
+        closed={closed}
         prefillEmail={prefillEmail}
         referredBy={incoming.code}
         onClose={() => setModalOpen(false)}

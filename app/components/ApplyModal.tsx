@@ -11,6 +11,7 @@ import {
   MARKETING_CONSENT_LABEL,
 } from "../lib/marketingConsent";
 import ReferralShare from "./ReferralShare";
+import { applicationsClosed, APPLICATIONS_CLOSED_MESSAGE } from "../lib/applicationWindow";
 
 const STORAGE_KEY = "ha_application";
 // Founding Batch 01 targets high-school operators — collect exact age 12–18.
@@ -118,6 +119,7 @@ function WordField({
 
 interface ApplyModalProps {
   open: boolean;
+  closed: boolean;
   prefillEmail?: string;
   /** Referral code this visitor arrived on, "" when they came in cold. */
   referredBy?: string;
@@ -127,6 +129,7 @@ interface ApplyModalProps {
 
 export default function ApplyModal({
   open,
+  closed,
   prefillEmail,
   referredBy = "",
   onClose,
@@ -172,10 +175,10 @@ export default function ApplyModal({
    *  accidental close doesn't cost anyone a half-written application. Doing it
    *  here rather than in an open-effect keeps state moves in event handlers. */
   const close = useCallback(() => {
-    setStep(restored ? 5 : 1);
+    setStep(result ? 5 : 1);
     setErr("");
     onClose();
-  }, [onClose, restored]);
+  }, [onClose, result]);
 
   // Open / close side-effects: lock scroll, manage focus.
   useEffect(() => {
@@ -210,6 +213,10 @@ export default function ApplyModal({
   useEffect(() => {
     if (cardRef.current) cardRef.current.scrollTop = 0;
   }, [step]);
+
+  useEffect(() => {
+    if (open && closed && !result && !busy) cardRef.current?.focus();
+  }, [open, closed, result, busy]);
 
   const back = useCallback((to: number) => {
     setErr("");
@@ -289,21 +296,9 @@ export default function ApplyModal({
       setStep(5);
       onApplied();
     } catch {
-      // Network/permission failure: still log the application locally so the
-      // operator isn't blocked, and surface a soft note.
-      const fallback: ApplicationRecord = {
-        ...input,
-        opId: "HA-" + String(Math.floor(Math.random() * 900) + 100),
-        queuePos: Math.floor(Math.random() * 40) + 47,
-        submitted: true,
-        ts: Date.now(),
-      };
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
-      } catch {}
-      setResult(fallback);
-      setStep(5);
-      onApplied();
+      setSubmitErr(applicationsClosed()
+        ? APPLICATIONS_CLOSED_MESSAGE
+        : "Your application could not be saved. Your answers are still here. Please try again before September 14 at 7 PM ET.");
     } finally {
       setBusy(false);
     }
@@ -323,6 +318,7 @@ export default function ApplyModal({
   ]);
 
   if (!open) return null;
+  const displayStep = result ? 5 : closed && !busy ? 0 : step;
 
   return (
     <div
@@ -333,22 +329,31 @@ export default function ApplyModal({
       aria-labelledby="modalTitle"
     >
       <div className="modal__scrim" onClick={close} />
-      <div className="modal__card" ref={cardRef}>
+      <div className="modal__card" ref={cardRef} tabIndex={-1}>
         <button className="modal__close" onClick={close} aria-label="Close">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
-        <div className="modal__progress">
-          <span className={step >= 1 ? "on" : ""} />
-          <span className={step >= 2 ? "on" : ""} />
-          <span className={step >= 3 ? "on" : ""} />
-          <span className={step >= 4 ? "on" : ""} />
-          <span className={step >= 5 ? "on" : ""} />
-        </div>
+        {displayStep > 0 && <div className="modal__progress">
+          <span className={displayStep >= 1 ? "on" : ""} />
+          <span className={displayStep >= 2 ? "on" : ""} />
+          <span className={displayStep >= 3 ? "on" : ""} />
+          <span className={displayStep >= 4 ? "on" : ""} />
+          <span className={displayStep >= 5 ? "on" : ""} />
+        </div>}
+
+        {displayStep === 0 && (
+          <div className="modal__step active" role="status">
+            <p className="eyebrow eyebrow--accent">Founding Batch 01</p>
+            <h3 id="modalTitle">Applications are closed.</h3>
+            <p className="modal__sub">{APPLICATIONS_CLOSED_MESSAGE} The online kickoff is September 21.</p>
+            <button className="btn btn--ghost" onClick={close}>Close</button>
+          </div>
+        )}
 
         {/* step 1 — the basics */}
-        {step === 1 && (
+        {displayStep === 1 && (
           <div className="modal__step active">
             <h3 id="modalTitle">Request access.</h3>
             <p className="modal__sub">Founding Batch 01. Takes five minutes.</p>
@@ -416,9 +421,9 @@ export default function ApplyModal({
         )}
 
         {/* step 2 — the build */}
-        {step === 2 && (
+        {displayStep === 2 && (
           <div className="modal__step active">
-            <h3>The build.</h3>
+            <h3 id="modalTitle">The build.</h3>
             <p className="modal__sub">Be real. Drive reads louder than polish.</p>
             <WordField
               id="m-build"
@@ -452,9 +457,9 @@ export default function ApplyModal({
         )}
 
         {/* step 3 — the proof */}
-        {step === 3 && (
+        {displayStep === 3 && (
           <div className="modal__step active">
-            <h3>The proof.</h3>
+            <h3 id="modalTitle">The proof.</h3>
             <p className="modal__sub">Show what you moved, not what you know.</p>
             <WordField
               id="m-impact"
@@ -488,9 +493,9 @@ export default function ApplyModal({
         )}
 
         {/* step 4 — the road */}
-        {step === 4 && (
+        {displayStep === 4 && (
           <div className="modal__step active">
-            <h3>The road.</h3>
+            <h3 id="modalTitle">The road.</h3>
             <p className="modal__sub">Last one. No right answer here.</p>
             <WordField
               id="m-plan"
@@ -520,7 +525,7 @@ export default function ApplyModal({
               </span>
             </label>
             <div className={`modal__err${err ? " show" : ""}`}>{err}</div>
-            {submitErr && <div className="modal__err show">{submitErr}</div>}
+            {submitErr && <div className="modal__err show" role="alert">{submitErr}</div>}
             <div className="modal__actions">
               <button
                 className="btn btn--ghost modal__back"
@@ -541,7 +546,7 @@ export default function ApplyModal({
         )}
 
         {/* step 5, success */}
-        {step === 5 && (
+        {displayStep === 5 && (
           <div className="modal__step active">
             <div className="success">
               <div className="success__seal">
@@ -556,17 +561,14 @@ export default function ApplyModal({
                   <path d="M5 12l5 5L19 7" />
                 </svg>
               </div>
-              <h3>Application logged.</h3>
+              <h3 id="modalTitle">Application logged.</h3>
               <p className="modal__sub" style={{ marginBottom: 0 }}>
                 You&apos;re in the queue. If it&apos;s a fit, we&apos;ll reach out.
               </p>
               <div className="success__id">
                 OPERATOR ID · <b>{result?.opId ?? "HA-000"}</b>
               </div>
-              {/* The offline fallback record has no counter document behind
-                  it, so there is no link worth sharing — show the plain queue
-                  number instead of a code that would credit nobody. */}
-              {result?.referralCode ? (
+              {!closed && result?.referralCode ? (
                 <ReferralShare
                   code={result.referralCode}
                   fallbackPos={result.queuePos}
