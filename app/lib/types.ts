@@ -105,6 +105,8 @@ export interface Profile {
   uid: string;
   /** Display name, always "First L." — built at signup, never the full name. */
   name: string;
+  /** Optional 128px photo, re-encoded locally as a raster data URL (≤40 KB). */
+  photoUrl?: string;
   ageBand: AgeBand;
   country: string;
   /** IANA timezone derived from the browser at signup, used for matching. */
@@ -364,6 +366,21 @@ export interface Workshop {
 export const WORKSHOP_MIN_CAPACITY = 2;
 export const WORKSHOP_MAX_CAPACITY = 200;
 export const WORKSHOP_DEFAULT_CAPACITY = 15;
+
+/** A Google Calendar draft, using UTC instants so DST never shifts a session. */
+export function workshopCalendarUrl(w: Workshop): string {
+  const start = w.startsAt.toDate();
+  const end = new Date(start.getTime() + w.durationMins * 60_000);
+  const stamp = (d: Date) => d.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: w.title,
+    dates: `${stamp(start)}/${stamp(end)}`,
+    details: [w.description, `Hosted by ${w.mentorName}`, w.meetLink].filter(Boolean).join("\n\n"),
+    location: w.meetLink,
+  });
+  return `https://calendar.google.com/calendar/render?${params}`;
+}
 
 /** Seat math, tolerant of legacy docs. `capacity: undefined` (pre-capacity
  *  seeds) reads as uncapped so nothing crashes and nobody is locked out. */

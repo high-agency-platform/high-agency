@@ -79,11 +79,12 @@ export async function getProfile(uid: string): Promise<Profile | null> {
 
 export function watchProfile(
   uid: string,
-  cb: (p: Profile | null) => void
+  cb: (p: Profile | null) => void,
+  onError?: ListenerErrorHandler
 ): Unsubscribe {
   return onSnapshot(doc(getDb(), "profiles", uid), (snap) => {
     cb(snap.exists() ? normalizeProfile(uid, snap.data()) : null);
-  }, listenerError(`profiles/${uid}`));
+  }, listenerError(`profiles/${uid}`, onError));
 }
 
 export async function saveProfile(

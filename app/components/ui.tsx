@@ -4,6 +4,8 @@
    All icons are inline SVG, stroke 2.2, currentColor (see design-system.md). */
 
 import type { Profile } from "../lib/types";
+import Image from "next/image";
+import { useState } from "react";
 import { localDay } from "../lib/streaks";
 
 type IconProps = { size?: number; filled?: boolean };
@@ -135,10 +137,13 @@ export function Hud({ profile, col = false }: { profile: Profile; col?: boolean 
   );
 }
 
-export function Avatar({ name, size }: { name: string; size?: "sm" | "lg" }) {
+export function Avatar({ name, photoUrl, size }: { name: string; photoUrl?: string; size?: "sm" | "lg" }) {
+  const [failedPhoto, setFailedPhoto] = useState<string | null>(null);
   return (
     <span className={`av ${size ? `av--${size}` : ""}`} aria-hidden="true">
-      {(name || "?").slice(0, 1)}
+      {photoUrl !== failedPhoto && photoUrl?.match(/^data:image\/(webp|jpeg);base64,/) ? (
+        <Image className="av__photo" src={photoUrl} width={128} height={128} alt="" unoptimized onError={() => setFailedPhoto(photoUrl)} />
+      ) : (name || "?").slice(0, 1)}
     </span>
   );
 }

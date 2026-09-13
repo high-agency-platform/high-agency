@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import type { Profile, Workshop } from "../lib/types";
-import { workshopSpots } from "../lib/types";
+import { workshopSpots, workshopCalendarUrl } from "../lib/types";
 import { CalendarIcon } from "./ui";
+import { MemberButton } from "./MemberButton";
 
 /** Seats left, shown everywhere a session renders. Silent when the session
  *  is uncapped (legacy docs only) or the viewer already holds a seat. */
@@ -14,12 +15,13 @@ export function SeatChip({ w }: { w: Workshop }) {
   return <span className="chip chip--want">{left} left</span>;
 }
 
-function dateParts(ts: { toDate: () => Date }): { day: string; mon: string; time: string } {
+function dateParts(ts: { toDate: () => Date }): { day: string; mon: string; weekday: string; time: string } {
   const d = ts.toDate();
   return {
     day: String(d.getDate()),
     mon: d.toLocaleDateString(undefined, { month: "short" }),
-    time: d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }),
+    weekday: d.toLocaleDateString(undefined, { weekday: "long" }),
+    time: d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit", timeZoneName: "short" }),
   };
 }
 
@@ -76,7 +78,7 @@ export function SessionAction({
   );
 }
 
-/** The enrollable session catalog (Learn page). */
+/** Upcoming sessions on the operator dashboard. */
 export function WorkshopList({
   workshops,
   profile,
@@ -92,33 +94,41 @@ export function WorkshopList({
     <div>
       {workshops.map((w) => {
         const enrolled = isEnrolled(w, profile);
-        const { day, mon, time } = dateParts(w.startsAt);
+        const { day, mon, weekday, time } = dateParts(w.startsAt);
+        const { left, full } = workshopSpots(w);
 
         return (
-          <div key={w.id} className="ses">
-            <div className={`ses__date ${enrolled ? "ses__date--live" : ""}`}>
-              <b>{day}</b>
-              <span>{mon}</span>
+          <article key={w.id} className="session-card">
+            <div className="session-card__when">
+              <div className={`ses__date ${enrolled ? "ses__date--live" : ""}`}>
+                <b>{day}</b>
+                <span>{mon}</span>
+              </div>
+              <div>
+                <span className="session-card__weekday">{weekday}</span>
+                <span className="session-card__time">{time} <span>· {w.durationMins} min</span></span>
+              </div>
             </div>
-            <div className="ses__body">
-              <span className="ses__title">
-                {w.title}
-                {!enrolled && <SeatChip w={w} />}
-                {enrolled && w.calendarEventId && (
-                  <span className="chip chip--why" title="Invite sent to your Google Calendar">
-                    <CalendarIcon size={12} /> on your calendar
-                  </span>
-                )}
+            <h3 className="session-card__title">{w.title}</h3>
+            <div className="session-card__mentor"><MemberButton uid={w.mentorUid} name={w.mentorName} /></div>
+            {w.description && (
+              <details className="more session-card__details">
+                <summary className="more__toggle">Session details</summary>
+                <div className="more__body"><p>{w.description}</p></div>
+              </details>
+            )}
+            <div className="session-card__footer">
+              <span className="session-card__seats">
+                {enrolled ? (
+                  "You're enrolled"
+                ) : !full && left !== null ? `${left} seats left` : null}
               </span>
-              <span className="ses__meta">
-                {time} · {w.durationMins}m · {w.mentorName}
-              </span>
-              {w.description && <p className="path__queue-note">{w.description}</p>}
+              <div className="ses__act">
+                <SessionAction w={w} profile={profile} onEnroll={onEnroll} onLeave={onLeave} />
+              </div>
             </div>
-            <div className="ses__act">
-              <SessionAction w={w} profile={profile} onEnroll={onEnroll} onLeave={onLeave} />
-            </div>
-          </div>
+            {enrolled && <a className="session-card__calendar" href={workshopCalendarUrl(w)} target="_blank" rel="noreferrer"><CalendarIcon size={16} /> Add to Google Calendar <span aria-hidden="true">↗</span></a>}
+          </article>
         );
       })}
     </div>

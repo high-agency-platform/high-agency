@@ -1,74 +1,89 @@
 "use client";
 
-/* Full public-profile overlay — the card a mentor reads from the roster or
-   the review queue. Renders only Profile fields (privacy-lean by
-   construction — never PrivateProfile data). */
-
+import { useEffect, useRef, type ReactNode } from "react";
 import type { Profile } from "../lib/types";
+import { normalizeLink } from "../lib/types";
 import { Avatar } from "./ui";
 
-export function ProfileModal({
-  profile,
-  onClose,
-}: {
-  profile: Profile;
-  onClose: () => void;
-}) {
+export function ProfileDialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const dialog = ref.current;
+    const overflow = document.body.style.overflow;
+    const previousFocus = document.activeElement;
+    dialog?.showModal();
+    document.body.style.overflow = "hidden";
+    return () => {
+      dialog?.close();
+      document.body.style.overflow = overflow;
+      if (previousFocus instanceof HTMLElement && previousFocus.isConnected) previousFocus.focus({ preventScroll: true });
+    };
+  }, []);
+
   return (
-    <div className="modal open" role="dialog" aria-modal="true">
-      <div className="modal__scrim" onClick={onClose} />
-      <div className="modal__card">
-        <button className="modal__close" onClick={onClose} aria-label="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
-          <Avatar name={profile.name} size="lg" />
-          <div>
-            <h3 style={{ marginBottom: 0 }}>{profile.name}</h3>
-            <span className="micro">
-              {profile.ageBand} · {profile.country} · {profile.stage}
-            </span>
-          </div>
-        </div>
-        {profile.headline && (
-          <p style={{ fontWeight: 700, marginBottom: 14 }}>{profile.headline}</p>
-        )}
+    <dialog ref={ref} className="profile-dialog" aria-label={title} onCancel={(e) => { e.preventDefault(); onClose(); }} onClick={(e) => {
+      if (e.target !== e.currentTarget) return;
+      const r = e.currentTarget.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) onClose();
+    }}>
+      <button type="button" className="modal__close" onClick={onClose} aria-label="Close">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M18 6L6 18M6 6l12 12" /></svg>
+      </button>
+      {children}
+    </dialog>
+  );
+}
+
+export function ProfileDetails({ profile }: { profile: Profile }) {
+  const mentor = profile.role === "mentor";
+  const links = [
+    { label: "Website", url: profile.links?.site },
+    { label: "LinkedIn", url: profile.links?.linkedin },
+    { label: "GitHub", url: profile.links?.github },
+  ].filter((link) => link.url?.trim());
+
+  return (
+    <article className="member-profile">
+      <header className="member-profile__header">
+        <Avatar name={profile.name} photoUrl={profile.photoUrl} size="lg" />
+        <span className="micro">{mentor ? "Mentor" : "Operator"}{profile.country ? ` · ${profile.country}` : ""}</span>
+        <h2>{profile.name}</h2>
+        {profile.headline && <p className="member-profile__headline">{profile.headline}</p>}
+      </header>
+      <div className="member-profile__body">
         {profile.building && (
-          <div className="field">
-            <label>Building</label>
-            <p className="muted" style={{ fontSize: 15 }}>{profile.building}</p>
+          <section>
+            <h3>{mentor ? "Working on" : "Building"}</h3>
+            <p>{profile.building}</p>
+            {!mentor && <span className="member-profile__stage">{{ idea: "Idea stage", building: "In progress", launched: "Launched", revenue: "Earning revenue" }[profile.stage]}</span>}
+          </section>
+        )}
+        {profile.bio && <section><h3>About</h3><p>{profile.bio}</p></section>}
+        {(profile.domains.length > 0 || profile.skills.length > 0) && (
+          <div className="member-profile__columns">
+            {profile.domains.length > 0 && <section><h3>{mentor ? "Expertise" : "Interests"}</h3><p>{profile.domains.join(" · ")}</p></section>}
+            {profile.skills.length > 0 && <section><h3>{mentor ? "Can help with" : "Skills"}</h3><p>{profile.skills.join(" · ")}</p></section>}
           </div>
         )}
         {profile.proofUrl && (
-          <div className="field">
-            <label>Proof</label>
-            <p style={{ fontSize: 15 }}>
-              <a href={profile.proofUrl} target="_blank" rel="noreferrer" className="link-btn">
-                {profile.proofUrl}
-              </a>
-              {profile.proofNote && <span className="muted"> — {profile.proofNote}</span>}
-            </p>
-          </div>
+          <section className="member-profile__work">
+            <h3>Selected work</h3>
+            {profile.proofNote && <p>{profile.proofNote}</p>}
+            <a className="link-btn" href={normalizeLink(profile.proofUrl)} target="_blank" rel="noreferrer">View work <span aria-hidden="true">↗</span></a>
+          </section>
         )}
-        <div className="field">
-          <label>Into</label>
-          <div className="chip-row">
-            {profile.skills.map((s) => (
-              <span key={s} className="chip">
-                {s}
-              </span>
-            ))}
-          </div>
-        </div>
-        {profile.bio && (
-          <div className="field">
-            <label>Bio</label>
-            <p className="muted" style={{ fontSize: 15 }}>{profile.bio}</p>
-          </div>
-        )}
+        {links.length > 0 && <nav className="member-profile__links" aria-label="Profile links">
+          {links.map((link) => <a key={link.label} href={normalizeLink(link.url ?? "")} target="_blank" rel="noreferrer">{link.label} <span aria-hidden="true">↗</span></a>)}
+        </nav>}
       </div>
-    </div>
+    </article>
+  );
+}
+
+export function ProfileModal({ profile, onClose }: { profile: Profile | null | undefined; onClose: () => void }) {
+  return (
+    <ProfileDialog title={profile ? `${profile.name}'s profile` : "Member profile"} onClose={onClose}>
+      {profile ? <ProfileDetails profile={profile} /> : <p className="empty" role="status">{profile === undefined ? "Loading profile…" : "This profile is unavailable."}</p>}
+    </ProfileDialog>
   );
 }

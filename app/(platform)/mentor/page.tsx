@@ -204,9 +204,9 @@ export default function MentorHomePage() {
           ) : (
             <div className="stack" style={{ gap: 10 }}>
               {roster.map(({ profile: p, progress, waiting }) => (
-                <button key={p.uid} type="button" className="mrow" onClick={() => setViewing(p)} style={{ width: "100%", textAlign: "left", background: "none", border: 0 }}>
+                <button key={p.uid} type="button" className="mrow" onClick={(e) => { e.currentTarget.focus(); setViewing(p); }} style={{ width: "100%", textAlign: "left", background: "none", border: 0 }}>
                   <span className="mrow__name" style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-                    <Avatar name={p.name} size="sm" />
+                    <Avatar name={p.name} photoUrl={p.photoUrl} size="sm" />
                     <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.name}</span>
                     {waiting > 0 && <span className="chip chip--on">{waiting} in review</span>}
                   </span>

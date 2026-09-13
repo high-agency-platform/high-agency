@@ -12,7 +12,8 @@
     "test:mentor": "firebase emulators:exec --only firestore --project highagency-62e67 \"tsx --test tests/mentorInvite.test.mts\"",
     "test:hubspot": "firebase emulators:exec --only firestore --project highagency-62e67 \"tsx --test tests/hubspot.test.mts\"",
     "test:staff": "firebase emulators:exec --only firestore --project highagency-62e67 \"tsx --test tests/staffReferrals.test.mts\"",
-    "test": "npm run test:rules && npm run test:referral && npm run test:consent && npm run test:mentor && npm run test:hubspot && npm run test:staff",
+    "test:calendar": "node --import tsx --test tests/calendarLink.test.mts",
+    "test": "npm run test:rules && npm run test:referral && npm run test:consent && npm run test:mentor && npm run test:hubspot && npm run test:staff && npm run test:calendar",
     "test:referral": "firebase emulators:exec --only firestore --project highagency-referral-test \"tsx --test tests/referral.test.mts tests/applicationWindow.test.mts\""
   },
   "dependencies": {

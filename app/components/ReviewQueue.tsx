@@ -10,7 +10,7 @@ import { useState } from "react";
 import type { Submission } from "../lib/types";
 import { REVIEW_NOTE_MAX } from "../lib/types";
 import { reviewProof } from "../lib/api";
-import { Avatar } from "./ui";
+import { MemberButton } from "./MemberButton";
 
 function fmtWhen(s: Submission): string {
   const d = s.updatedAt?.toDate();
@@ -30,14 +30,7 @@ export function ProofRow({
   return (
     <div className="path__queue-row">
       <div className="path__queue-who">
-        <Avatar name={sub.name} size="sm" />
-        {onName ? (
-          <button type="button" className="link-btn" onClick={() => onName(sub)}>
-            {sub.name}
-          </button>
-        ) : (
-          sub.name
-        )}
+        <MemberButton uid={sub.uid} name={sub.name} onClick={onName ? () => onName(sub) : undefined} />
         <a href={sub.proofUrl} target="_blank" rel="noreferrer">
           proof
         </a>

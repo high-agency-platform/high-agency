@@ -286,7 +286,7 @@ service cloud.firestore {
     function isValidProfile(data) {
       return hasOnlyAllowedFields(['uid', 'name', 'ageBand', 'country', 'timezone',
                'headline', 'building', 'stage', 'domains', 'skills',
-               'proofUrl', 'proofNote', 'hours', 'bio', 'links',
+               'proofUrl', 'proofNote', 'hours', 'bio', 'links', 'photoUrl',
                'consentStatus', 'consentEmailSentAt', 'plan', 'role',
                'streak', 'streakFreezes', 'lastActiveDay', 'lastBuildLogDay',
                'enrolledWorkshops',
@@ -302,6 +302,8 @@ service cloud.firestore {
                'streak', 'streakFreezes', 'lastActiveDay', 'updatedAt']) &&
              data.uid == request.auth.uid &&
              validString(data.name, 1, 80) &&
+             (!('photoUrl' in data) || (validString(data.photoUrl, 0, 40000) &&
+               (data.photoUrl == '' || data.photoUrl.matches('^data:image/(webp|jpeg);base64,[A-Za-z0-9+/]+={0,2}$')))) &&
              data.ageBand in ['13-15', '16-17', '18+'] &&
              validString(data.country, 1, 60) &&
              validString(data.timezone, 1, 60) &&

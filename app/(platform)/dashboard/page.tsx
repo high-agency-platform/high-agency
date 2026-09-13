@@ -1,10 +1,6 @@
 "use client";
 
-/* The operator's whole app, on one page. Reading order is the priority
-   order: where you are in the season → the daily move (ship one line) → the
-   weekly move (the track) → what's on (sessions) → the room (the feed).
-   Desktop puts the daily move, sessions and feed in a sticky column beside
-   the track; mobile stacks them in that same order. */
+/* One workspace: the track first, then sessions and shared updates. */
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,7 +17,8 @@ import {
 import { enrollWorkshop, leaveWorkshop } from "../../lib/api";
 import { seasonProgress } from "../../lib/types";
 import type { BuildLog, Season, Submission, Workshop } from "../../lib/types";
-import { Avatar, Bar, LockIcon } from "../../components/ui";
+import { Bar, LockIcon } from "../../components/ui";
+import { MemberButton } from "../../components/MemberButton";
 import { ConsentResend } from "../../components/ConsentResend";
 import { ShipLine } from "../../components/ShipLine";
 import { SeasonPath } from "../../components/Season";
@@ -127,35 +124,25 @@ export default function HomePage() {
   const progress = seasonProgress(season, mine);
 
   return (
-    <div className="screen">
-      {/* ---- Where you are ---- */}
-      <header className="screen__block">
+    <div className="screen dashboard">
+      <header className="dashboard__header">
         {season ? (
           <>
-            <span className="micro">
-              Season 1{season.category ? ` · ${season.category}` : ""}
-              {season.duration ? ` · ${season.duration}` : ""}
-            </span>
-            <h1 className="h1" style={{ marginTop: 4 }}>{season.name}</h1>
-            {progress.total > 0 && (
-              <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12, maxWidth: 560 }}>
-                <Bar value={progress.done / progress.total} />
-                <span className="num" style={{ whiteSpace: "nowrap" }}>
-                  {progress.done} / {progress.total}
-                </span>
-              </div>
-            )}
-            {(season.overview || season.outcome || season.tagline) && (
-              <details className="more" style={{ marginTop: 14, maxWidth: 720 }}>
-                <summary className="more__toggle">
-                  About this season
-                  <span className="more__hint">{season.tagline ? "" : "read"}</span>
-                </summary>
+            <div>
+              <span className="micro">Season 1</span>
+              <h1 className="h1">{season.name}</h1>
+            </div>
+            {(season.overview || season.outcome || season.tagline || season.category || season.duration) && (
+              <details className="more dashboard__about">
+                <summary className="more__toggle">Season guide</summary>
                 <div className="more__body">
-                  {season.tagline && <p style={{ fontWeight: 700 }}>{season.tagline}</p>}
+                  {(season.category || season.duration) && (
+                    <span className="micro">{[season.category, season.duration].filter(Boolean).join(" · ")}</span>
+                  )}
+                  {season.tagline && <p><b>{season.tagline}</b></p>}
                   {season.overview && <p className="muted">{season.overview}</p>}
                   {season.outcome && (
-                    <p className="path__evidence" style={{ marginTop: 6 }}>
+                    <p>
                       <b>By the end:</b> {season.outcome}
                     </p>
                   )}
@@ -179,104 +166,104 @@ export default function HomePage() {
         </div>
       )}
 
-      <div className="grid2 grid2--wide">
-        {/* ---- The weekly move: the track ---- */}
-        <section className="tile">
+      <div className="dashboard__grid">
+        <section className="tile dashboard__track" aria-labelledby="track-title">
           <div className="tile__head">
-            <h2 className="h3">The track</h2>
-            {season && (
-              <span className="micro">{season.milestones.length} steps</span>
+            <h2 className="h3" id="track-title">Your track</h2>
+            {progress.total > 0 && (
+              <span className="dashboard__progress">
+                <b className="num">{progress.done}/{progress.total}</b> complete
+              </span>
             )}
           </div>
+          {progress.total > 0 && <Bar value={progress.done / progress.total} />}
           {seasonSnap === null ? (
             <p className="empty">Loading…</p>
           ) : !season ? (
             <p className="empty">The track lands soon.</p>
           ) : (
-            <SeasonPath season={season} mine={mine} wall={wall} profile={profile} consentPending={consentPending} />
+            <SeasonPath key={season.id} season={season} mine={mine} wall={wall} profile={profile} consentPending={consentPending} />
           )}
         </section>
 
-        {/* ---- The daily move, what's on, and the room ---- */}
-        <div className="stack side--sticky">
-          <ShipLine profile={profile} consentPending={consentPending} />
-
-          <section className="tile">
-            <div className="tile__head">
-              <h2 className="h3">Next sessions</h2>
-            </div>
-            {workshops === null ? (
-              <p className="empty">Loading…</p>
-            ) : workshops.length === 0 ? (
-              <p className="empty">Nothing scheduled yet.</p>
-            ) : (
-              <WorkshopList workshops={workshops.slice(0, 6)} profile={profile} onEnroll={enroll} onLeave={leave} />
-            )}
-            {seatErr && <p className="form-err">{seatErr}</p>}
-            {recordings.length > 0 && (
-              <details className="more" style={{ marginTop: 10 }}>
-                <summary className="more__toggle">
-                  Replays
-                  <span className="more__hint">{recordings.length}</span>
-                </summary>
-                <div className="more__body">
-                  {recordings.map((w) => {
-                    const d = w.startsAt.toDate();
-                    return (
-                      <div key={w.id} className="ses">
-                        <div className="ses__date">
-                          <b>{d.getDate()}</b>
-                          <span>{d.toLocaleDateString(undefined, { month: "short" })}</span>
-                        </div>
-                        <div className="ses__body">
-                          <span className="ses__title">{w.title}</span>
-                          <span className="ses__meta">{w.mentorName}</span>
-                        </div>
-                        <div className="ses__act">
-                          <a className="btn btn--ghost btn--sm" href={w.recordingUrl} target="_blank" rel="noreferrer">
-                            Watch
-                          </a>
-                        </div>
+        <section className="tile dashboard__sessions" aria-labelledby="sessions-title">
+          <div className="tile__head">
+            <h2 className="h3" id="sessions-title">Sessions</h2>
+          </div>
+          {workshops === null ? (
+            <p className="empty">Loading…</p>
+          ) : workshops.length === 0 ? (
+            <p className="empty">Nothing scheduled yet.</p>
+          ) : (
+            <WorkshopList workshops={workshops.slice(0, 6)} profile={profile} onEnroll={enroll} onLeave={leave} />
+          )}
+          {seatErr && <p className="form-err">{seatErr}</p>}
+          {recordings.length > 0 && (
+            <details className="more dashboard__replays">
+              <summary className="more__toggle">
+                Replays
+                <span className="more__hint">{recordings.length}</span>
+              </summary>
+              <div className="more__body">
+                {recordings.map((w) => {
+                  const d = w.startsAt.toDate();
+                  return (
+                    <div key={w.id} className="ses">
+                      <div className="ses__date">
+                        <b>{d.getDate()}</b>
+                        <span>{d.toLocaleDateString(undefined, { month: "short" })}</span>
                       </div>
-                    );
-                  })}
-                </div>
-              </details>
-            )}
-          </section>
+                      <div className="ses__body">
+                        <span className="ses__title">{w.title}</span>
+                        <MemberButton uid={w.mentorUid} name={w.mentorName} />
+                      </div>
+                      <div className="ses__act">
+                        <a className="btn btn--ghost btn--sm" href={w.recordingUrl} target="_blank" rel="noreferrer">
+                          Watch
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </details>
+          )}
+        </section>
 
-          <section className="tile">
-            <div className="tile__head">
-              <h2 className="h3">The feed</h2>
-              <span className="micro">everyone&apos;s lines</span>
-            </div>
-            {logs.length === 0 ? (
-              <p className="empty">Ship the first line.</p>
-            ) : (
-              <div className="feed" style={{ marginTop: 0 }}>
-                {logs.map((l) => (
-                  <div key={l.id} className="feed__row">
-                    <Avatar name={l.name} size="sm" />
-                    <div className="feed__body">
-                      <b>{l.name}</b> <span className="feed__day">{l.day}</span>
+        <section className="tile dashboard__updates" aria-labelledby="updates-title">
+          <div className="tile__head">
+            <h2 className="h3" id="updates-title">Community</h2>
+          </div>
+          <ShipLine profile={profile} consentPending={consentPending} />
+          {logs.length === 0 ? (
+            <p className="empty">Share the first update.</p>
+          ) : (
+            <div className="feed">
+              {logs.map((l) => (
+                <div key={l.id} className="feed__row">
+                  <div className="feed__body">
+                    <div className="dashboard__byline">
+                      <MemberButton uid={l.uid} name={l.name} />
+                      <time className="feed__day" dateTime={l.day}>
+                        {new Date(`${l.day}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
+                      </time>
                       {l.uid === profile.uid && (
                         <button
                           type="button"
-                          className="link-btn micro"
-                          style={{ marginLeft: 8 }}
+                          className="link-btn dashboard__remove"
                           onClick={() => removeBuildLog(l.id).catch(() => {})}
                         >
-                          remove
+                          Remove
                         </button>
                       )}
-                      <p>{l.text}</p>
                     </div>
+                    <p>{l.text}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       </div>
     </div>
   );

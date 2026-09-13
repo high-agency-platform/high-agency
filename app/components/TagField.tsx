@@ -53,6 +53,7 @@ export function TagField({
             key={t}
             type="button"
             className={`pick ${value.includes(t) ? "sel" : ""}`}
+            aria-pressed={value.includes(t)}
             disabled={!value.includes(t) && atCap}
             onClick={() => togglePreset(t)}
           >
@@ -64,6 +65,7 @@ export function TagField({
             key={t}
             type="button"
             className="pick sel"
+            aria-pressed={true}
             onClick={() => onChange(value.filter((x) => x !== t))}
             title="Remove"
           >

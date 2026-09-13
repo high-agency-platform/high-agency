@@ -2,7 +2,7 @@
 
 /* Google Calendar for mentors: one card that says whether this mentor's
    calendar is connected, and the button that connects or disconnects it.
-   Sessions and check-ins get their Meet room from here. */
+   Sessions get their Meet room from here. */
 
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { calendarStatus, connectCalendar, disconnectCalendar, type CalendarStatus } from "../lib/api";
@@ -12,19 +12,21 @@ import { CalendarIcon, CheckIcon } from "./ui";
 export function useCalendarStatus(): {
   status: CalendarStatus | null;
   refresh: () => void;
+  error: string;
 } {
   const [status, setStatus] = useState<CalendarStatus | null>(null);
   const [tick, setTick] = useState(0);
+  const [error, setError] = useState("");
   useEffect(() => {
     let stale = false;
     calendarStatus()
       .then((s) => !stale && setStatus(s))
-      .catch(() => !stale && setStatus({ configured: false, connected: false, email: "" }));
+      .catch(() => !stale && setError("Couldn't check the calendar connection."));
     return () => {
       stale = true;
     };
   }, [tick]);
-  return { status, refresh: () => setTick((t) => t + 1) };
+  return { status, error, refresh: () => { setStatus(null); setError(""); setTick((t) => t + 1); } };
 }
 
 /** The `?calendar=` value this page load came back from Google with. Latched
@@ -77,7 +79,7 @@ export function CalendarConnect({
   /** One line + button, for the home screen. */
   compact?: boolean;
 }) {
-  const { status, refresh } = useCalendarStatus();
+  const { status, refresh, error: statusError } = useCalendarStatus();
   const flash = useReturnFlash();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -107,74 +109,21 @@ export function CalendarConnect({
     }
   }
 
-  if (status === null) return null;
-
-  if (!status.configured) {
-    if (compact) return null;
-    return (
-      <div className="tile tile--flat">
-        <div className="tile__head">
-          <h2 className="h3">
-            <CalendarIcon size={18} /> Google Calendar
-          </h2>
-        </div>
-        <p className="muted">
-          Not set up on this server yet. Until it is, sessions use whatever Meet link you paste.
-        </p>
-      </div>
-    );
-  }
-
-  if (status.connected) {
-    return (
-      <div className={compact ? "notice" : "tile tile--lime"}>
-        {!compact && (
-          <div className="tile__head">
-            <h2 className="h3">
-              <span className="signal"><CheckIcon /></span> Google Calendar
-            </h2>
-          </div>
-        )}
-        <span>
-          {compact ? <span className="signal"><CheckIcon size={14} /></span> : null} Connected as{" "}
-          <b>{status.email || "your Google account"}</b>.
-          {!compact && (
-            <small>
-              New sessions and check-ins get a Meet room and land on your calendar. Operators who
-              enroll get the invite.
-            </small>
-          )}
-        </span>
-        {flash && <span className="micro signal">{flash}</span>}
-        <button className="btn btn--ghost btn--sm" onClick={disconnect} disabled={busy}>
-          Disconnect
-        </button>
-        {err && <p className="form-err">{err}</p>}
-      </div>
-    );
-  }
+  if (statusError) return <div className="notice"><span role="alert">{statusError}</span><button className="btn btn--ghost btn--sm" onClick={refresh}>Retry</button></div>;
+  if (status === null) return <p className="muted">Checking Google Calendar…</p>;
+  if (!status.configured) return compact ? null : <div className="tile"><h2 className="h3">Google Calendar</h2><p className="muted">Calendar setup is unavailable.</p></div>;
 
   return (
-    <div className={compact ? "notice" : "tile tile--ember"}>
-      {!compact && (
-        <div className="tile__head">
-          <h2 className="h3">
-            <CalendarIcon size={18} /> Google Calendar
-          </h2>
-        </div>
-      )}
-      <span>
-        {compact ? "Connect Google Calendar" : "Connect your calendar."}
-        <small>
-          Every session and check-in you schedule gets a Meet room automatically, and enrolled
-          operators get the invite on their own calendar.
-        </small>
-      </span>
-      {flash && <span className="micro">{flash}</span>}
-      <button className="btn btn--primary btn--sm" onClick={connect} disabled={busy}>
-        {busy ? "…" : "Connect"}
+    <section className={compact ? "notice" : "tile calendar-connect"}>
+      <div className="calendar-connect__body">
+        <h2 className="h3"><CalendarIcon size={18} /> Google Calendar {status.connected && <span className="signal"><CheckIcon size={16} /></span>}</h2>
+        <p>{status.connected ? status.email || "Connected" : "Connect to create Meet links and invite members."}</p>
+        {flash && <p role="status">{flash}</p>}
+        {err && <p className="form-err" role="alert">{err}</p>}
+      </div>
+      <button className={`btn ${status.connected ? "btn--ghost" : "btn--primary"} btn--sm`} onClick={status.connected ? disconnect : connect} disabled={busy}>
+        {busy ? "Working…" : status.connected ? "Disconnect" : "Connect"}
       </button>
-      {err && <p className="form-err">{err}</p>}
-    </div>
+    </section>
   );
 }

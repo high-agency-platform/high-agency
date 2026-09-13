@@ -129,8 +129,8 @@ function OperatorShell({
         </Link>
         <div className="topbar__right">
           <Hud profile={profile} />
-          <button type="button" className="topbar__you" onClick={() => setYouEdit(true)} aria-label="Your card">
-            <Avatar name={profile.name} />
+          <button type="button" className="topbar__you" onClick={(e) => { e.currentTarget.focus(); setYouEdit(true); }} aria-label="Your card">
+            <Avatar name={profile.name} photoUrl={profile.photoUrl} />
           </button>
         </div>
       </header>

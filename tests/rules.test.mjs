@@ -315,6 +315,39 @@ test("pending minor can still READ (sees the waiting-on-consent state)", async (
   await assertSucceeds(getDoc(doc(db, "seasons/s1")));
 });
 
+test("PHOTO: operators and mentors can update their own bounded raster photo", async () => {
+  for (const uid of ["granted", "mentorA"]) {
+    await assertSucceeds(updateDoc(doc(asUser(uid), `profiles/${uid}`), {
+      photoUrl: "data:image/webp;base64,UklGRg==", updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(doc(asUser(uid), `profiles/${uid}`), { photoUrl: "" }));
+  }
+});
+
+test("PHOTO: unsupported formats, remote URLs, malformed data and oversized payloads are denied", async () => {
+  const ref = doc(asUser("granted"), "profiles/granted");
+  for (const photoUrl of [
+    "https://example.com/tracker.jpg", "javascript:alert(1)",
+    "data:image/svg+xml;base64,PHN2Zz4=", "data:image/webp;base64,!invalid!", 42,
+    `data:image/jpeg;base64,${"A".repeat(40000)}`,
+  ]) await assertFails(updateDoc(ref, { photoUrl }));
+});
+
+test("PHOTO: a photo never grants another member edit access or public read access", async () => {
+  const db = asUser("other");
+  await assertFails(updateDoc(doc(db, "profiles/granted"), { photoUrl: "data:image/jpeg;base64,/9j/2Q==" }));
+  await assertSucceeds(getDoc(doc(db, "profiles/granted")));
+  await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "profiles/granted")));
+  await assertFails(getDoc(doc(db, "privateProfiles/granted")));
+});
+
+test("PHOTO: updating a photo cannot change role, consent or the server-owned streak", async () => {
+  const ref = doc(asUser("minor"), "profiles/minor");
+  for (const extra of [{ role: "mentor" }, { consentStatus: "granted" }, { streak: 99 }]) {
+    await assertFails(updateDoc(ref, { photoUrl: "data:image/webp;base64,UklGRg==", ...extra }));
+  }
+});
+
 /* ========================================================================= *
  *  Workshops — readable by everyone signed in, written only by the server
  * ========================================================================= */
