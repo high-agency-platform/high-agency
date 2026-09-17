@@ -13,7 +13,7 @@ import {
 import ReferralShare from "./ReferralShare";
 
 const STORAGE_KEY = "ha_application";
-// Founding Batch 01 targets high-school operators — collect exact age 12–18.
+// The program targets high-school operators — collect exact age 12–18.
 const AGES = ["12", "13", "14", "15", "16", "17", "18"];
 
 // Per-question word ceilings. Enforced in the UI only: we block, never truncate.
@@ -351,7 +351,7 @@ export default function ApplyModal({
         {step === 1 && (
           <div className="modal__step active">
             <h3 id="modalTitle">Request access.</h3>
-            <p className="modal__sub">Founding Batch 01. Takes five minutes.</p>
+            <p className="modal__sub">Batch 02, starting November. Takes five minutes.</p>
             <div className="field">
               <label htmlFor="m-name">Full name</label>
               <input

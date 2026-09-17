@@ -46,7 +46,7 @@ function approvalHtml(appUrl: string, firstName?: string): string {
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;color:#211d18;line-height:1.55">
     <h1 style="font-size:22px;margin:0 0 16px">${greeting}</h1>
     <p style="margin:0 0 14px">
-      You've been accepted into the <strong>High Agency</strong> founding batch —
+      You've been accepted into <strong>High Agency</strong> Batch 02, starting November —
       a live cohort program where you join a small squad, ship real milestones,
       and learn from people who've actually done it.
     </p>
@@ -92,7 +92,7 @@ export async function sendApprovalEmail(params: {
   const { error } = await resend.emails.send({
     from: FROM,
     to,
-    subject: "You're in — High Agency founding batch",
+    subject: "You're in — High Agency Batch 02",
     html: approvalHtml(appUrl.replace(/\/$/, ""), firstName),
   });
   if (error) {

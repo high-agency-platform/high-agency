@@ -9,11 +9,15 @@ const ITEMS: { q: string; a: string }[] = [
   },
   {
     q: "Is it free?",
-    a: "The founding batch is free. Live mentorship becomes a premium add-on later.",
+    a: "Yes. Batch 02 is free, like the founding batch. Live mentorship becomes a premium add-on later.",
   },
   {
     q: "How selective is it?",
     a: "By application, intentionally small. We weigh drive over résumé.",
+  },
+  {
+    q: "When does it start?",
+    a: "Applications for the founding batch have closed. Batch 02 starts in November; apply now and we'll confirm the exact date with your acceptance.",
   },
   {
     q: "Do I need a startup idea?",

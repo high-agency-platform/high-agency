@@ -228,7 +228,7 @@ export default function Waitlist() {
             <div className="hero__copy">
               <Reveal className="eyebrow hero__tag">
                 <span className="dot" />
-                Founding Batch 01
+                Batch 02 · Starts November
               </Reveal>
               <Reveal as="h1" className="display" d={1}>
                 School is a <span className="strike">waiting room.</span>
@@ -240,6 +240,12 @@ export default function Waitlist() {
               </Reveal>
               <Reveal d={2}>
                 <CaptureForm label="Request access" onApply={openModal} />
+              </Reveal>
+              <Reveal className="capture__note" d={3}>
+                <span>
+                  <b>Founding batch is full.</b> Applications are now open for
+                  the second cohort, starting November.
+                </span>
               </Reveal>
               <Reveal className="capture__note" d={3}>
                 <span><b>By application</b> · Free · Ages 13–19</span>
@@ -516,13 +522,14 @@ export default function Waitlist() {
               <div className="final__inner">
                 <Reveal className="eyebrow eyebrow--accent">
                   <span className="dot" />
-                  Applications open
+                  Batch 02 applications open
                 </Reveal>
                 <Reveal as="h2" className="h2" d={1}>
                   Ambition is the only prerequisite.
                 </Reveal>
                 <Reveal as="p" className="lead" d={2}>
-                  Stop rehearsing. Start building.
+                  The founding batch is full. The second cohort kicks off in
+                  November. Stop rehearsing. Start building.
                 </Reveal>
                 <Reveal d={2}>
                   <CaptureForm label="Apply now" onApply={openModal} />
