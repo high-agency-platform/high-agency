@@ -12,6 +12,7 @@ import {
 import { sendAccessEmail } from "../../../lib/accessEmail";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 /** Reads live allowlist state and sends mail — never cached. */
 export const dynamic = "force-dynamic";
 

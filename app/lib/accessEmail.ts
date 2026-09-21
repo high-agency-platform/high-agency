@@ -1,5 +1,6 @@
 /** Email-link transport. Never log sign-in credentials. */
 import { Resend } from "resend";
+import { createHash } from "node:crypto";
 import type { EmailDelivery } from "./consentEmail";
 
 export type { EmailDelivery };
@@ -64,14 +65,26 @@ export async function sendAccessEmail(params: {
   }
 
   const resend = new Resend(apiKey);
-  const { error } = await resend.emails.send({
+  const message = {
     from: FROM,
     to,
     subject: "Your High Agency sign-in link",
     html: signInHtml(signInUrl, name),
-  });
-  if (error) {
-    throw new Error(`Resend failed: ${error.message ?? String(error)}`);
+  };
+  const idempotencyKey = `access-${createHash("sha256").update(JSON.stringify(message)).digest("hex")}`;
+  const deadline = Date.now() + 45_000;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const { error, headers } = await resend.emails.send(message, { idempotencyKey });
+    if (!error) return "sent";
+    // Daily/monthly quotas and invalid recipients cannot be fixed by retrying.
+    if (error.name !== "rate_limit_exceeded" || attempt === 11) throw new Error(`Resend failed: ${error.name}`);
+    const retryAfter = headers?.["retry-after"];
+    const seconds = Number(retryAfter);
+    const requestedMs = retryAfter ? (Number.isFinite(seconds) ? seconds * 1000 : Date.parse(retryAfter) - Date.now()) : 0;
+    const backoff = Math.min(4000, 250 * 2 ** attempt);
+    const delay = Math.max(Number.isFinite(requestedMs) ? requestedMs : 0, backoff) + Math.random() * backoff;
+    if (Date.now() + delay >= deadline) throw new Error("Resend failed: rate_limit_exceeded");
+    await new Promise(resolve => setTimeout(resolve, delay));
   }
-  return "sent";
+  throw new Error("Resend failed: rate_limit_exceeded");
 }
