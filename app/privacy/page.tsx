@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "What High Agency collects, why, and how to get it removed.",
 };
 
-const EFFECTIVE = "1 September 2026";
+const EFFECTIVE = "21 September 2026";
 const CONTACT = "info@high-agency.io";
 
 /** Public, static, no sign-in. Linked from the waitlist footer and from the
@@ -44,29 +44,31 @@ export default function PrivacyPage() {
           We sign you in with your email address. Your public profile, visible to other
           signed-in members, holds only your first name and last initial, an age band (13–15,
           16–17, or 18+), your country and timezone, and what you tell us about what you are
-          building. Your exact date of birth, full name, city, and a parent&apos;s email
-          address are stored separately and are visible only to you and to High Agency staff.
+          building, including an optional profile photo and links. Your exact date of birth,
+          full name, and city are stored separately and are visible only to you and to
+          High Agency staff. Older accounts may also have a parent or guardian contact
+          and a consent record; signup no longer collects a parent email.
         </p>
         <h3>When you use the platform</h3>
         <p>
-          What you and your squad do on the platform: squads you create or apply to, build
-          logs you post, the steps your mentor records on your squad&apos;s track, check-ins
-          you request, workshops you enroll in, and your streak. Squad content is visible to
-          your squad members, your mentor, and High Agency staff.
+          Your work on the season track: proof you submit, mentor feedback, workshops you
+          enroll in, and your streak. Proof is visible to its author and mentors. Public
+          profile details are visible to other members. The platform no longer has a
+          community feed; communication takes place in Slack.
         </p>
         <h3>If you are under 18</h3>
         <p>
-          We ask for a parent or guardian&apos;s email address and send them a consent link.
-          Until they approve, your account can read the platform but cannot post, apply, or
-          join a squad. A parent or guardian can withdraw consent at any time by writing to
-          us, and we will close the account.
+          Invited members can access the platform after email verification and profile
+          setup. Access does not depend on a parent approval email. Historical parent
+          contact and consent records, where present, remain private. You or your parent
+          or guardian can contact us about your account using the address below.
         </p>
 
-        <h2>Google Calendar (mentors)</h2>
+        <h2>Google Calendar</h2>
         <p>
-          Mentors may connect their Google account so that the workshops and squad check-ins
-          they schedule appear on their Google Calendar with a Google Meet room. When a mentor
-          connects, we ask Google for permission to manage calendar events
+          Members may connect Google Calendar to sync the sessions they enroll in. Mentors
+          can also create scheduled workshops with a Google Meet room. When you connect,
+          we ask Google for permission to manage calendar events
           (<code>calendar.events</code>) and to see the email address of the connected
           account.
         </p>
@@ -74,17 +76,19 @@ export default function PrivacyPage() {
           <li>
             We use this access only to create, update, and cancel the events High Agency
             schedules, and to add or remove the students who enroll in them as guests. We do
-            not read, store, or display any other event on the mentor&apos;s calendar.
+            not read, store, or display unrelated calendar events.
           </li>
           <li>
-            Students who enroll in a workshop are added to the event as guests using the
-            email address they sign in with. Guests cannot see each other&apos;s email
-            addresses; the hosting mentor can.
+            Members with a connected calendar receive private copies of their enrolled
+            sessions, including the meeting link. Other members receive invitations at
+            their sign-in email when the host has connected Calendar. Invitation guests
+            cannot see each other&apos;s email addresses; the hosting mentor can.
           </li>
           <li>
-            We store the mentor&apos;s Google refresh token encrypted on our servers so we do
-            not have to ask again. A mentor can disconnect at any time from their profile
-            page, which revokes the token at Google and deletes our copy.
+            We store your Google refresh token encrypted on our servers so sessions stay
+            in sync. You can revoke access in your Google account. Members can also
+            disconnect from their profile page. Disconnecting in High Agency removes
+            future synced session copies, revokes the token, and deletes our token copy.
           </li>
           <li>
             High Agency&apos;s use of information received from Google APIs adheres to the{" "}
@@ -102,10 +106,9 @@ export default function PrivacyPage() {
 
         <h2>How we use it</h2>
         <ul>
-          <li>To run the program: form squads, match you with a mentor, schedule sessions.</li>
+          <li>To run the program: maintain the season track, review proof, and schedule sessions.</li>
           <li>To contact you about your application, your account, and the sessions you join.</li>
-          <li>To obtain and record parental consent for members under 18.</li>
-          <li>To keep the platform safe, which includes letting staff review squad content.</li>
+          <li>To keep the platform safe, which includes letting staff review submitted proof.</li>
         </ul>
         <p>We do not sell personal information and we do not show advertising.</p>
 
@@ -113,7 +116,7 @@ export default function PrivacyPage() {
         <p>
           We rely on a small number of providers to run the service: Google Firebase (sign-in
           and database), Vercel (hosting), Resend (transactional email), HubSpot (keeping track
-          of waitlist applicants), and Google Calendar for mentors who connect it. Each
+          of waitlist applicants), and Google Calendar for members who connect it. Each
           processes data only to provide its service to us.
         </p>
 

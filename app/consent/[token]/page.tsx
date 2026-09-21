@@ -125,7 +125,7 @@ function ConsentBody({
         </span>
         <h1 className="h2">Thank you — {state.childName} is all set.</h1>
         <p className="lead">
-          Consent is recorded and {state.childName}&apos;s community access is now
+          Consent is recorded and {state.childName}&apos;s proof submission is now
           unlocked. You can close this page. There&apos;s nothing else you need to
           do.
         </p>
@@ -144,10 +144,10 @@ function ConsentBody({
           {state.childName} signed up for High Agency — a live cohort program where
           ambitious young people (13–18) build real projects together, walking
           a mentor-written track. Because they&apos;re under 18, we need your approval
-          before they can post work and take part in the community.
+          before they can submit proof of work.
         </p>
         <ul className="consent__list">
-          <li>Post proof of work that other members of the program can see.</li>
+          <li>Submit proof of work privately to their mentors.</li>
           <li>Work through real-world milestones — ship a project, get first users.</li>
           <li>Attend live expert workshops. Free for the founding batch.</li>
         </ul>

@@ -46,7 +46,7 @@ function approvalHtml(appUrl: string, firstName?: string): string {
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;color:#211d18;line-height:1.55">
     <h1 style="font-size:22px;margin:0 0 16px">${greeting}</h1>
     <p style="margin:0 0 14px">
-      You've been accepted into the <strong>High Agency</strong> founding batch —
+      You've been accepted into <strong>High Agency</strong> Batch 02, starting November —
       a live cohort program where you work a mentor-written track, ship real proof,
       and learn from people who've actually done it.
     </p>
@@ -62,8 +62,7 @@ function approvalHtml(appUrl: string, firstName?: string): string {
       </a>
     </p>
     <p style="margin:0;font-size:13px;color:#6b645b">
-      If you're under 18, we'll ask for a parent's email during setup so they can
-      approve your account. That's a one-click step for them.
+      Verify your email, add a few profile details, and start the season.
     </p>
   </div>`;
 }
@@ -92,7 +91,7 @@ export async function sendApprovalEmail(params: {
   const { error } = await resend.emails.send({
     from: FROM,
     to,
-    subject: "You're in — High Agency founding batch",
+    subject: "You're in — High Agency Batch 02",
     html: approvalHtml(appUrl.replace(/\/$/, ""), firstName),
   });
   if (error) {

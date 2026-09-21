@@ -47,7 +47,7 @@ export default function MentorTrackPage() {
     <div className="screen">
       <header className="screen__head">
         <h1 className="h1">The track</h1>
-        <span className="micro">one season · every mentor edits it · operators see saves instantly</span>
+        <span className="micro">one season · every mentor edits it · released milestones appear for students within 10 seconds</span>
       </header>
 
       {seasons === null ? (

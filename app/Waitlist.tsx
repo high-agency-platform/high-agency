@@ -13,8 +13,6 @@ import waitingRoom from "./components/ascii/programs/waitingRoom";
 import engineBurn from "./components/ascii/programs/engineBurn";
 import { PLATFORM_ENABLED } from "./lib/flags";
 import { fetchReferralCounter } from "./lib/firebase";
-import { APPLICATION_DEADLINE_ISO } from "./lib/applicationWindow";
-import { useApplicationsClosed } from "./lib/useApplicationsClosed";
 import {
   REFERRAL_JUMP,
   REFERRAL_PARAM,
@@ -130,20 +128,15 @@ function ReferralBanner({ code, staff }: IncomingReferral) {
 function CaptureForm({
   label,
   onApply,
-  closed,
   applied,
 }: {
   label: string;
   onApply: (email: string) => void;
-  closed: boolean;
   applied: boolean;
 }) {
   const [email, setEmail] = useState("");
   if (applied) {
     return <button className="btn btn--ghost" onClick={() => onApply("")}>View application</button>;
-  }
-  if (closed) {
-    return <p className="application-closed" role="status">Applications are closed <span>Online kickoff · September 21</span></p>;
   }
   return (
     <form
@@ -174,8 +167,7 @@ function CaptureForm({
   );
 }
 
-export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean }) {
-  const closed = useApplicationsClosed(initiallyClosed);
+export default function Waitlist() {
   const [modalOpen, setModalOpen] = useState(false);
   const [prefillEmail, setPrefillEmail] = useState("");
   const [justApplied, setJustApplied] = useState(false);
@@ -196,8 +188,8 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
     setModalOpen(true);
   }, []);
 
-  const applyLabel = applied ? "View application" : closed ? "Applications closed" : "Apply";
-  const captureStatus = { closed, applied };
+  const applyLabel = applied ? "View application" : "Apply";
+  const captureStatus = { applied };
 
   return (
     <>
@@ -205,11 +197,9 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
       <header className="nav">
         <aside className="announcements" aria-label="Application dates">
           <p className="announcements__item">
-            {closed ? <>Applications for Founding Batch 01 are closed.</> : <>
-              Applications close <time dateTime={APPLICATION_DEADLINE_ISO}><strong>September 14 · 7 PM ET</strong></time><span className="announcements__firm">. No extensions.</span>
-            </>}
+            <strong>Batch 02 applications are open.</strong> Starts November.
           </p>
-          <p className="announcements__item announcements__item--second">Official kickoff (online) is September 21st.</p>
+          <p className="announcements__item announcements__item--second">The founding batch is full. Your next chapter starts here.</p>
         </aside>
         <div className="wrap nav__inner">
           <a className="brand" href="#top">
@@ -226,9 +216,8 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
             <button
               className="btn btn--primary nav__cta"
               onClick={() => openModal()}
-              disabled={closed && !applied}
             >
-              {closed && !applied ? "Closed" : applyLabel}
+              {applyLabel}
             </button>
           </nav>
         </div>
@@ -241,7 +230,7 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
             <div className="hero__copy">
               <Reveal className="eyebrow hero__tag">
                 <span className="dot" />
-                Founding Batch 01
+                Batch 02 · Starts November
               </Reveal>
               <Reveal as="h1" className="display" d={1}>
                 School is a <span className="strike">waiting room.</span>
@@ -252,12 +241,12 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
                 Teaching what schools can&apos;t.
               </Reveal>
               <Reveal d={2}>
-                <CaptureForm label="Request access" onApply={openModal} {...captureStatus} />
+                <CaptureForm label="Apply for Batch 02" onApply={openModal} {...captureStatus} />
               </Reveal>
-              {!closed && <Reveal className="capture__note" d={3}>
+              <Reveal className="capture__note" d={3}>
                 <span><b>By application</b> · Free · Ages 13–19</span>
-              </Reveal>}
-              {!closed && <ReferralBanner {...incoming} />}
+              </Reveal>
+              <ReferralBanner {...incoming} />
             </div>
             <HeroLaunch />
           </div>
@@ -434,20 +423,20 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
               <div className="final__inner">
                 <Reveal className="eyebrow eyebrow--accent">
                   <span className="dot" />
-                  {closed ? "Founding Batch 01" : "Applications open"}
+                  Batch 02 applications open
                 </Reveal>
                 <Reveal as="h2" className="h2" d={1}>
-                  {closed ? "Applications are closed." : "Ambition is the only prerequisite."}
+                  Ambition is the only prerequisite.
                 </Reveal>
                 <Reveal as="p" className="lead" d={2}>
-                  {closed ? "Thank you for your interest. The online kickoff is September 21." : "Stop rehearsing. Start building."}
+                  The founding batch is full. Join the next cohort in November.
                 </Reveal>
                 <Reveal d={2}>
-                  {(!closed || applied) && <CaptureForm label="Apply now" onApply={openModal} {...captureStatus} />}
+                  <CaptureForm label="Apply now" onApply={openModal} {...captureStatus} />
                 </Reveal>
-                {!closed && <Reveal className="capture__note" d={3}>
+                <Reveal className="capture__note" d={3}>
                   <span><b>By application</b> · Free</span>
-                </Reveal>}
+                </Reveal>
               </div>
               <div className="final__pad" aria-hidden="true">
                 <AsciiCanvas
@@ -475,7 +464,7 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
               <a href="#problem">Problem</a>
               <a href="#system">What you join</a>
               <a href="#faq">FAQ</a>
-              {closed && !applied ? <span>Applications closed</span> : <a
+              <a
                 href="#"
                 onClick={(e) => {
                   e.preventDefault();
@@ -483,7 +472,7 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
                 }}
               >
                 {applyLabel}
-              </a>}
+              </a>
               <a href="/privacy">Privacy</a>
               <a href="/terms">Terms</a>
             </div>
@@ -494,7 +483,6 @@ export default function Waitlist({ initiallyClosed }: { initiallyClosed: boolean
 
       <ApplyModal
         open={modalOpen}
-        closed={closed}
         prefillEmail={prefillEmail}
         referredBy={incoming.code}
         onClose={() => setModalOpen(false)}

@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../components/AuthProvider";
-import { saveProfile, savePrivateProfile, requestConsentEmail } from "../../lib/db";
+import { saveProfile, savePrivateProfile } from "../../lib/db";
 import { localDay } from "../../lib/streaks";
 import { DOMAINS, SKILLS } from "../../lib/types";
 import { COUNTRIES } from "../../lib/countries";
+import { ProfilePhoto } from "../../components/ProfilePhoto";
 import { Bar } from "../../components/ui";
 import type { AgeBand, VentureStage } from "../../lib/types";
 
@@ -60,13 +61,17 @@ export default function OnboardingPage() {
   const [dob, setDob] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
-  const [parentEmail, setParentEmail] = useState("");
 
   // ---- Stage 2: operator profile (under 5) ----
+  const [photoUrl, setPhotoUrl] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [headline, setHeadline] = useState("");
   const [building, setBuilding] = useState("");
   const [stage, setStage] = useState<VentureStage | null>(null);
   const [domains, setDomains] = useState<string[]>([]);
+  const [otherDomainOpen, setOtherDomainOpen] = useState(false);
+  const [otherDomain, setOtherDomain] = useState("");
+  const otherDomainInvalid = otherDomainOpen && otherDomain.length > 20;
   const [skills, setSkills] = useState<string[]>([]);
   const [proofUrl, setProofUrl] = useState("");
   const [proofNote, setProofNote] = useState("");
@@ -113,7 +118,6 @@ export default function OnboardingPage() {
   }, [step]);
 
   const age = useMemo(() => (dob ? ageFrom(dob) : null), [dob]);
-  const isMinor = age !== null && age < 18;
   // The stage picker ("Where's it at?") only makes sense once there's a
   // venture to place — asking it of someone with no project is nonsensical
   // and shouldn't gate them out of the season.
@@ -128,12 +132,8 @@ export default function OnboardingPage() {
       setError("Name, date of birth, and country are required.");
       return;
     }
-    if (age !== null && age < 13) {
+    if (age === null || !Number.isFinite(age) || age < 13 || age > 100) {
       setError("High Agency is for operators 13 and up.");
-      return;
-    }
-    if (isMinor && !parentEmail.trim()) {
-      setError("Under 18 needs a parent or guardian email for consent.");
       return;
     }
     setError("");
@@ -141,13 +141,9 @@ export default function OnboardingPage() {
   }
 
   async function submit() {
-    if (!user || age === null) return;
+    if (!user || age === null || busy || photoBusy || otherDomainInvalid) return;
     if (hasBuilding && !stage) {
       setError("Pick where you're at — even just an idea counts.");
-      return;
-    }
-    if (domains.length === 0 || skills.length === 0) {
-      setError("Pick at least one domain and one interest.");
       return;
     }
     setBusy(true);
@@ -166,7 +162,6 @@ export default function OnboardingPage() {
           lastName: lastName.trim(),
           dob,
           city: city.trim(),
-          parentEmail: isMinor ? parentEmail.trim() : "",
         },
         true
       );
@@ -175,6 +170,7 @@ export default function OnboardingPage() {
         user.uid,
         {
           name: displayName,
+          photoUrl,
           ageBand: bandFor(age),
           country: country.trim(),
           timezone,
@@ -183,13 +179,13 @@ export default function OnboardingPage() {
           // No venture described → default to "idea" so the required field
           // stays valid without forcing an unanswerable question.
           stage: hasBuilding && stage ? stage : "idea",
-          domains,
+          domains: [...new Set([...domains, ...(otherDomainOpen && otherDomain.trim() ? [otherDomain.trim()] : [])])],
           skills,
           proofUrl: proofUrl.trim(),
           proofNote: proofNote.trim(),
           bio: bio.trim(),
           links: { github: github.trim(), linkedin: linkedin.trim(), site: site.trim() },
-          consentStatus: isMinor ? "pending" : "granted",
+          consentStatus: "none",
           plan: "free",
           role: "operator",
           streak: 1,
@@ -200,18 +196,6 @@ export default function OnboardingPage() {
         },
         true
       );
-      // Minors: kick off the parental-consent email now that the profile
-      // exists with consentStatus "pending". Non-blocking — if it fails, a
-      // mentor can resend from the admin queue, so we never trap onboarding.
-      if (isMinor) {
-        try {
-          await requestConsentEmail();
-        } catch {
-          /* ignore — resend path exists */
-        }
-      }
-      // Never land on an empty dashboard — straight into discovery
-      // with matches pre-loaded.
       router.replace("/dashboard");
     } catch {
       submitted.current = false;
@@ -303,23 +287,6 @@ export default function OnboardingPage() {
             </div>
           </div>
 
-          {isMinor && (
-            <div className="field">
-              <label htmlFor="ob-parent">Parent email</label>
-              <input
-                id="ob-parent"
-                type="email"
-                value={parentEmail}
-                onChange={(e) => setParentEmail(e.target.value)}
-                placeholder="parent@email.com"
-                maxLength={254}
-              />
-              <small className="field__hint">
-                We&apos;ll ask them to approve — you&apos;re under 18.
-              </small>
-            </div>
-          )}
-
           {error && <p className="form-err">{error}</p>}
 
           <div className="row-actions">
@@ -330,6 +297,7 @@ export default function OnboardingPage() {
         </>
       ) : (
         <>
+          <ProfilePhoto name={firstName} value={photoUrl} onChange={setPhotoUrl} onBusy={setPhotoBusy} />
           <div className="field">
             <label htmlFor="ob-headline">Headline · optional</label>
             <input
@@ -371,9 +339,9 @@ export default function OnboardingPage() {
           )}
 
           <div className="field">
-            <label>Domains</label>
+            <label>Domains · optional</label>
             <div className="chip-row">
-              {DOMAINS.map((d) => (
+              {DOMAINS.filter((d) => d !== "Other").map((d) => (
                 <button
                   key={d}
                   type="button"
@@ -383,11 +351,34 @@ export default function OnboardingPage() {
                   {d}
                 </button>
               ))}
+              <button
+                type="button"
+                className={`pick ${otherDomainOpen ? "sel" : ""}`}
+                aria-expanded={otherDomainOpen}
+                aria-controls="ob-other-domain"
+                onClick={() => setOtherDomainOpen(!otherDomainOpen)}
+              >
+                Other
+              </button>
+              {otherDomainOpen && (
+                <input
+                  id="ob-other-domain"
+                  className="ob__other-domain"
+                  aria-label="Other domain (optional)"
+                  aria-invalid={otherDomainInvalid}
+                  aria-describedby={otherDomainInvalid ? "ob-domain-error" : undefined}
+                  placeholder="Your domain…"
+                  value={otherDomain}
+                  onChange={(e) => setOtherDomain(e.target.value)}
+                  autoFocus
+                />
+              )}
             </div>
+            {otherDomainInvalid && <small id="ob-domain-error" className="field__count" role="alert">Keep it to 20 characters.</small>}
           </div>
 
           <div className="field">
-            <label>Into</label>
+            <label>Interests · optional</label>
             <div className="chip-row">
               {SKILLS.map((s) => (
                 <button
@@ -403,54 +394,48 @@ export default function OnboardingPage() {
           </div>
 
           <div className="field">
-            <label>Proof of work · optional</label>
-            <input
-              id="ob-proof"
-              value={proofUrl}
-              onChange={(e) => setProofUrl(e.target.value)}
-              placeholder="Link the best thing you've made"
-              maxLength={300}
-            />
-            <input
-              value={proofNote}
-              onChange={(e) => setProofNote(e.target.value)}
-              placeholder="Why it matters — one line"
-              maxLength={200}
-            />
-          </div>
-
-          <div className="field">
-            <label htmlFor="ob-bio">Bio · optional</label>
-            <textarea
-              id="ob-bio"
-              value={bio}
-              onChange={(e) => setBio(e.target.value)}
-              placeholder="Personality, not résumé"
-              maxLength={300}
-            />
-          </div>
-
-          <div className="field">
             <label>Links · optional</label>
-            <input
-              value={github}
-              onChange={(e) => setGithub(e.target.value)}
-              placeholder="GitHub"
-              maxLength={200}
-            />
-            <input
-              value={linkedin}
-              onChange={(e) => setLinkedin(e.target.value)}
-              placeholder="LinkedIn"
-              maxLength={200}
-            />
-            <input
-              value={site}
-              onChange={(e) => setSite(e.target.value)}
-              placeholder="Personal site"
-              maxLength={200}
-            />
+            <div className="ob__links">
+              <input aria-label="GitHub" value={github} onChange={(e) => setGithub(e.target.value)} placeholder="GitHub" maxLength={200} />
+              <input aria-label="LinkedIn" value={linkedin} onChange={(e) => setLinkedin(e.target.value)} placeholder="LinkedIn" maxLength={200} />
+              <input aria-label="Personal site" value={site} onChange={(e) => setSite(e.target.value)} placeholder="Personal site" maxLength={200} />
+            </div>
           </div>
+
+          <details className="more">
+            <summary className="more__toggle">More about you · optional</summary>
+            <div className="more__body">
+              <div className="field">
+                <label>Proof of work · optional</label>
+                <input
+                  id="ob-proof"
+                  value={proofUrl}
+                  onChange={(e) => setProofUrl(e.target.value)}
+                  placeholder="Link the best thing you've made"
+                  maxLength={300}
+                />
+                <input
+                  value={proofNote}
+                  onChange={(e) => setProofNote(e.target.value)}
+                  placeholder="Why it matters — one line"
+                  maxLength={200}
+                />
+              </div>
+
+              <div className="field">
+                <label htmlFor="ob-bio">Bio · optional</label>
+                <textarea
+                  id="ob-bio"
+                  value={bio}
+                  onChange={(e) => setBio(e.target.value)}
+                  placeholder="Personality, not résumé"
+                  maxLength={300}
+                />
+              </div>
+
+
+            </div>
+          </details>
 
           {error && <p className="form-err">{error}</p>}
 
@@ -458,7 +443,7 @@ export default function OnboardingPage() {
             <button className="btn btn--ghost" onClick={() => setStep(1)}>
               Back
             </button>
-            <button className="btn btn--primary" onClick={submit} disabled={busy}>
+            <button className="btn btn--primary" onClick={submit} disabled={busy || photoBusy || otherDomainInvalid}>
               {busy ? "…" : "Start the season"}
             </button>
           </div>

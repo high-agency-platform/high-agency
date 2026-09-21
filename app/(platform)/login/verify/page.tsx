@@ -1,15 +1,5 @@
 "use client";
 
-/**
- * TEMPORARY — founding-batch access gate (step 2 of 2).
- *
- * The magic link from /api/access/request lands here. This page completes the
- * Firebase email-link sign-in, re-checks the allowlist SERVER-side
- * (/api/access/claim — signing in is not the same as being allowed in), and
- * routes to the right onboarding or app for the role.
- *
- * Delete with the rest of the gate — see app/lib/accessGate.ts.
- */
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -89,7 +79,7 @@ export default function VerifyPage() {
       // Signing in proves the mailbox, not the entitlement. The allowlist is
       // re-read server-side against the verified token before anyone is let in.
       try {
-        const claim = await claimAccess();
+        const claim = await claimAccess(new URL(window.location.href).searchParams.get("invite"));
         if (cancelled) return;
 
         if (!claim.ok) {
@@ -105,8 +95,7 @@ export default function VerifyPage() {
           setPhase("mentor-onboarding");
           return;
         }
-        // Operators go through the existing onboarding untouched, parental
-        // consent and all.
+        // Operators finish their profile before entering the season.
         router.replace("/onboarding");
       } catch {
         if (!cancelled) setPhase("error");
@@ -171,7 +160,7 @@ export default function VerifyPage() {
     }
 
     try {
-      const claim = await claimAccess();
+      const claim = await claimAccess(new URL(window.location.href).searchParams.get("invite"));
       if (!claim.ok) {
         await signOut(auth);
         setPhase("not-approved");
@@ -232,11 +221,9 @@ export default function VerifyPage() {
           <span className="gate__logo" aria-hidden="true">
             <img src="/brand/high-agency-mark.svg" alt="" />
           </span>
-          <h1 className="h1">You&apos;re not in the batch yet.</h1>
+          <h1 className="h1">Your invite is unavailable.</h1>
           <p className="gate__sub">
-            That email isn&apos;t on the founding-batch list, so we&apos;ve
-            signed you back out. Applications are open — we&apos;re adding
-            people as spots free up.
+            Ask your mentor for a fresh Season 1 invite, then verify your email again.
           </p>
           <button
             className="btn btn--primary btn--block"

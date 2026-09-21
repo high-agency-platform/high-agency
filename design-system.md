@@ -1,3 +1,5 @@
+> **2026-09-21:** Milestones are now mentor-released; unreleased content is withheld by the server. Community is replaced by a Resources tile with Slack. The visual tokens below remain authoritative.
+
 > **Revision note (2026-09-03) — Season 1.** The `.path` quest spine is now an
 > **accordion** on a single operator page (one step open at a time, the current
 > step open by default); `.locked` means *not started*, not gated — nothing on the

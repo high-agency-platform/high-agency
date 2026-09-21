@@ -11,8 +11,6 @@
  *    neither index by id nor validate element-wise. And submitting is a
  *    STREAK action: the streak is written here, in the same transaction.
  *
- * Parental consent is enforced here for these writes; the rules can't see
- * them.
  */
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "./firebaseAdmin";
@@ -37,6 +35,7 @@ import {
   SUBMISSION_NOTE_MAX,
   REVIEW_NOTE_MAX,
   normalizeVerifier,
+  milestoneReleased,
   milestoneId,
   submissionKey,
   type SeasonMilestone,
@@ -45,6 +44,7 @@ import {
 } from "./types";
 
 export interface MilestoneWire {
+  released?: boolean;
   /** Absent on a brand-new row; the server mints one. Present rows keep theirs. */
   id?: string;
   title: string;
@@ -125,6 +125,7 @@ function cleanMilestones(raw: unknown): SeasonMilestone[] {
       proof: str(r.proof, MILESTONE_PROOF_MAX),
       effort: str(r.effort, MILESTONE_EFFORT_MAX),
       verifier: normalizeVerifier(r.verifier),
+      released: milestoneReleased(r, out.length),
       sessions,
     });
   }
@@ -177,7 +178,7 @@ export async function saveSeason(
     const keep = new Set(milestones.map((m) => m.id));
     const removed = (Array.isArray(stored?.milestones) ? stored.milestones : [])
       .map((m: unknown) => String((m as { id?: unknown })?.id ?? ""))
-      .filter((mid: string) => mid && !keep.has(mid));
+      .filter((mid: string) => mid && (!keep.has(mid) || milestones.find(m => m.id === mid)?.released === false));
     const blocked: string[] = [];
     for (const mid of removed) {
       const q = await tx.get(ref.collection("submissions").where("milestoneId", "==", mid).limit(1));
@@ -235,15 +236,15 @@ export async function recordSubmission(
 
     const profile = pSnap.data();
     if (!profile) throw new HttpError(403, "no-profile");
-    if (profile.consentStatus === "pending") throw new HttpError(403, "consent-pending");
 
     const season = sSnap.data();
     if (!season) throw new HttpError(404, "not-found");
-    if (season.state === "archived") throw new HttpError(409, "season-closed");
+    if (season.state !== "live") throw new HttpError(409, "season-closed");
     const milestone = (Array.isArray(season.milestones) ? season.milestones : []).find(
       (m: unknown) => (m as { id?: unknown })?.id === mid
     ) as Record<string, unknown> | undefined;
     if (!milestone) throw new HttpError(404, "unknown-milestone");
+    if (!milestoneReleased(milestone, season.milestones.indexOf(milestone))) throw new HttpError(403, "milestone-locked");
 
     // The whole reason this runs on the server: the verifier decides whether
     // the row is born approved, and it comes from the season doc, never the
@@ -318,4 +319,19 @@ export async function reviewSubmission(
     updatedAt: now,
   });
   return { status };
+}
+
+export async function readReleasedSeason(uid: string) {
+  const db = adminDb();
+  if (!(await db.collection("profiles").doc(uid).get()).exists) throw new HttpError(403, "no-profile");
+  const snap = await db.collection("seasons").where("state", "==", "live").limit(1).get();
+  const doc = snap.docs[0];
+  if (!doc) return null;
+  const data = doc.data();
+  const all = cleanMilestones(data.milestones);
+  const milestones = all.filter(milestoneReleased);
+  return { id: doc.id, name: data.name, kind: data.kind, category: data.category, duration: data.duration,
+    tagline: data.tagline, overview: data.overview, outcome: data.outcome, state: data.state,
+    milestones, milestonePreviews: all.map((m, i) => ({ id: m.id, title: m.title, released: milestoneReleased(m, i) })),
+    hasUpcoming: milestones.length < all.length };
 }

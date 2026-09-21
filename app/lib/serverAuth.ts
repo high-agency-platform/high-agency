@@ -42,6 +42,14 @@ export async function requireUser(req: NextRequest): Promise<Caller> {
   }
 }
 
+/** Calendar connections belong only to admitted members with a profile. */
+export async function requireMember(req: NextRequest): Promise<Caller & { profile: Record<string, unknown> }> {
+  const caller = await requireUser(req);
+  const profile = (await adminDb().collection("profiles").doc(caller.uid).get()).data();
+  if (!profile || !["mentor", "operator"].includes(String(profile.role))) throw new HttpError(403, "forbidden");
+  return { ...caller, profile };
+}
+
 /** A signed-in caller whose profile says mentor. Returns the profile data
  *  too, since every mentor route needs at least the display name. */
 export async function requireMentor(

@@ -1,8 +1,7 @@
 "use client";
 
 /* Mentor home: the work waiting on you. Proof to review is the daily job and
-   sits first; then who's waiting on a parent, what you're running, and where
-   everyone is on the track. */
+   sits first, then sessions and everyone’s progress on the track. */
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
@@ -11,9 +10,8 @@ import {
   useLiveSeason,
   useReviewQueue,
   useRoster,
-  useConsentQueue,
 } from "../../components/mentorData";
-import { watchMyUpcomingWorkshops, grantConsent, requestConsentEmail } from "../../lib/db";
+import { watchMyUpcomingWorkshops } from "../../lib/db";
 import { createWorkshop } from "../../lib/api";
 import { workshopSpots, seasonProgress } from "../../lib/types";
 import type { Profile, Submission, Workshop } from "../../lib/types";
@@ -31,10 +29,6 @@ function fmtWhen(d: Date): string {
   );
 }
 
-function fmtSent(ts: { toDate: () => Date }): string {
-  return ts.toDate().toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
 export default function MentorHomePage() {
   const { user, profile } = useMentorGate();
   const uid = user?.uid ?? null;
@@ -43,12 +37,10 @@ export default function MentorHomePage() {
   const seasonId = season?.id ?? null;
   const { queue, truncated } = useReviewQueue(seasonId);
   const { operators, submissions } = useRoster(seasonId);
-  const { pending, truncated: moreConsent } = useConsentQueue(!!uid);
   const { status: calendar } = useCalendarStatus();
 
   const [sessions, setSessions] = useState<Workshop[]>([]);
   const [viewing, setViewing] = useState<Profile | null>(null);
-  const [resendState, setResendState] = useState<Record<string, string>>({});
 
   // The new-session composer, right here on the home screen.
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -94,15 +86,6 @@ export default function MentorHomePage() {
     }
   }
 
-  async function resendConsent(targetUid: string) {
-    setResendState((s) => ({ ...s, [targetUid]: "Sending…" }));
-    const r = await requestConsentEmail(targetUid).catch(() => ({ ok: false, error: "network" }));
-    setResendState((s) => ({
-      ...s,
-      [targetUid]: r.ok ? "Email sent just now" : r.error === "rate-limited" ? "Sent recently — wait a minute" : "Couldn't send",
-    }));
-  }
-
   if (!user || !profile) return null;
 
   const first = profile.name.split(" ")[0];
@@ -114,7 +97,6 @@ export default function MentorHomePage() {
   /** The job, as counts. Zero-count queues aren't shown. */
   const counts = [
     { n: queue?.length ?? 0, label: (queue?.length ?? 0) === 1 ? "proof to review" : "proofs to review", href: "#review" },
-    { n: pending?.length ?? 0, label: "waiting on a parent", href: "#consent" },
   ].filter((q) => q.n > 0);
 
   return (
@@ -143,9 +125,6 @@ export default function MentorHomePage() {
       {error && <p className="form-err">{error}</p>}
       {flash && <p className="micro signal screen__block">{flash}</p>}
 
-      <section className="screen__block">
-        <CalendarConnect returnTo="/mentor" compact />
-      </section>
 
       {!seasonLoading && !season && (
         <section className="tile tile--ember screen__block" style={{ alignItems: "flex-start" }}>
@@ -233,6 +212,7 @@ export default function MentorHomePage() {
                 Calendar
               </Link>
             </div>
+            <CalendarConnect returnTo="/mentor" compact />
             {upcoming.length === 0 ? (
               <p className="empty">Nothing booked. Schedule a workshop above.</p>
             ) : (
@@ -271,59 +251,7 @@ export default function MentorHomePage() {
             )}
           </section>
 
-          {/* ---- Parental consent: an ops queue, not a daily surface ---- */}
-          <details className="more tile" id="consent" open={(pending?.length ?? 0) > 0}>
-            <summary className="more__toggle">
-              Parental consent
-              <span className="more__hint">
-                {pending === null ? "…" : pending.length === 0 ? "queue clear" : `${pending.length}${moreConsent ? "+" : ""} waiting`}
-              </span>
-            </summary>
-            <div className="more__body">
-              {pending === null ? (
-                <p className="empty">Loading…</p>
-              ) : pending.length === 0 ? (
-                <p className="empty">Nobody is waiting on a parent.</p>
-              ) : (
-                <>
-                  {moreConsent && (
-                    <p className="micro" style={{ marginBottom: 12 }}>
-                      Showing the first {pending.length}. Clear these to load more.
-                    </p>
-                  )}
-                  <div className="admin-list">
-                    {pending.map((p) => (
-                      <div key={p.uid} className="tile tile--flat admin-row">
-                        <div className="admin-row__body">
-                          <div className="admin-row__title">
-                            <b>{p.name}</b>
-                          </div>
-                          <span className="admin-row__meta">
-                            {p.ageBand} · {p.country}
-                          </span>
-                          <span className="admin-row__meta">
-                            {resendState[p.uid]
-                              ? resendState[p.uid]
-                              : p.consentEmailSentAt
-                                ? `Email sent ${fmtSent(p.consentEmailSentAt)}`
-                                : "No consent email sent yet"}
-                          </span>
-                        </div>
-                        <div className="row-actions" style={{ marginTop: 0 }}>
-                          <button className="btn btn--ghost btn--sm" onClick={() => resendConsent(p.uid)}>
-                            Resend
-                          </button>
-                          <button className="btn btn--verify btn--sm" onClick={() => grantConsent(p.uid).catch(() => {})}>
-                            Grant
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </details>
+
         </div>
       </div>
 

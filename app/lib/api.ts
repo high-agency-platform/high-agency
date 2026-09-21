@@ -106,35 +106,25 @@ export async function reviewProof(input: ReviewWire): Promise<{ status: Submissi
   return r.data;
 }
 
-/* ---------------- Build log (streak action) ---------------- */
-
-/** One line to the season feed. The server writes the log and the streak
- *  together; the live profile listener moves the flame. */
-export async function postBuildLog(text: string): Promise<{ streak: number; day: string }> {
-  const r = await authed<{ streak: number; day: string; error?: string }>("/api/build-log", {
-    method: "POST",
-    body: JSON.stringify({ text }),
-  });
-  if (!r.ok) throw new Error(r.data.error ?? "failed");
-  return r.data;
-}
-
 /* ---------------- Google Calendar ---------------- */
 
 export interface CalendarStatus {
   /** The OAuth client exists on the server at all. */
   configured: boolean;
-  /** This mentor has connected an account. */
+  /** This member has connected an account. */
   connected: boolean;
   email: string;
+  syncError: boolean;
 }
 
 export async function calendarStatus(): Promise<CalendarStatus> {
   const r = await authed<Partial<CalendarStatus>>("/api/google/status");
+  if (!r.ok) throw new Error("calendar-status-failed");
   return {
     configured: !!r.data.configured,
     connected: !!r.data.connected,
     email: r.data.email ?? "",
+    syncError: !!r.data.syncError,
   };
 }
 
@@ -152,4 +142,9 @@ export async function connectCalendar(returnTo: string): Promise<void> {
 export async function disconnectCalendar(): Promise<void> {
   const r = await authed<{ error?: string }>("/api/google/disconnect", { method: "POST" });
   if (!r.ok) throw new Error(r.data.error ?? "failed");
+}
+
+export async function syncCalendar(): Promise<void> {
+  const r = await authed<{ error?: string }>("/api/google/sync", { method: "POST" });
+  if (!r.ok) throw new Error(r.data.error ?? "sync-failed");
 }

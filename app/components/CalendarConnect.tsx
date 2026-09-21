@@ -5,8 +5,8 @@
    Sessions get their Meet room from here. */
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { calendarStatus, connectCalendar, disconnectCalendar, type CalendarStatus } from "../lib/api";
-import { CalendarIcon, CheckIcon } from "./ui";
+import { calendarStatus, connectCalendar, disconnectCalendar, syncCalendar, type CalendarStatus } from "../lib/api";
+import { CheckIcon } from "./ui";
 
 /** Fetched once per mount. `null` while loading. */
 export function useCalendarStatus(): {
@@ -65,6 +65,8 @@ function useReturnFlash(): string {
     ? "Google Calendar connected."
     : landed === "denied"
       ? "No access was granted — nothing changed."
+      : landed === "sync-error"
+        ? "Connected. Session sync needs a retry."
       : landed
         ? "Couldn't connect. Try again."
         : "";
@@ -96,34 +98,45 @@ export function CalendarConnect({
   }
 
   async function disconnect() {
-    if (!confirm("Disconnect Google Calendar? Existing events stay on your calendar.")) return;
+    if (!confirm("Disconnect Google Calendar? Future synced session copies will be removed; hosted events stay on your calendar.")) return;
     setBusy(true);
     setErr("");
     try {
       await disconnectCalendar();
       refresh();
-    } catch {
-      setErr("Couldn't disconnect. Try again.");
+    } catch (error) {
+      setErr(error instanceof Error && error.message === "invitation-sync-incomplete" ? "Disconnected. Session invitations need a retry." : "Couldn't disconnect. Try again.");
     } finally {
+      refresh();
       setBusy(false);
     }
   }
 
+  async function sync() {
+    setBusy(true);
+    setErr("");
+    try { await syncCalendar(); refresh(); }
+    catch { setErr("Session sync is incomplete. Please retry."); }
+    finally { setBusy(false); }
+  }
+
   if (statusError) return <div className="notice"><span role="alert">{statusError}</span><button className="btn btn--ghost btn--sm" onClick={refresh}>Retry</button></div>;
-  if (status === null) return <p className="muted">Checking Google Calendar…</p>;
-  if (!status.configured) return compact ? null : <div className="tile"><h2 className="h3">Google Calendar</h2><p className="muted">Calendar setup is unavailable.</p></div>;
+  if (status === null) return <span className="meta muted">Checking calendar…</span>;
+  const unavailable = !status.configured;
+  const hint = status.connected ? "Your enrolled sessions sync automatically. Click to sync again." : "Add your enrolled sessions to Google Calendar automatically.";
 
   return (
-    <section className={compact ? "notice" : "tile calendar-connect"}>
-      <div className="calendar-connect__body">
-        <h2 className="h3"><CalendarIcon size={18} /> Google Calendar {status.connected && <span className="signal"><CheckIcon size={16} /></span>}</h2>
-        <p>{status.connected ? status.email || "Connected" : "Connect to create Meet links and invite members."}</p>
-        {flash && <p role="status">{flash}</p>}
-        {err && <p className="form-err" role="alert">{err}</p>}
-      </div>
-      <button className={`btn ${status.connected ? "btn--ghost" : "btn--primary"} btn--sm`} onClick={status.connected ? disconnect : connect} disabled={busy}>
-        {busy ? "Working…" : status.connected ? "Disconnect" : "Connect"}
+    <div className={compact ? "calendar-connect-inline" : "tile calendar-connect"}>
+      <button className="btn btn--ghost btn--sm" onClick={status.connected || status.syncError ? sync : connect} disabled={busy || unavailable} title={hint}>
+        {/* Official Google Calendar product artwork. */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/brand/google-calendar.webp" width={19} height={19} alt="" />
+        {busy ? "Working…" : status.syncError ? "Retry calendar sync" : status.connected ? "Google Calendar" : "Connect Google Calendar"}
+        {status.connected && !status.syncError && <CheckIcon size={14} />}
       </button>
-    </section>
+      {!compact && status.connected && <button className="btn btn--ghost btn--sm" onClick={disconnect} disabled={busy}>Disconnect</button>}
+      {flash && <span className="meta" role="status">{flash}</span>}
+      {(err || status.syncError) && <span className="form-err" role="alert">{err || "Some sessions need another sync."}</span>}
+    </div>
   );
 }

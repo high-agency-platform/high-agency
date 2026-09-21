@@ -9,15 +9,19 @@ const ITEMS: { q: string; a: string }[] = [
   },
   {
     q: "Is it free?",
-    a: "The founding batch is free. Live mentorship becomes a premium add-on later.",
+    a: "Yes. Batch 02 is free, like the founding batch.",
   },
   {
     q: "How selective is it?",
     a: "By application, intentionally small. We weigh drive over résumé.",
   },
   {
+    q: "When does it start?",
+    a: "The founding batch is full. Batch 02 starts in November; apply now and we'll confirm the exact date with your acceptance.",
+  },
+  {
     q: "Do I need a startup idea?",
-    a: "No. Your Unit helps you find the thing worth building.",
+    a: "No. Your mentors help you find the thing worth building.",
   },
   {
     q: "What's the time commitment?",
@@ -25,7 +29,7 @@ const ITEMS: { q: string; a: string }[] = [
   },
   {
     q: "I'm under 18. What about my parents?",
-    a: "A guardian gives consent before full access. They don't run it — you do.",
+    a: "Invited members can join after verifying their email and setting up a profile. You don't need to wait for a parent approval email.",
   },
 ];
 

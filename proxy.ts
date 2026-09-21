@@ -10,6 +10,7 @@ import { PLATFORM_ENABLED } from "./app/lib/flags";
 //
 // Keep this list in sync with the routes under `app/(platform)/` plus `/login`.
 const PLATFORM_PREFIXES = [
+  "/join",
   "/login",
   "/onboarding",
   "/dashboard",
@@ -36,6 +37,8 @@ export function proxy(request: NextRequest) {
 // the bare path and the wildcard so `/login` and `/login/...` are both covered.
 export const config = {
   matcher: [
+    "/join",
+    "/join/:path*",
     "/login",
     "/login/:path*",
     "/onboarding",

@@ -183,7 +183,7 @@ beforeEach(async () => {
   });
 });
 
-const asUser = (uid, opts) => testEnv.authenticatedContext(uid, opts).firestore();
+const asUser = (uid, opts) => testEnv.authenticatedContext(uid, { email_verified: true, ...opts }).firestore();
 const subs = (db) => collection(db, "seasons/s1/submissions");
 
 /* ========================================================================= *
@@ -312,7 +312,7 @@ test("GATE: clients cannot read or write approvedMembers", async () => {
 test("pending minor can still READ (sees the waiting-on-consent state)", async () => {
   const db = asUser("minor");
   await assertSucceeds(getDoc(doc(db, "profiles/minor")));
-  await assertSucceeds(getDoc(doc(db, "seasons/s1")));
+  await assertFails(getDoc(doc(db, "seasons/s1")));
 });
 
 test("PHOTO: operators and mentors can update their own bounded raster photo", async () => {
@@ -384,10 +384,11 @@ test("GOOGLE TOKENS: clients cannot read or write a mentor's calendar token", as
  *  The season — readable by everyone signed in, written only by the server
  * ========================================================================= */
 
-test("SEASON: every signed-in user can read it; a visitor cannot", async () => {
-  await assertSucceeds(getDoc(doc(asUser("granted"), "seasons/s1")));
-  await assertSucceeds(getDoc(doc(asUser("minor"), "seasons/s1")));
-  await assertSucceeds(getDocs(query(collection(asUser("granted"), "seasons"), where("state", "==", "live"))));
+test("SEASON: only mentors can read the full unreleased track", async () => {
+  await assertFails(getDoc(doc(asUser("granted"), "seasons/s1")));
+  await assertSucceeds(getDoc(doc(asUser("mentorA"), "seasons/s1")));
+  await assertFails(getDoc(doc(asUser("minor"), "seasons/s1")));
+  await assertFails(getDocs(query(collection(asUser("granted"), "seasons"), where("state", "==", "live"))));
   await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "seasons/s1")));
 });
 
@@ -431,16 +432,14 @@ test("PROOF: any mentor reads a mentor-reviewed row", async () => {
   await assertSucceeds(getDoc(doc(asUser("mentorB"), "seasons/s1/submissions/other__mission")));
 });
 
-test("PROOF: every signed-in member reads an open row — it's the accountability", async () => {
-  await assertSucceeds(getDoc(doc(asUser("other"), "seasons/s1/submissions/granted__cold-ask")));
-  await assertSucceeds(getDoc(doc(asUser("minor"), "seasons/s1/submissions/granted__cold-ask")));
+test("PROOF: auto-completed proof is private to its author and mentors", async () => {
+  await assertFails(getDoc(doc(asUser("other"), "seasons/s1/submissions/granted__cold-ask")));
+  await assertFails(getDoc(doc(asUser("minor"), "seasons/s1/submissions/granted__cold-ask")));
   await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), "seasons/s1/submissions/granted__cold-ask")));
 });
 
-test("PROOF LIST: the public wall — where verifier == 'open' — is readable by an operator", async () => {
-  const db = asUser("other");
-  const snap = await assertSucceeds(getDocs(query(subs(db), where("verifier", "==", "open"))));
-  if (snap.size !== 1) throw new Error(`expected exactly the one open row, got ${snap.size}`);
+test("PROOF LIST: the removed public wall is denied", async () => {
+  await assertFails(getDocs(query(subs(asUser("other")), where("verifier", "==", "open"))));
 });
 
 test("PROOF LIST: your own rows — where uid == you — are readable, every verifier kind", async () => {
@@ -474,9 +473,9 @@ test("PROOF LIST: a mentor reads everything (the roster)", async () => {
  *  Build log — the season feed. Server-written; author may delete own.
  * ========================================================================= */
 
-test("FEED: every signed-in user reads it", async () => {
-  await assertSucceeds(getDoc(doc(asUser("other"), "buildLogs/l1")));
-  await assertSucceeds(getDocs(collection(asUser("minor"), "buildLogs")));
+test("FEED: retired community feed is not readable", async () => {
+  await assertFails(getDoc(doc(asUser("other"), "buildLogs/l1")));
+  await assertFails(getDocs(collection(asUser("minor"), "buildLogs")));
 });
 
 test("FEED: nobody posts a build log from the browser (server route only)", async () => {
@@ -486,10 +485,10 @@ test("FEED: nobody posts a build log from the browser (server route only)", asyn
   await assertFails(updateDoc(doc(asUser("granted"), "buildLogs/l1"), { text: "edited" }));
 });
 
-test("FEED: the author may delete their own line; nobody else may", async () => {
+test("FEED: retired feed cannot be mutated", async () => {
   await assertFails(deleteDoc(doc(asUser("other"), "buildLogs/l1")));
   await assertFails(deleteDoc(doc(asUser("mentorA"), "buildLogs/l1")));
-  await assertSucceeds(deleteDoc(doc(asUser("granted"), "buildLogs/l1")));
+  await assertFails(deleteDoc(doc(asUser("granted"), "buildLogs/l1")));
 });
 
 /* ========================================================================= *
@@ -503,4 +502,59 @@ test("SQUADS: the old cohorts collection is sealed (no rule = deny)", async () =
   await assertFails(getDoc(doc(asUser("granted"), "cohorts/old")));
   await assertFails(getDoc(doc(asUser("mentorA"), "cohorts/old")));
   await assertFails(updateDoc(doc(asUser("granted"), "cohorts/old"), { name: "x" }));
+});
+
+test("INVITES: verified membership permits onboarding without an email allowlist", async () => {
+  await testEnv.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), "memberships/invited"), { role: "operator", seasonId: "s1" }));
+  await assertFails(setDoc(doc(asUser("invited", { email_verified: false }), "profiles/invited"), profile("invited", "granted")));
+  await assertSucceeds(setDoc(doc(asUser("invited"), "profiles/invited"), { ...profile("invited", "granted"), domains: [], skills: [], photoUrl: "data:image/webp;base64,UklGRg==" }));
+});
+
+test("INVITES: no client can self-enroll, inspect invites, or bypass verification", async () => {
+  for (const col of ["seasonInvites", "memberships", "accessRateLimits"]) {
+    await assertFails(getDocs(collection(asUser("mentorA"), col)));
+    await assertFails(setDoc(doc(asUser("newbie"), col, "newbie"), { role: "mentor" }));
+  }
+  await assertFails(setDoc(doc(asUser("newbie", { email: "approved@example.com", email_verified: false }), "profiles/newbie"), profile("newbie", "granted")));
+  await assertFails(getDoc(doc(asUser("stranger"), "profiles/granted")));
+  await assertFails(getDocs(collection(asUser("stranger"), "workshops")));
+});
+
+
+test("PROFILE: optional domains are bounded at twenty characters on create and edit", async () => {
+  await testEnv.withSecurityRulesDisabled(async ctx => setDoc(doc(ctx.firestore(), "memberships/domain-test"), { role: "operator", seasonId: "s1" }));
+  const ref = doc(asUser("domain-test"), "profiles/domain-test");
+  await assertFails(setDoc(ref, { ...profile("domain-test", "none"), domains: ["x".repeat(21)] }));
+  await assertSucceeds(setDoc(ref, { ...profile("domain-test", "none"), domains: ["x".repeat(20)] }));
+  await assertFails(updateDoc(ref, { domains: ["AI", "x".repeat(21)] }));
+  await assertFails(updateDoc(ref, { domains: ["AI", 7] }));
+  await assertSucceeds(updateDoc(ref, { domains: [] }));
+});
+
+test("PROFILE: legacy long domains do not block unrelated edits", async () => {
+  await testEnv.withSecurityRulesDisabled(async ctx => updateDoc(doc(ctx.firestore(), "profiles/granted"), { domains: ["x".repeat(24)] }));
+  await assertSucceeds(updateDoc(doc(asUser("granted"), "profiles/granted"), { headline: "New headline" }));
+  await assertFails(updateDoc(doc(asUser("granted"), "profiles/granted"), { domains: ["y".repeat(24)] }));
+});
+
+
+test("PROFILE: advisor title and roster visibility are server-owned", async () => {
+  await testEnv.withSecurityRulesDisabled(async ctx => {
+    await setDoc(doc(ctx.firestore(), "memberships/staff-title-test"), { role: "operator", seasonId: "s1" });
+    await updateDoc(doc(ctx.firestore(), "profiles/mentorA"), { staffTitle: "advisor", hidden: false });
+    await updateDoc(doc(ctx.firestore(), "profiles/other"), { hidden: true });
+  });
+  const newProfile = doc(asUser("staff-title-test"), "profiles/staff-title-test");
+  for (const metadata of [{ staffTitle: "advisor" }, { hidden: true }, { hidden: false }]) {
+    await assertFails(setDoc(newProfile, { ...profile("staff-title-test", "none"), ...metadata }));
+  }
+  await assertFails(updateDoc(doc(asUser("mentorB"), "profiles/mentorB"), { staffTitle: "advisor" }));
+  await assertFails(updateDoc(doc(asUser("mentorA"), "profiles/mentorA"), { staffTitle: "mentor" }));
+  await assertFails(updateDoc(doc(asUser("mentorA"), "profiles/mentorA"), { hidden: true }));
+  await assertFails(updateDoc(doc(asUser("other"), "profiles/other"), { hidden: false }));
+  await assertFails(updateDoc(doc(asUser("granted"), "profiles/granted"), { hidden: true }));
+  await assertSucceeds(updateDoc(doc(asUser("mentorA"), "profiles/mentorA"), { headline: "An advisor profile" }));
+  await assertSucceeds(updateDoc(doc(asUser("other"), "profiles/other"), { headline: "A hidden profile" }));
+  // Visibility metadata leaves the canonical mentor role and permissions intact.
+  await assertSucceeds(getDoc(doc(asUser("mentorA"), "seasons/s1")));
 });

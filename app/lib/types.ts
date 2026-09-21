@@ -130,14 +130,17 @@ export interface Profile {
   bio: string;
   links: { github: string; linkedin: string; site: string };
 
-  /** Minors start "pending" until a parent confirms; adults are "granted". */
+  /** Historical consent metadata; new operators use "none". Never an access gate. */
   consentStatus: ConsentStatus;
-  /** When the parental-consent email was last dispatched (server-set, admin
-   *  SDK). Gives mentors context in the consent queue; absent until sent. */
+  /** Historical parental email dispatch time. */
   consentEmailSentAt?: Timestamp;
   /** Dormant monetization scaffold — everyone is "free"; nothing reads it. */
   plan: Plan;
   role: Role;
+  /** Server-assigned display distinction; permissions still come from role. */
+  staffTitle?: "advisor";
+  /** Server-owned roster visibility for retired test profiles; not an access gate. */
+  hidden?: boolean;
 
   /* ---- streak (the only game mechanic) ---- */
   streak: number;
@@ -169,7 +172,7 @@ export interface PrivateProfile {
   /** YYYY-MM-DD. */
   dob: string;
   city: string;
-  /** Set for minors; consent email goes here. */
+  /** Historical parent contact; new profiles leave this empty. */
   parentEmail: string;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -320,16 +323,7 @@ export interface CohortApplication {
 /* Build log (the sleeper feature)                                     */
 /* ------------------------------------------------------------------ */
 
-export interface BuildLog {
-  id: string;
-  uid: string;
-  name: string;
-  /** One-liner to a short paragraph (<=300 chars). */
-  text: string;
-  /** YYYY-MM-DD in the author's local time. */
-  day: string;
-  createdAt?: Timestamp;
-}
+
 
 /* ------------------------------------------------------------------ */
 /* Workshops                                                           */
@@ -337,6 +331,8 @@ export interface BuildLog {
 
 export interface Workshop {
   id: string;
+  /** Operator-hidden fixture or archived session; retained for audit/history. */
+  hidden?: boolean;
   title: string;
   /** Display name of the owning mentor, stamped server-side from their profile. */
   mentorName: string;
@@ -366,6 +362,12 @@ export interface Workshop {
 export const WORKSHOP_MIN_CAPACITY = 2;
 export const WORKSHOP_MAX_CAPACITY = 200;
 export const WORKSHOP_DEFAULT_CAPACITY = 15;
+export const WORKSHOP_MAX_DURATION_MINS = 600;
+
+/** Active sessions remain available to late joiners until their scheduled end. */
+export function workshopIsUpcoming(w: Workshop, now: number): boolean {
+  return w.startsAt.toDate().getTime() + w.durationMins * 60_000 > now;
+}
 
 /** A Google Calendar draft, using UTC instants so DST never shifts a session. */
 export function workshopCalendarUrl(w: Workshop): string {
@@ -443,13 +445,14 @@ export const CHECKIN_NUDGE_WEEKS = 2;
 export type SeasonState = "draft" | "live" | "archived";
 
 /** Who closes a milestone out.
- *  "open"   — posting the proof completes it, and every member can see it.
+ *  "open"   — posting the proof completes it; author and mentors can see it.
  *  "mentor" — a mentor approves or returns it; the proof is private to the
  *             author and the mentors, and stays private after approval.
  *  The mentor's source copy says `peer_lead`; normalizeVerifier() maps it. */
 export type Verifier = "open" | "mentor";
 
 export interface SeasonMilestone {
+  released?: boolean;
   /** Stable for the life of the season and NEVER regenerated on edit —
    *  submission doc ids are built from it (see submissionKey). */
   id: string;
@@ -467,7 +470,14 @@ export interface SeasonMilestone {
   sessions: string[];
 }
 
+/** Legacy tracks start with just their first milestone released. */
+export function milestoneReleased(m: { released?: unknown }, index: number): boolean {
+  return m.released === true || (m.released === undefined && index === 0);
+}
+
 export interface Season {
+  milestonePreviews?: { id: string; title: string; released: boolean }[];
+  hasUpcoming?: boolean;
   id: string;
   name: string;
   kind: string;
@@ -572,12 +582,12 @@ export function seasonProgress(
   mine: Submission[]
 ): { done: number; total: number } {
   const approved = new Set(mine.filter((s) => s.status === "approved").map((s) => s.milestoneId));
-  const list = season?.milestones ?? [];
+  const list = season?.milestonePreviews ?? season?.milestones ?? [];
   return { done: list.filter((m) => approved.has(m.id)).length, total: list.length };
 }
 
 /** The first milestone this operator hasn't had approved. Visual only —
- *  nothing is gated; any milestone may be submitted in any order. */
+ *  the server supplies only milestones released by the mentor. */
 export function nextMilestone(
   season: Season | null | undefined,
   mine: Submission[]

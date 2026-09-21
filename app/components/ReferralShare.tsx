@@ -61,7 +61,7 @@ export default function ReferralShare({
     if (navigator.share) {
       try {
         await navigator.share({
-          title: "High Agency — Founding Batch 01",
+          title: "High Agency — Batch 02",
           text: "I'm in the queue for High Agency. Apply with my link and we both move up.",
           url: link,
         });

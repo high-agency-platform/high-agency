@@ -1,26 +1,25 @@
 "use client";
 
-/* One workspace: the track first, then sessions and shared updates. */
+/* One workspace: the track first, then sessions and resources. */
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "../../components/AuthProvider";
 import {
-  watchLiveSeason,
+  watchReleasedSeason,
   watchMySubmissions,
-  watchOpenSubmissions,
-  watchBuildLogs,
-  removeBuildLog,
   getUpcomingWorkshops,
+  watchUpcomingWorkshops,
   getPastWorkshops,
 } from "../../lib/db";
 import { enrollWorkshop, leaveWorkshop } from "../../lib/api";
+import { SLACK_URL } from "../../lib/program";
 import { seasonProgress } from "../../lib/types";
-import type { BuildLog, Season, Submission, Workshop } from "../../lib/types";
-import { Bar, LockIcon } from "../../components/ui";
+import type { Season, Submission, Workshop } from "../../lib/types";
+import { Bar } from "../../components/ui";
 import { MemberButton } from "../../components/MemberButton";
-import { ConsentResend } from "../../components/ConsentResend";
-import { ShipLine } from "../../components/ShipLine";
+import { CalendarConnect } from "../../components/CalendarConnect";
 import { SeasonPath } from "../../components/Season";
 import { WorkshopList } from "../../components/WorkshopList";
 
@@ -32,10 +31,9 @@ export default function HomePage() {
   // Tagged with the season they came from, so a season change can never
   // briefly show the previous season's rows.
   const [mineSnap, setMineSnap] = useState<{ seasonId: string; subs: Submission[] } | null>(null);
-  const [wallSnap, setWallSnap] = useState<{ seasonId: string; subs: Submission[] } | null>(null);
-  const [logs, setLogs] = useState<BuildLog[]>([]);
   const [workshops, setWorkshops] = useState<Workshop[] | null>(null);
   const [recordings, setRecordings] = useState<Workshop[]>([]);
+  const [seasonError, setSeasonError] = useState("");
   const [seatErr, setSeatErr] = useState("");
 
   useEffect(() => {
@@ -50,7 +48,7 @@ export default function HomePage() {
 
   useEffect(() => {
     if (!uid) return;
-    return watchLiveSeason((season) => setSeasonSnap({ season }));
+    return watchReleasedSeason((season) => { setSeasonSnap({ season }); setSeasonError(""); }, () => setSeasonError("Couldn’t load the track. Reconnecting…"));
   }, [uid]);
 
   const season = seasonSnap?.season ?? null;
@@ -62,19 +60,10 @@ export default function HomePage() {
   }, [uid, seasonId]);
 
   useEffect(() => {
-    if (!uid || !seasonId) return;
-    return watchOpenSubmissions(seasonId, (subs) => setWallSnap({ seasonId, subs }));
-  }, [uid, seasonId]);
-
-  useEffect(() => {
     if (!uid) return;
-    return watchBuildLogs(setLogs);
-  }, [uid]);
-
-  useEffect(() => {
-    if (!uid) return;
-    getUpcomingWorkshops().then(setWorkshops).catch(() => setWorkshops([]));
+    const stop = watchUpcomingWorkshops(setWorkshops, () => setSeatErr("Couldn’t load sessions. Please refresh."));
     getPastWorkshops().then(setRecordings).catch(() => setRecordings([]));
+    return stop;
   }, [uid]);
 
   /** Claim a seat, then reflect it locally — sessions are fetched once, not
@@ -119,8 +108,6 @@ export default function HomePage() {
   if (!user || !profile) return null;
 
   const mine = mineSnap && mineSnap.seasonId === seasonId ? mineSnap.subs : [];
-  const wall = wallSnap && wallSnap.seasonId === seasonId ? wallSnap.subs : [];
-  const consentPending = profile.consentStatus === "pending";
   const progress = seasonProgress(season, mine);
 
   return (
@@ -132,39 +119,11 @@ export default function HomePage() {
               <span className="micro">Season 1</span>
               <h1 className="h1">{season.name}</h1>
             </div>
-            {(season.overview || season.outcome || season.tagline || season.category || season.duration) && (
-              <details className="more dashboard__about">
-                <summary className="more__toggle">Season guide</summary>
-                <div className="more__body">
-                  {(season.category || season.duration) && (
-                    <span className="micro">{[season.category, season.duration].filter(Boolean).join(" · ")}</span>
-                  )}
-                  {season.tagline && <p><b>{season.tagline}</b></p>}
-                  {season.overview && <p className="muted">{season.overview}</p>}
-                  {season.outcome && (
-                    <p>
-                      <b>By the end:</b> {season.outcome}
-                    </p>
-                  )}
-                </div>
-              </details>
-            )}
           </>
         ) : (
           <h1 className="h1">Yo, {profile.name.split(" ")[0]}.</h1>
         )}
       </header>
-
-      {consentPending && (
-        <div className="notice screen__block">
-          <LockIcon size={20} />
-          <span>
-            Waiting on your parent&apos;s OK.
-            <small>They got an email — everything unlocks after.</small>
-          </span>
-          <ConsentResend sentAtMs={profile.consentEmailSentAt?.toMillis()} />
-        </div>
-      )}
 
       <div className="dashboard__grid">
         <section className="tile dashboard__track" aria-labelledby="track-title">
@@ -177,12 +136,13 @@ export default function HomePage() {
             )}
           </div>
           {progress.total > 0 && <Bar value={progress.done / progress.total} />}
+          {seasonError && <p className="form-err" role="alert">{seasonError}</p>}
           {seasonSnap === null ? (
             <p className="empty">Loading…</p>
           ) : !season ? (
             <p className="empty">The track lands soon.</p>
           ) : (
-            <SeasonPath key={season.id} season={season} mine={mine} wall={wall} profile={profile} consentPending={consentPending} />
+            <SeasonPath key={season.id} season={season} mine={mine} />
           )}
         </section>
 
@@ -190,6 +150,7 @@ export default function HomePage() {
           <div className="tile__head">
             <h2 className="h3" id="sessions-title">Sessions</h2>
           </div>
+          <CalendarConnect returnTo="/dashboard" compact />
           {workshops === null ? (
             <p className="empty">Loading…</p>
           ) : workshops.length === 0 ? (
@@ -230,39 +191,18 @@ export default function HomePage() {
           )}
         </section>
 
-        <section className="tile dashboard__updates" aria-labelledby="updates-title">
-          <div className="tile__head">
-            <h2 className="h3" id="updates-title">Community</h2>
-          </div>
-          <ShipLine profile={profile} consentPending={consentPending} />
-          {logs.length === 0 ? (
-            <p className="empty">Share the first update.</p>
-          ) : (
-            <div className="feed">
-              {logs.map((l) => (
-                <div key={l.id} className="feed__row">
-                  <div className="feed__body">
-                    <div className="dashboard__byline">
-                      <MemberButton uid={l.uid} name={l.name} />
-                      <time className="feed__day" dateTime={l.day}>
-                        {new Date(`${l.day}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                      </time>
-                      {l.uid === profile.uid && (
-                        <button
-                          type="button"
-                          className="link-btn dashboard__remove"
-                          onClick={() => removeBuildLog(l.id).catch(() => {})}
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </div>
-                    <p>{l.text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <section className="tile dashboard__resources" aria-labelledby="resources-title">
+          <div className="tile__head"><h2 className="h3" id="resources-title">Resources</h2></div>
+          <a className="resource-link" href={SLACK_URL} target="_blank" rel="noreferrer">
+            <span className="resource-link__mark" aria-hidden="true"><Image src="/brand/slack.svg" alt="" width="28" height="28" /></span>
+            <span><strong>Slack</strong><small>Conversations, questions, and small wins.</small></span>
+            <span aria-hidden="true">↗</span>
+          </a>
+          <a className="resource-link" href="/resources/high-agency-structure.pdf" target="_blank" rel="noreferrer">
+            <span className="resource-link__mark" aria-hidden="true"><svg width="26" height="30" viewBox="0 0 24 28" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M4 1h10l6 6v20H4zM14 1v7h6M8 14h8M8 19h6" /></svg></span>
+            <span><strong>High Agency structure</strong><small>The vision, the skills, and the people.</small></span>
+            <span className="micro">PDF ↗</span>
+          </a>
         </section>
       </div>
     </div>

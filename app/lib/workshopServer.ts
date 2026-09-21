@@ -17,10 +17,15 @@ import {
   updateEvent,
   setAttendees,
   deleteEvent,
+  GOOGLE_TOKENS,
+  memberEventId,
+  syncMemberEvent,
+  pruneMemberEvents,
 } from "./googleCalendar";
 import {
   WORKSHOP_MIN_CAPACITY,
   WORKSHOP_MAX_CAPACITY,
+  WORKSHOP_MAX_DURATION_MINS,
 } from "./types";
 
 export interface WorkshopWire {
@@ -62,7 +67,7 @@ export function cleanWorkshop(input: Partial<WorkshopWire>): Clean {
   const startsAt = new Date(typeof input.startsAt === "string" ? input.startsAt : NaN);
   if (isNaN(startsAt.getTime())) throw new HttpError(400, "bad-start");
   const durationMins = Math.round(Number(input.durationMins));
-  if (!(durationMins > 0 && durationMins <= 600)) throw new HttpError(400, "bad-duration");
+  if (!(durationMins > 0 && durationMins <= WORKSHOP_MAX_DURATION_MINS)) throw new HttpError(400, "bad-duration");
   const capacity = Math.round(Number(input.capacity));
   if (!(capacity >= WORKSHOP_MIN_CAPACITY && capacity <= WORKSHOP_MAX_CAPACITY)) {
     throw new HttpError(400, "bad-capacity");
@@ -81,6 +86,8 @@ export function cleanWorkshop(input: Partial<WorkshopWire>): Clean {
 /** Sign-in emails for a set of uids — what goes on the guest list. */
 async function emailsFor(uids: string[]): Promise<string[]> {
   if (uids.length === 0) return [];
+  const linked = await adminDb().getAll(...uids.map(uid => adminDb().collection(GOOGLE_TOKENS).doc(uid)));
+  uids = uids.filter((_, i) => !linked[i].data()?.refreshTokenEnc);
   const out: string[] = [];
   for (let i = 0; i < uids.length; i += 100) {
     const res = await adminAuth().getUsers(uids.slice(i, i + 100).map((uid) => ({ uid })));
@@ -181,15 +188,15 @@ export async function updateWorkshop(
     recordingUrl: c.recordingUrl,
     mentorName,
   });
+  await Promise.all(((data.enrolledUids as string[]) ?? []).map(syncMemberCalendar));
 }
 
 export async function deleteWorkshop(id: string, mentorUid: string): Promise<void> {
   const { ref, data } = await ownedWorkshop(id, mentorUid);
   const token = await accessTokenFor(mentorUid);
-  if (token && typeof data.calendarEventId === "string" && data.calendarEventId) {
-    await deleteEvent(token, data.calendarEventId).catch((e) =>
-      console.warn("[workshops] calendar delete failed:", e)
-    );
+  if (typeof data.calendarEventId === "string" && data.calendarEventId) {
+    if (!token) throw new HttpError(409, "calendar-reconnect-required");
+    await deleteEvent(token, data.calendarEventId);
   }
   const db = adminDb();
   const batch = db.batch();
@@ -200,22 +207,25 @@ export async function deleteWorkshop(id: string, mentorUid: string): Promise<voi
   }
   batch.delete(ref);
   await batch.commit();
+  await Promise.all(((data.enrolledUids as string[]) ?? []).map(syncMemberCalendar));
 }
 
 export type SeatResult = "enrolled" | "already" | "full" | "left" | "not-enrolled";
 
 /** Keep the calendar guest list equal to the roster. Never throws — a
  *  calendar failure must not undo a seat. */
-async function syncGuests(workshopId: string): Promise<void> {
+async function syncGuests(workshopId: string): Promise<boolean> {
   try {
     const snap = await adminDb().collection("workshops").doc(workshopId).get();
     const data = snap.data();
-    if (!data?.calendarEventId || typeof data.mentorUid !== "string") return;
+    if (data?.hidden === true || !data?.calendarEventId || typeof data.mentorUid !== "string") return true;
     const token = await accessTokenFor(data.mentorUid);
-    if (!token) return;
+    if (!token) throw new Error("host-calendar-disconnected");
     await setAttendees(token, data.calendarEventId, await emailsFor(data.enrolledUids ?? []));
-  } catch (e) {
-    console.warn("[workshops] guest sync failed:", e);
+    return true;
+  } catch {
+    console.warn("[workshops] guest sync failed");
+    return false;
   }
 }
 
@@ -234,14 +244,17 @@ export async function enroll(workshopId: string, uid: string): Promise<SeatResul
       return "already" as const;
     }
     if (typeof w.capacity === "number" && roster.length >= w.capacity) return "full" as const;
-    tx.update(wRef, { enrolledUids: FieldValue.arrayUnion(uid) });
+    tx.update(wRef, { enrolledUids: FieldValue.arrayUnion(uid), enrollmentKeys: { ...(w.enrollmentKeys ?? {}), [uid]: `${Date.now()}-${Math.random().toString(36).slice(2)}` } });
     tx.update(pRef, {
       enrolledWorkshops: FieldValue.arrayUnion(workshopId),
       updatedAt: FieldValue.serverTimestamp(),
     });
     return "enrolled" as const;
   });
-  if (result === "enrolled") await syncGuests(workshopId);
+  if (result === "enrolled" || result === "already") {
+    await syncGuests(workshopId);
+    await syncMemberCalendar(uid);
+  }
   return result;
 }
 
@@ -263,6 +276,96 @@ export async function leave(workshopId: string, uid: string): Promise<SeatResult
     tx.update(wRef, { enrolledUids: FieldValue.arrayRemove(uid) });
     return "left" as const;
   });
-  if (result === "left") await syncGuests(workshopId);
+  if (result === "left" || result === "not-enrolled") {
+    await syncGuests(workshopId);
+    await syncMemberCalendar(uid);
+  }
   return result;
+}
+
+
+/** Reconcile from the current roster, including existing enrollments after OAuth. */
+async function reconcileMemberCalendar(uid: string): Promise<boolean> {
+  const db = adminDb();
+  const tokenRef = db.collection(GOOGLE_TOKENS).doc(uid);
+  try {
+    const token = await accessTokenFor(uid);
+    if (!token) return restoreMemberInvitations(uid);
+    const sessions = await db.collection("workshops").where("enrolledUids", "array-contains", uid).get();
+    const keep = new Set<string>();
+    for (const snap of sessions.docs) {
+      const w = snap.data();
+      if (w.hidden === true || w.mentorUid === uid) continue;
+      const start = w.startsAt.toDate() as Date;
+      const end = new Date(start.getTime() + Number(w.durationMins) * 60_000);
+      if (end.getTime() <= Date.now()) continue;
+      // Cancel any old email invitation before inserting the private copy.
+      if (!await syncGuests(snap.id)) throw new Error("guest-sync-failed");
+      const id = memberEventId(snap.id, String(w.enrollmentKeys?.[uid] ?? "legacy"));
+      keep.add(id);
+      await syncMemberEvent(token, id, {
+        summary: String(w.title), description: `${w.description ?? ""}\n\nHigh Agency workshop with ${w.mentorName ?? "your mentor"}.\n${w.meetLink ?? ""}`.trim(),
+        start, end, timezone: "UTC",
+      }, String(w.meetLink ?? ""));
+    }
+    await pruneMemberEvents(token, keep);
+    await tokenRef.update({ syncError: false });
+    return true;
+  } catch {
+    // Persist a visible retry state without logging provider payloads or member data.
+    if ((await tokenRef.get()).exists) await tokenRef.update({ syncError: true });
+    console.warn("[workshops] member calendar sync incomplete");
+    return false;
+  }
+}
+
+export async function restoreMemberInvitations(uid: string): Promise<boolean> {
+  const db = adminDb();
+  const sessions = await db.collection("workshops").where("enrolledUids", "array-contains", uid).get();
+  const results = await Promise.all(sessions.docs.filter(s => s.data().hidden !== true).map(s => syncGuests(s.id)));
+  const ok = results.every(Boolean);
+  await db.collection(GOOGLE_TOKENS).doc(uid).set({ invitationSyncPending: !ok, syncError: !ok }, { merge: true });
+  return ok;
+}
+
+
+/** A Firestore lease serializes reconciliation across concurrent server instances. */
+export async function syncMemberCalendar(uid: string): Promise<boolean> {
+  const db = adminDb();
+  const ref = db.collection(GOOGLE_TOKENS).doc(uid);
+  const acquired = await db.runTransaction(async tx => {
+    const data = (await tx.get(ref)).data();
+    if (!data?.refreshTokenEnc) return data?.invitationSyncPending === true ? "restore" : "disconnected";
+    if (Number(data.syncLockUntil ?? 0) > Date.now()) {
+      tx.update(ref, { syncRequested: true, syncError: true });
+      return "busy";
+    }
+    tx.update(ref, { syncLockUntil: Date.now() + 300_000, syncRequested: false });
+    return "acquired";
+  });
+  if (acquired === "restore") return restoreMemberInvitations(uid);
+  if (acquired !== "acquired") return acquired === "disconnected";
+  let ok = false;
+  try {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      ok = await reconcileMemberCalendar(uid);
+      const again = await db.runTransaction(async tx => {
+        const data = (await tx.get(ref)).data();
+        if (!data) return false;
+        const pending = data.syncRequested === true;
+        if (pending && attempt < 2) tx.update(ref, { syncRequested: false });
+        return pending;
+      });
+      if (!again || !ok) break;
+    }
+  } finally {
+    await db.runTransaction(async tx => {
+      const data = (await tx.get(ref)).data();
+      if (data) {
+        ok = ok && data.syncRequested !== true;
+        tx.update(ref, { syncLockUntil: 0, syncError: !ok });
+      }
+    });
+  }
+  return ok;
 }

@@ -18,15 +18,15 @@ const mono = Geist_Mono({
   display: "swap",
 });
 
-const SITE_URL = "https://high-agency-omega.vercel.app";
+const SITE_URL = "https://high-agency.io";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "High Agency: Apply for the Founding Batch",
+  title: "High Agency: Apply for Batch 02",
   description:
     "A selective cohort for ambitious young operators who'd rather build the thing than study it. Not school. Not tutoring. A launchpad.",
   openGraph: {
-    title: "High Agency: Apply for the Founding Batch",
+    title: "High Agency: Apply for Batch 02",
     description:
       "A selective cohort for ambitious young operators who'd rather build the thing than study it. Not school. Not tutoring. A launchpad.",
     url: SITE_URL,
@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "High Agency: Apply for the Founding Batch",
+    title: "High Agency: Apply for Batch 02",
     description:
       "A selective cohort for ambitious young operators who'd rather build the thing than study it.",
   },

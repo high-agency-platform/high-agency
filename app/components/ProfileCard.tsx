@@ -78,7 +78,7 @@ export function ProfileCard({ uid, profile, onSaved, onCancel }: { uid: string; 
   return (
     <form className="profile-editor" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
       <header className="profile-editor__head">
-        <span className="micro">{profile.name}</span>
+        <span className="micro">{profile.staffTitle === "advisor" ? "Advisor · " : ""}{profile.name}</span>
         <h2>Edit profile</h2>
       </header>
       <nav className="profile-editor__nav" aria-label="Profile sections">
@@ -98,7 +98,7 @@ export function ProfileCard({ uid, profile, onSaved, onCancel }: { uid: string; 
         <div className="field"><label htmlFor="pf-bio">About you</label><textarea id="pf-bio" value={bio} onChange={(e) => setBio(e.target.value)} maxLength={300} placeholder="Optional" /></div>
       </section>
       <section hidden={section !== "focus"} className="profile-editor__section">
-        <TagField label={mentor ? "Expertise" : "Interests"} presets={DOMAINS.filter((d) => d !== "Other")} value={domains} max={MAX_EXPERTISE} onChange={setDomains} />
+        <TagField label={mentor ? "Expertise" : "Interests"} presets={DOMAINS.filter((d) => d !== "Other")} value={domains} max={MAX_EXPERTISE} maxLength={mentor ? undefined : 20} onChange={setDomains} />
         <TagField label={mentor ? "Can coach" : "Skills"} presets={SKILLS} value={skills} max={MAX_COACH} onChange={setSkills} />
       </section>
       <section hidden={section !== "links"} className="profile-editor__section">

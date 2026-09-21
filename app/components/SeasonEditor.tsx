@@ -21,9 +21,9 @@ import {
   MILESTONE_TITLE_MAX,
   MILESTONE_WHY_MAX,
   MILESTONE_PROOF_MAX,
-  MILESTONE_EFFORT_MAX,
   MILESTONE_SESSIONS_MAX,
   milestoneId,
+  milestoneReleased,
 } from "../lib/types";
 import { saveSeason } from "../lib/api";
 import { PlusIcon } from "./ui";
@@ -52,14 +52,14 @@ function fromSeason(s: Season | null): Draft {
     overview: s?.overview ?? "",
     outcome: s?.outcome ?? "",
     state: s?.state ?? "live",
-    milestones: s?.milestones ?? [],
+    milestones: s?.milestones.map((m, i) => ({ ...m, released: milestoneReleased(m, i) })) ?? [],
     base: s?.updatedAt?.toMillis() ?? null,
   };
 }
 
 const ERRORS: Record<string, string> = {
   "stale-write": "Someone else saved the track first. Reload to see it, then redo your change.",
-  "milestone-has-submissions": "A step you removed already has proof against it. Put it back.",
+  "milestone-has-submissions": "A step you removed or hid already has proof. Keep it released.",
   "name-required": "Give the season a name.",
   "too-many-milestones": `That's more than ${SEASON_MAX_MILESTONES} steps.`,
 };
@@ -112,6 +112,7 @@ export function SeasonEditor({
       proof: "",
       effort: "",
       verifier: "mentor",
+      released: false,
       sessions: [],
     };
     edit({ milestones: [...draft.milestones, m] });
@@ -142,7 +143,7 @@ export function SeasonEditor({
           .filter((m) => m.title),
       });
       setEdits(null);
-      setFlash("Saved — everyone sees it now.");
+      setFlash("Saved — released milestones are visible to students.");
       setTimeout(() => setFlash(""), 3500);
     } catch (e) {
       setError(ERRORS[(e as Error).message] ?? "Couldn't save the track. Try again.");
@@ -277,6 +278,12 @@ export function SeasonEditor({
                       {m.verifier === "mentor" ? "mentor" : "open"}
                     </span>
                   </div>
+                  <div className="track-row__tools" style={{ marginTop: 12 }}>
+                    <span className="micro">{milestoneReleased(m, i) ? "Released to students" : "Locked for students"}</span>
+                    <button type="button" className={`btn btn--sm ${milestoneReleased(m, i) ? "btn--ghost" : "btn--primary"}`} disabled={busy || (hasProof && milestoneReleased(m, i))} onClick={() => patch(m.id, { released: !milestoneReleased(m, i) })}>
+                      {milestoneReleased(m, i) ? "Unrelease" : "Release"}
+                    </button>
+                  </div>
                   {isOpen && (
                     <div className="track-row__body">
                       <textarea
@@ -295,14 +302,6 @@ export function SeasonEditor({
                         onChange={(e) => patch(m.id, { proof: e.target.value })}
                       />
                       <div className="track-row__tools">
-                        <input
-                          className="input"
-                          style={{ maxWidth: 200 }}
-                          value={m.effort}
-                          placeholder="Effort · 2–3 hours"
-                          maxLength={MILESTONE_EFFORT_MAX}
-                          onChange={(e) => patch(m.id, { effort: e.target.value })}
-                        />
                         <div className="chip-row">
                           {(["open", "mentor"] as Verifier[]).map((v) => (
                             <button
@@ -312,11 +311,11 @@ export function SeasonEditor({
                               onClick={() => patch(m.id, { verifier: v })}
                               title={
                                 v === "open"
-                                  ? "Posting completes it; everyone can see the proof"
+                                  ? "Posting completes it; proof stays private"
                                   : "You approve or return it; proof stays private"
                               }
                             >
-                              {v === "open" ? "Open" : "Mentor reviews"}
+                              {v === "open" ? "Auto-complete" : "Mentor reviews"}
                             </button>
                           ))}
                         </div>
@@ -371,7 +370,6 @@ export function SeasonEditor({
                   {!isOpen && (m.why || m.proof) && (
                     <button type="button" className="track-row__peek" onClick={() => setOpen(m.id)}>
                       {m.proof || m.why}
-                      {m.effort && <span className="micro"> · {m.effort}</span>}
                     </button>
                   )}
                 </div>

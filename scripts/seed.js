@@ -1,4 +1,4 @@
-// Seed operator profiles, the workshop calendar, the season feed and a few
+// Seed operator profiles, the workshop calendar, a few
 // proof submissions into Firestore via the REST API, authenticated with the
 // firebase CLI's OAuth token (IAM bypasses security rules).
 // Idempotent: fixed document ids, PATCH = upsert. Run: node scripts/seed.js
@@ -348,23 +348,6 @@ const workshops = {
   }),
 };
 
-// ─── Build log entries (the season feed) ──────────────────────────────────
-// A few realistic lines so the feed isn't empty on first sign-in.
-
-function logEntry({ uid, name, text, daysAgo }) {
-  const at = new Date(Date.now() - daysAgo * 86400000);
-  return { fields: { uid: s(uid), name: s(name), text: s(text), day: s(at.toISOString().slice(0, 10)), createdAt: ts(at) } };
-}
-
-const buildLogs = {
-  "seed-log-1": logEntry({ uid: "seed-maya", name: "Maya C.", daysAgo: 0, text: "Sent 5 cold asks to band directors in Ontario. One replied within the hour." }),
-  "seed-log-2": logEntry({ uid: "seed-lena", name: "Lena F.", daysAgo: 0, text: "Rewrote the schools page headline. 200 emails go out tomorrow." }),
-  "seed-log-3": logEntry({ uid: "seed-dev", name: "Dev P.", daysAgo: 1, text: "Audio pipeline at 38ms on the Pixel 6a. Shipping the build tonight." }),
-  "seed-log-4": logEntry({ uid: "seed-arjun", name: "Arjun M.", daysAgo: 1, text: "Onboarded tutor #10. First one who found us through a parent's referral." }),
-  "seed-log-5": logEntry({ uid: "seed-sofia", name: "Sofia R.", daysAgo: 2, text: "Session plan 20: projectile motion, three worked examples, one trap question." }),
-  "seed-log-6": logEntry({ uid: "seed-tomas", name: "Tomas E.", daysAgo: 2, text: "Batch four PCBs arrived. Two boards short — supplier is reshipping." }),
-};
-
 // ─── Proof submissions (seasons/s1) ────────────────────────────────────────
 // Shaped exactly as POST /api/submissions writes them. Doc id is
 // `${uid}__${milestoneId}`. Open rows are born approved; mentor rows wait.
@@ -416,8 +399,6 @@ async function main() {
   console.log("Seeding workshops…");
   for (const [id, doc] of Object.entries(workshops)) await upsert(`workshops/${id}`, doc);
 
-  console.log("Seeding the feed…");
-  for (const [id, doc] of Object.entries(buildLogs)) await upsert(`buildLogs/${id}`, doc);
 
   if (await exists("seasons/s1")) {
     console.log("Seeding proof (seasons/s1/submissions)…");

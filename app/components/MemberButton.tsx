@@ -14,11 +14,13 @@ export function MemberButton({ uid, name, onClick }: { uid?: string; name: strin
     return watchProfile(uid, (profile) => setSnapshot({ uid, profile }), () => setSnapshot({ uid, profile: null }));
   }, [uid]);
   const profile = snapshot?.uid === uid ? snapshot?.profile : undefined;
-  const content = <><Avatar name={profile?.name ?? name} photoUrl={profile?.photoUrl} size="sm" /><span>{profile?.name ?? name}</span></>;
+  if (uid && (profile === undefined || profile?.hidden)) return null;
+  const visibleName = uid && profile === null ? "Unavailable member" : profile?.name ?? name;
+  const content = <><Avatar name={visibleName} photoUrl={profile?.photoUrl} size="sm" /><span>{visibleName}</span></>;
 
   return (
     <>
-      {uid ? <button type="button" className="member-button" onClick={(e) => { e.currentTarget.focus(); if (onClick) onClick(); else setOpen(true); }} aria-label={`View ${profile?.name ?? name}'s profile`}>{content}</button>
+      {uid ? <button type="button" className="member-button" onClick={(e) => { e.currentTarget.focus(); if (onClick) onClick(); else setOpen(true); }} aria-label={`View ${visibleName}'s profile`}>{content}</button>
         : <span className="member-button member-button--static">{content}</span>}
       {open && <ProfileModal profile={profile} onClose={() => setOpen(false)} />}
     </>

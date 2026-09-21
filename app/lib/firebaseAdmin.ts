@@ -62,7 +62,7 @@ function adminApp(): App {
     app = getApps()[0];
     return app;
   }
-  const credential = serviceAccountCredential();
+  const credential = process.env.FIRESTORE_EMULATOR_HOST ? undefined : serviceAccountCredential();
   app = initializeApp({
     projectId: PROJECT_ID,
     ...(credential ? { credential } : {}),

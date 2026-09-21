@@ -1,18 +1,18 @@
 "use client";
 
-/* Any milestone can be opened; the next unfinished one opens by default. */
+/* Any released milestone can be opened; the next unfinished one opens by default. */
 
 import { useState } from "react";
-import type { Profile, Season, SeasonMilestone, Submission } from "../lib/types";
+import type { Season, SeasonMilestone, Submission } from "../lib/types";
 import { byMilestone, nextMilestone, SUBMISSION_URL_MAX, SUBMISSION_NOTE_MAX } from "../lib/types";
+import { SLACK_URL, WELCOME_MILESTONE } from "../lib/program";
 import { submitProof } from "../lib/api";
-import { CheckIcon } from "./ui";
+import { CheckIcon, LockIcon } from "./ui";
 import { MemberButton } from "./MemberButton";
-import { ProofRow } from "./ReviewQueue";
 
 const ERRORS: Record<string, string> = {
+  "milestone-locked": "Your mentor hasn’t released this milestone yet.",
   "proof-required": "Paste a link that starts with http.",
-  "consent-pending": "Waiting on your parent's OK first.",
   "already-approved": "This one's already approved.",
   "season-closed": "This season is closed.",
   "unknown-milestone": "That step just changed — reload.",
@@ -21,17 +21,10 @@ const ERRORS: Record<string, string> = {
 export function SeasonPath({
   season,
   mine,
-  wall,
-  profile,
-  consentPending,
 }: {
   season: Season;
   /** My own rows, every verifier kind. */
   mine: Submission[];
-  /** Everyone's open-verifier rows. */
-  wall: Submission[];
-  profile: Profile;
-  consentPending: boolean;
 }) {
   const next = nextMilestone(season, mine);
   // undefined = follow the live "next" milestone; a tap forks a local choice.
@@ -85,31 +78,31 @@ export function SeasonPath({
     }
   }
 
-  if (season.milestones.length === 0) {
-    return <p className="empty">The track lands soon.</p>;
+  const steps = season.milestonePreviews ?? season.milestones.map((m) => ({ ...m, released: true }));
+
+  if (steps.length === 0) {
+    return <p className="empty">Your mentor will release the first milestone soon.</p>;
   }
 
   return (
     <div className="path">
       <nav className="milestone-nav" aria-label="Milestones">
-        {season.milestones.map((m, i) => {
+        {steps.map((m, i) => {
           const status = subs[m.id]?.status;
-          const label = status === "approved" ? "Complete" : status === "submitted" ? "In review" : status === "returned" ? "Needs revision" : "Not submitted";
-          return <button key={m.id} type="button" className={`milestone-nav__step ${status === "approved" ? "is-complete" : ""}`} aria-pressed={openId === m.id} aria-label={`${m.title} — ${label}`} disabled={busy} onClick={() => toggle(m.id)}>
-            <span className="milestone-nav__number" aria-hidden="true">{status === "approved" ? <CheckIcon size={14} /> : String(i + 1).padStart(2, "0")}</span>
+          const label = !m.released ? "Locked" : status === "approved" ? "Complete" : status === "submitted" ? "In review" : status === "returned" ? "Needs revision" : "Not submitted";
+          return <button key={m.id} type="button" className={`milestone-nav__step ${!m.released ? "is-locked" : ""} ${status === "approved" ? "is-complete" : ""}`} aria-pressed={openId === m.id} aria-label={`${m.title} — ${label}`} disabled={busy || !m.released} title={!m.released ? "Your mentor will unlock this step" : undefined} onClick={() => toggle(m.id)}>
+            <span className="milestone-nav__number" aria-hidden="true">{!m.released ? <LockIcon size={14} /> : status === "approved" ? <CheckIcon size={14} /> : String(i + 1).padStart(2, "0")}</span>
             <span>{m.title}</span>
           </button>;
         })}
       </nav>
-      {!openId && <div className="milestone-complete"><CheckIcon size={22} /><h3>Track complete</h3><p>Revisit any milestone above.</p></div>}
+      {!openId && <div className="milestone-complete"><CheckIcon size={22} /><h3>{season.hasUpcoming ? "You’re up to date" : "Track complete"}</h3><p>{season.hasUpcoming ? "Your mentor will release the next milestone." : "Revisit any milestone above."}</p></div>}
       {season.milestones.filter((m) => m.id === openId).map((m) => {
         const sub = subs[m.id];
         const done = sub?.status === "approved";
-        const peers = m.verifier === "open" ? wall.filter((s) => s.milestoneId === m.id && s.uid !== profile.uid) : [];
         return (
           <section key={m.id} className={`milestone-focus${popId === m.id ? " pop" : ""}`} aria-label={m.title}>
             <header className="milestone-focus__head">
-              <span className="micro">{m.effort}</span>
               <h3>{m.title}</h3>
               {sub && <span className={`path__state ${done ? "path__state--ok" : sub.status === "returned" ? "path__state--warn" : ""}`}>{done ? "Complete" : sub.status === "submitted" ? "In review" : "Needs revision"}</span>}
             </header>
@@ -118,6 +111,7 @@ export function SeasonPath({
                 <div className="path__requirement">
                   <span className="micro">To complete</span>
                   <p>{m.proof}</p>
+                  {m.id === WELCOME_MILESTONE.id && <a className="link-btn" href={SLACK_URL} target="_blank" rel="noreferrer">Introduce yourself in Slack ↗</a>}
                 </div>
               )}
 
@@ -150,7 +144,6 @@ export function SeasonPath({
                   <button
                     type="button"
                     className="btn btn--primary btn--sm"
-                    disabled={consentPending}
                     onClick={() => startForm(m, sub)}
                   >
                     Revise proof
@@ -161,7 +154,6 @@ export function SeasonPath({
                 <button
                   type="button"
                   className="btn btn--primary btn--sm"
-                  disabled={consentPending}
                   onClick={() => startForm(m)}
                 >
                   Post proof
@@ -171,7 +163,7 @@ export function SeasonPath({
               {formFor === m.id && (
                 <div className="path__form">
                   <p className="path__visibility">
-                    {m.verifier === "mentor" ? "Visible only to you and mentors." : "Visible to everyone in the program."}
+                    Visible only to you and mentors.
                   </p>
                   <input
                     className="input"
@@ -198,7 +190,7 @@ export function SeasonPath({
                     <button
                       type="button"
                       className="btn btn--primary btn--sm"
-                      disabled={busy || !url.trim() || consentPending}
+                      disabled={busy || !url.trim()}
                       onClick={() => send(m)}
                     >
                       {busy ? "Posting…" : "Post proof"}
@@ -218,21 +210,6 @@ export function SeasonPath({
                         <ul>{m.sessions.map((s) => <li key={s}>{s}</li>)}</ul>
                       </div>
                     )}
-                  </div>
-                </details>
-              )}
-
-              {/* ---- everyone else's proof (open steps only) ---- */}
-              {peers.length > 0 && (
-                <details className="more" style={{ width: "100%" }}>
-                  <summary className="more__toggle">
-                    Community proof
-                    <span className="more__hint">{peers.length}</span>
-                  </summary>
-                  <div className="more__body path__queue" style={{ borderTop: 0, paddingTop: 4 }}>
-                    {peers.map((s) => (
-                      <ProofRow key={s.id} sub={s} />
-                    ))}
                   </div>
                 </details>
               )}

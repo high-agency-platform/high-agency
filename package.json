@@ -13,8 +13,10 @@
     "test:hubspot": "firebase emulators:exec --only firestore --project highagency-62e67 \"tsx --test tests/hubspot.test.mts\"",
     "test:staff": "firebase emulators:exec --only firestore --project highagency-62e67 \"tsx --test tests/staffReferrals.test.mts\"",
     "test:calendar": "node --import tsx --test tests/calendarLink.test.mts",
-    "test": "npm run test:rules && npm run test:referral && npm run test:consent && npm run test:mentor && npm run test:hubspot && npm run test:staff && npm run test:calendar",
-    "test:referral": "firebase emulators:exec --only firestore --project highagency-referral-test \"tsx --test tests/referral.test.mts tests/applicationWindow.test.mts\""
+    "test": "npm run test:rules && npm run test:referral && npm run test:consent && npm run test:mentor && npm run test:hubspot && npm run test:staff && npm run test:calendar && npm run test:season",
+    "test:referral": "firebase emulators:exec --only firestore --project highagency-referral-test \"tsx --test tests/referral.test.mts\"",
+    "dev:qa": "sh scripts/qa-local.sh",
+    "test:season": "firebase emulators:exec --only firestore --project demo-highagency \"tsx --test tests/seasonAccess.test.mts\""
   },
   "dependencies": {
     "firebase": "^12.14.0",

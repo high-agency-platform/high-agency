@@ -42,6 +42,7 @@ export async function POST(req: NextRequest) {
   let email: string;
   try {
     const decoded = await adminAuth().verifyIdToken(idToken);
+    if (!decoded.email_verified) return NextResponse.json({ error: "email-unverified" }, { status: 403 });
     uid = decoded.uid;
     email = decoded.email ?? "";
   } catch {

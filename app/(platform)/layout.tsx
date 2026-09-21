@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { AuthProvider, useAuth } from "../components/AuthProvider";
+import { MemberWorkspace } from "../components/MemberWorkspace";
 import { ProfileSheet } from "../components/ProfileSheet";
 import type { Profile } from "../lib/types";
 import {
@@ -134,7 +135,7 @@ function OperatorShell({
           </button>
         </div>
       </header>
-      <main>{children}</main>
+      <MemberWorkspace>{children}</MemberWorkspace>
       {you && <ProfileSheet uid={uid} profile={profile} onClose={close} />}
     </div>
   );
@@ -148,6 +149,8 @@ function Shell({ children }: { children: React.ReactNode }) {
   // Sign-in, onboarding and the invite-only mentor signup render bare: each
   // completes a flow the shell would otherwise appear in the middle of.
   const bare =
+    pathname === "/qa" ||
+    pathname === "/join" ||
     pathname === "/login" ||
     pathname === "/login/verify" ||
     pathname === "/onboarding" ||
@@ -161,7 +164,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         <Rail />
         <div className="shell__main">
           <MentorTopBar />
-          <main>{children}</main>
+          <MemberWorkspace>{children}</MemberWorkspace>
         </div>
         <TabBar />
       </div>

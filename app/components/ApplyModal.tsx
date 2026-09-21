@@ -11,10 +11,9 @@ import {
   MARKETING_CONSENT_LABEL,
 } from "../lib/marketingConsent";
 import ReferralShare from "./ReferralShare";
-import { applicationsClosed, APPLICATIONS_CLOSED_MESSAGE } from "../lib/applicationWindow";
 
 const STORAGE_KEY = "ha_application";
-// Founding Batch 01 targets high-school operators — collect exact age 12–18.
+// The program targets high-school operators — collect exact age 12–18.
 const AGES = ["12", "13", "14", "15", "16", "17", "18"];
 
 // Per-question word ceilings. Enforced in the UI only: we block, never truncate.
@@ -119,7 +118,6 @@ function WordField({
 
 interface ApplyModalProps {
   open: boolean;
-  closed: boolean;
   prefillEmail?: string;
   /** Referral code this visitor arrived on, "" when they came in cold. */
   referredBy?: string;
@@ -129,7 +127,6 @@ interface ApplyModalProps {
 
 export default function ApplyModal({
   open,
-  closed,
   prefillEmail,
   referredBy = "",
   onClose,
@@ -214,10 +211,6 @@ export default function ApplyModal({
     if (cardRef.current) cardRef.current.scrollTop = 0;
   }, [step]);
 
-  useEffect(() => {
-    if (open && closed && !result && !busy) cardRef.current?.focus();
-  }, [open, closed, result, busy]);
-
   const back = useCallback((to: number) => {
     setErr("");
     setStep(to);
@@ -296,9 +289,7 @@ export default function ApplyModal({
       setStep(5);
       onApplied();
     } catch {
-      setSubmitErr(applicationsClosed()
-        ? APPLICATIONS_CLOSED_MESSAGE
-        : "Your application could not be saved. Your answers are still here. Please try again before September 14 at 7 PM ET.");
+      setSubmitErr("Your application could not be saved. Your answers are still here. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -318,7 +309,7 @@ export default function ApplyModal({
   ]);
 
   if (!open) return null;
-  const displayStep = result ? 5 : closed && !busy ? 0 : step;
+  const displayStep = result ? 5 : step;
 
   return (
     <div
@@ -335,28 +326,19 @@ export default function ApplyModal({
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
-        {displayStep > 0 && <div className="modal__progress">
+        <div className="modal__progress">
           <span className={displayStep >= 1 ? "on" : ""} />
           <span className={displayStep >= 2 ? "on" : ""} />
           <span className={displayStep >= 3 ? "on" : ""} />
           <span className={displayStep >= 4 ? "on" : ""} />
           <span className={displayStep >= 5 ? "on" : ""} />
-        </div>}
-
-        {displayStep === 0 && (
-          <div className="modal__step active" role="status">
-            <p className="eyebrow eyebrow--accent">Founding Batch 01</p>
-            <h3 id="modalTitle">Applications are closed.</h3>
-            <p className="modal__sub">{APPLICATIONS_CLOSED_MESSAGE} The online kickoff is September 21.</p>
-            <button className="btn btn--ghost" onClick={close}>Close</button>
-          </div>
-        )}
+        </div>
 
         {/* step 1 — the basics */}
         {displayStep === 1 && (
           <div className="modal__step active">
-            <h3 id="modalTitle">Request access.</h3>
-            <p className="modal__sub">Founding Batch 01. Takes five minutes.</p>
+            <h3 id="modalTitle">Apply for Batch 02.</h3>
+            <p className="modal__sub">Starts November. Free to join. Takes five minutes.</p>
             <div className="field">
               <label htmlFor="m-name">Full name</label>
               <input
@@ -568,7 +550,7 @@ export default function ApplyModal({
               <div className="success__id">
                 OPERATOR ID · <b>{result?.opId ?? "HA-000"}</b>
               </div>
-              {!closed && result?.referralCode ? (
+              {result?.referralCode ? (
                 <ReferralShare
                   code={result.referralCode}
                   fallbackPos={result.queuePos}

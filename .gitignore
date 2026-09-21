@@ -46,3 +46,7 @@ next-env.d.ts
 
 .vercel
 firestore-debug.log
+
+/.next-qa/
+firebase-debug.log
+ui-debug.log

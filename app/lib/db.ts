@@ -4,8 +4,6 @@ import {
   getDoc,
   getDocs,
   setDoc,
-  updateDoc,
-  deleteDoc,
   query,
   where,
   orderBy,
@@ -20,14 +18,13 @@ import { getDb, getFirebaseAuth } from "./firebase";
 import type {
   Profile,
   PrivateProfile,
-  BuildLog,
   Workshop,
   MentorSignupInput,
   Season,
   SeasonMilestone,
   Submission,
 } from "./types";
-import { normalizeVerifier } from "./types";
+import { normalizeVerifier, workshopIsUpcoming, WORKSHOP_MAX_DURATION_MINS } from "./types";
 
 export type ListenerErrorHandler = (e: FirestoreError) => void;
 
@@ -89,7 +86,7 @@ export function watchProfile(
 
 export async function saveProfile(
   uid: string,
-  data: Partial<Omit<Profile, "uid" | "createdAt" | "updatedAt">>,
+  data: Partial<Omit<Profile, "uid" | "createdAt" | "updatedAt" | "staffTitle" | "hidden">>,
   isNew: boolean
 ): Promise<void> {
   await setDoc(
@@ -104,7 +101,7 @@ export async function saveProfile(
   );
 }
 
-/** DOB, full name, city, parent email — owner-readable only, ever. */
+/** DOB, full name, city, and legacy parent contact — owner-readable only. */
 export async function savePrivateProfile(
   uid: string,
   data: Partial<Omit<PrivateProfile, "uid" | "createdAt" | "updatedAt">>,
@@ -145,9 +142,19 @@ export function watchOperators(cb: (profiles: Profile[]) => void): Unsubscribe {
     cb(
       snap.docs
         .map((d) => normalizeProfile(d.id, d.data()))
+        .filter((p) => !p.hidden)
         .sort((a, b) => a.name.localeCompare(b.name))
     );
   }, listenerError("operators"));
+}
+
+/** One member-only listener backs the sidebar and its profile cards. */
+export function watchMembers(cb: (profiles: Profile[]) => void, onError: ListenerErrorHandler): Unsubscribe {
+  return onSnapshot(collection(getDb(), "profiles"), (snap) => {
+    cb(snap.docs.map((d) => normalizeProfile(d.id, d.data()))
+      .filter((p) => !p.hidden && (p.role === "mentor" || p.role === "operator"))
+      .sort((a, b) => a.name.localeCompare(b.name)));
+  }, onError);
 }
 
 /* ---------------- The season (reads) ---------------- */
@@ -164,6 +171,7 @@ function normalizeMilestone(raw: unknown): SeasonMilestone {
     proof: String(m.proof ?? ""),
     effort: String(m.effort ?? ""),
     verifier: normalizeVerifier(m.verifier),
+    ...(typeof m.released === "boolean" ? { released: m.released } : {}),
     sessions: Array.isArray(m.sessions) ? m.sessions.map(String) : [],
   };
 }
@@ -195,6 +203,24 @@ export function watchLiveSeason(cb: (s: Season | null) => void): Unsubscribe {
   }, listenerError("seasons/live"));
 }
 
+/** Student reads go through the server so unreleased content never reaches the browser. */
+export function watchReleasedSeason(cb: (s: Season | null) => void, onError: () => void): Unsubscribe {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout>;
+  async function refresh() {
+    try {
+      const token = await getFirebaseAuth().currentUser?.getIdToken();
+      const response = await fetch("/api/season", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+      if (!response.ok) throw new Error("season-unavailable");
+      const { season } = await response.json();
+      if (!stopped) cb(season ? normalizeSeason(season.id, season) : null);
+    } catch { if (!stopped) onError(); }
+    finally { if (!stopped) timer = setTimeout(refresh, 10_000); }
+  }
+  void refresh();
+  return () => { stopped = true; clearTimeout(timer); };
+}
+
 /** Every season, newest first — the mentor editor's picker. */
 export function watchSeasons(cb: (seasons: Season[]) => void): Unsubscribe {
   const q = query(collection(getDb(), "seasons"), limit(20));
@@ -219,10 +245,6 @@ function toSubmission(id: string, data: Record<string, unknown>): Submission {
   return { id, ...data } as Submission;
 }
 
-function newestFirst(a: Submission, b: Submission): number {
-  return (b.updatedAt?.toMillis() ?? 0) - (a.updatedAt?.toMillis() ?? 0);
-}
-
 /** My own rows, every verifier kind. */
 export function watchMySubmissions(
   seasonId: string,
@@ -238,22 +260,6 @@ export function watchMySubmissions(
   }, listenerError(`submissions/mine/${seasonId}`));
 }
 
-/** The public proof wall: every 'open' row from everyone. */
-export function watchOpenSubmissions(
-  seasonId: string,
-  cb: (subs: Submission[]) => void
-): Unsubscribe {
-  const q = query(
-    collection(getDb(), "seasons", seasonId, "submissions"),
-    where("verifier", "==", "open"),
-    limit(500)
-  );
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => toSubmission(d.id, d.data())).sort(newestFirst));
-  }, listenerError(`submissions/open/${seasonId}`));
-}
-
-/** How many rows the review queue shows at once; the UI says when it's full. */
 export const REVIEW_QUEUE_LIMIT = 200;
 
 /** Mentors only: everything waiting on a review, oldest first. */
@@ -286,22 +292,6 @@ export function watchAllSubmissions(
   }, listenerError(`submissions/all/${seasonId}`));
 }
 
-/* ---------------- Build log (the season feed) ---------------- */
-/* Posting is a STREAK action, written by the server (POST /api/build-log —
-   see lib/api.ts), so the streak can never be set from a browser. Reads and
-   the author's own delete stay here. */
-
-export function watchBuildLogs(cb: (logs: BuildLog[]) => void): Unsubscribe {
-  const q = query(collection(getDb(), "buildLogs"), orderBy("createdAt", "desc"), limit(40));
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as BuildLog));
-  }, listenerError("buildLogs"));
-}
-
-export async function removeBuildLog(logId: string): Promise<void> {
-  await deleteDoc(doc(getDb(), "buildLogs", logId));
-}
-
 /* ---------------- Workshops (reads) ---------------- */
 /* Every workshop WRITE — authoring, enrolling, leaving — goes through the
    Route Handlers in app/api/workshops/** (see lib/api.ts), because each one
@@ -310,21 +300,40 @@ export async function removeBuildLog(logId: string): Promise<void> {
 /** Legacy `office_hours` docs predate the current model; hide rather than
  *  delete them. */
 function catalogOnly(docs: Workshop[]): Workshop[] {
-  return docs.filter((w) => (w as { kind?: string }).kind !== "office_hours");
+  return docs.filter((w) => w.hidden !== true && (w as { kind?: string }).kind !== "office_hours");
+}
+
+function upcomingWorkshopQuery() {
+  return query(
+    collection(getDb(), "workshops"),
+    where("startsAt", ">", Timestamp.fromMillis(Date.now() - WORKSHOP_MAX_DURATION_MINS * 60_000)),
+    orderBy("startsAt", "asc")
+  );
+}
+
+function upcomingCatalog(docs: Workshop[]): Workshop[] {
+  const now = Date.now();
+  return catalogOnly(docs).filter(w => workshopIsUpcoming(w, now));
 }
 
 export async function getUpcomingWorkshops(): Promise<Workshop[]> {
-  const q = query(
-    collection(getDb(), "workshops"),
-    where("startsAt", ">", Timestamp.now()),
-    orderBy("startsAt", "asc"),
-    limit(24)
-  );
-  const snap = await getDocs(q);
-  return catalogOnly(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Workshop)).slice(
-    0,
-    12
-  );
+  const snap = await getDocs(upcomingWorkshopQuery());
+  return upcomingCatalog(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Workshop));
+}
+
+/** Updates roster/meeting edits live, and expires sessions without another read. */
+export function watchUpcomingWorkshops(
+  cb: (workshops: Workshop[]) => void,
+  onError?: ListenerErrorHandler
+): Unsubscribe {
+  let latest: Workshop[] | null = null;
+  const emit = () => { if (latest) cb(upcomingCatalog(latest)); };
+  const unsubscribe = onSnapshot(upcomingWorkshopQuery(), snap => {
+    latest = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Workshop);
+    emit();
+  }, listenerError("workshops/upcoming", onError));
+  const timer = setInterval(emit, 30_000);
+  return () => { clearInterval(timer); unsubscribe(); };
 }
 
 /** Finished sessions that have a recording posted — the replay shelf.
@@ -368,85 +377,7 @@ export function watchMyUpcomingWorkshops(
   mentorUid: string,
   cb: (workshops: Workshop[]) => void
 ): Unsubscribe {
-  const q = query(
-    collection(getDb(), "workshops"),
-    where("startsAt", ">", Timestamp.now()),
-    orderBy("startsAt", "asc"),
-    limit(50)
-  );
-  return onSnapshot(q, (snap) => {
-    cb(
-      catalogOnly(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Workshop)).filter(
-        (w) => w.mentorUid === mentorUid
-      )
-    );
-  }, listenerError("workshops/mine"));
-}
-
-/* ---------------- Admin: member consent (mentors) ---------------- */
-
-/** How many pending-consent rows a mentor sees at once. The queue is meant to
- *  be worked down, not scrolled: an unbounded listener over every pending
- *  minor would grow with the intake batch. Callers surface the truncation
- *  rather than pretending the page is the whole queue. */
-export const CONSENT_QUEUE_LIMIT = 50;
-
-/** Operators awaiting parental consent — the mentor's approval queue.
- *  Single-field equality query (no composite index); sorted client-side.
- *  Deliberately capped — see CONSENT_QUEUE_LIMIT. */
-export function watchPendingConsent(cb: (profiles: Profile[]) => void): Unsubscribe {
-  const q = query(
-    collection(getDb(), "profiles"),
-    where("consentStatus", "==", "pending"),
-    limit(CONSENT_QUEUE_LIMIT)
-  );
-  return onSnapshot(q, (snap) => {
-    cb(snap.docs.map((d) => normalizeProfile(d.id, d.data())));
-  }, listenerError(`pendingConsent`));
-}
-
-/** Mentor grants parental consent — flips a pending minor to granted,
- *  unlocking community access. Allowed by rules' isConsentGrant(). This is the
- *  manual override / audit fallback; the primary path is the parent-approval
- *  link ([[requestConsentEmail]] → email → /consent/[token]). */
-export async function grantConsent(uid: string): Promise<void> {
-  await updateDoc(doc(getDb(), "profiles", uid), {
-    consentStatus: "granted",
-    updatedAt: serverTimestamp(),
-  });
-}
-
-/** Ask the server to (re)send the parental-consent email. Called with no uid
- *  by a minor for themselves at onboarding, or with a target uid by a mentor
- *  resending from the admin queue. The server verifies the caller's ID token,
- *  mints a single-use token, and dispatches the email (or logs the link in dev
- *  when no RESEND_API_KEY is set). Throws if not signed in. */
-export async function requestConsentEmail(
-  uid?: string
-): Promise<{
-  ok: boolean;
-  delivery?: "sent" | "logged";
-  error?: string;
-  /** Seconds until a resend is allowed again (present on a rate-limited 429). */
-  retryAfter?: number;
-}> {
-  const user = getFirebaseAuth().currentUser;
-  if (!user) throw new Error("not-signed-in");
-  const idToken = await user.getIdToken();
-  const res = await fetch("/api/consent/send", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${idToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(uid ? { uid } : {}),
-  });
-  const data = (await res.json().catch(() => ({}))) as {
-    delivery?: "sent" | "logged";
-    error?: string;
-    retryAfter?: number;
-  };
-  return { ok: res.ok, ...data };
+  return watchUpcomingWorkshops(workshops => cb(workshops.filter(w => w.mentorUid === mentorUid)));
 }
 
 /* ---------------- Mentor invites ---------------- */

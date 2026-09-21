@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Profile, Workshop } from "../lib/types";
-import { workshopSpots, workshopCalendarUrl } from "../lib/types";
+import { workshopSpots, workshopCalendarUrl, workshopIsUpcoming } from "../lib/types";
 import { CalendarIcon } from "./ui";
 import { MemberButton } from "./MemberButton";
 
@@ -45,13 +45,16 @@ export function SessionAction({
   onEnroll?: (w: Workshop) => void;
   onLeave?: (w: Workshop) => void;
 }) {
-  // Captured once per mount: "has it started?" needs a clock, and reading
-  // one during render is impure.
-  const [now] = useState(() => Date.now());
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
   const enrolled = isEnrolled(w, profile);
   const full = workshopSpots(w).full;
   const started = w.startsAt.toDate().getTime() <= now;
 
+  if (!workshopIsUpcoming(w, now)) return <span className="micro">Ended</span>;
   if (enrolled)
     return (
       <>
@@ -70,7 +73,6 @@ export function SessionAction({
       </>
     );
   if (full) return <span className="ses__lock" title="Every seat is taken">Full</span>;
-  if (started) return <span className="micro">started</span>;
   return (
     <button className="btn btn--ghost btn--sm" onClick={() => onEnroll?.(w)}>
       Enroll

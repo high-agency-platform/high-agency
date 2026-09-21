@@ -40,7 +40,7 @@ service cloud.firestore {
     //   parent email. Owner-only, both directions. Never listed.
     //
     // Collection: seasons/{id} — THE shared track: one document every
-    //   mentor edits, read by every signed-in user. SERVER-WRITTEN ONLY
+    //   mentor edits; full reads are mentor-only. SERVER-WRITTEN ONLY
     //   (POST /api/season): the save is a transaction with a stale-write
     //   check, and it refuses to drop a milestone that already has proof.
     //   Subcollection:
@@ -50,13 +50,11 @@ service cloud.firestore {
     //       verifier, which lives inside a list these rules can't index.
     //       READ is split by the row's snapshotted `verifier` (see below).
     //
-    // Collection: buildLogs/{auto} — the season feed, one line a day.
-    //   Server-written (POST /api/build-log) because posting is a streak
-    //   action; readable by every signed-in user; author may delete own.
+    // Retired buildLogs are retained but inaccessible to clients.
+    // seasonInvites, memberships, and accessRateLimits are server-only.
     //
-    // PARENTAL CONSENT for these writes is enforced in the routes, not here
-    //   — the rules never see them. (The squad-era consentAllows() helper is
-    //   gone with the squad writes it guarded.)
+    // Historical parent-contact and consent records remain protected.
+    // Season participation no longer depends on a parent approval email.
     //
     // Collection: workshops — mentor-hosted sessions, readable by every
     //   signed-in user and WRITTEN ONLY BY THE SERVER (app/api/workshops/**,
@@ -89,6 +87,15 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isMember() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/profiles/$(request.auth.uid));
+    }
+
+    function canOnboard() {
+      return isAuthenticated() && request.auth.token.get('email_verified', false) == true &&
+        (exists(/databases/$(database)/documents/memberships/$(request.auth.uid)) || isApprovedMember());
+    }
+
     function hasOnlyAllowedFields(fields) {
       return request.resource.data.keys().hasOnly(fields);
     }
@@ -109,6 +116,20 @@ service cloud.firestore {
     // small max sizes to cap damage (residual risk accepted for v1).
     function validStringList(value, maxItems) {
       return value is list && value.size() <= maxItems;
+    }
+
+    // Nine slots is the domain cap; validate every slot before accepting new tags.
+    function validOperatorDomains(value) {
+      return validStringList(value, 9) &&
+        (value.size() < 1 || validString(value[0], 1, 20)) &&
+        (value.size() < 2 || validString(value[1], 1, 20)) &&
+        (value.size() < 3 || validString(value[2], 1, 20)) &&
+        (value.size() < 4 || validString(value[3], 1, 20)) &&
+        (value.size() < 5 || validString(value[4], 1, 20)) &&
+        (value.size() < 6 || validString(value[5], 1, 20)) &&
+        (value.size() < 7 || validString(value[6], 1, 20)) &&
+        (value.size() < 8 || validString(value[7], 1, 20)) &&
+        (value.size() < 9 || validString(value[8], 1, 20));
     }
 
     function isMentor() {
@@ -134,9 +155,7 @@ service cloud.firestore {
     // ===============================================================
 
     match /applications/{id} {
-      // September 14 at 7 PM Toronto / New York time. The server clock is authoritative.
-      allow create: if request.time < timestamp.value('2026-09-14T23:00:00.000Z') &&
-                       request.resource.data.keys().hasAll(['name', 'email', 'age', 'building', 'boldest']) &&
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'age', 'building', 'boldest']) &&
                        validString(request.resource.data.name, 1, 120) &&
                        validString(request.resource.data.email, 3, 254) &&
                        validString(request.resource.data.building, 0, 2000) &&
@@ -287,7 +306,7 @@ service cloud.firestore {
       return hasOnlyAllowedFields(['uid', 'name', 'ageBand', 'country', 'timezone',
                'headline', 'building', 'stage', 'domains', 'skills',
                'proofUrl', 'proofNote', 'hours', 'bio', 'links', 'photoUrl',
-               'consentStatus', 'consentEmailSentAt', 'plan', 'role',
+               'consentStatus', 'consentEmailSentAt', 'plan', 'role', 'staffTitle', 'hidden',
                'streak', 'streakFreezes', 'lastActiveDay', 'lastBuildLogDay',
                'enrolledWorkshops',
                'createdAt', 'updatedAt',
@@ -310,8 +329,8 @@ service cloud.firestore {
              validString(data.headline, 0, 90) &&
              validString(data.building, 0, 300) &&
              data.stage in ['idea', 'building', 'launched', 'revenue'] &&
-             validStringList(data.domains, 9) && data.domains.size() >= 1 &&
-             validStringList(data.skills, 7) && data.skills.size() >= 1 &&
+             validStringList(data.domains, 9) &&
+             validStringList(data.skills, 7) &&
              (!('proofUrl' in data) || validString(data.proofUrl, 0, 300)) &&
              (!('proofNote' in data) || validString(data.proofNote, 0, 200)) &&
              // Weekly hours moved to per-application; kept optional here so
@@ -323,6 +342,8 @@ service cloud.firestore {
              (!('consentEmailSentAt' in data) || data.consentEmailSentAt is timestamp) &&
              data.plan in ['free', 'pro'] &&
              data.role in ['operator', 'mentor'] &&
+             (!('staffTitle' in data) || (data.role == 'mentor' && data.staffTitle == 'advisor')) &&
+             (!('hidden' in data) || data.hidden is bool) &&
              data.streak is number && data.streak >= 0 && data.streak <= 100000 &&
              data.streakFreezes is number && data.streakFreezes >= 0 && data.streakFreezes <= 3 &&
              validString(data.lastActiveDay, 10, 10) &&
@@ -331,7 +352,7 @@ service cloud.firestore {
              (!('pendingApplications' in data) || validStringList(data.pendingApplications, 3));
     }
 
-    // Mentors (trusted staff) grant parental consent in-app — the only
+    // Legacy mentor consent grants remain supported — the only
     // cross-user profile write. Scoped to flipping consentStatus to
     // 'granted'; role and plan grants stay server-side (admin CLI tooling
     // and the mentor-invite redemption route).
@@ -342,35 +363,35 @@ service cloud.firestore {
     }
 
     match /profiles/{userId} {
-      allow read: if isAuthenticated();
+      allow get: if isOwner(userId) || isMember();
+      allow list: if isMember();
       // Clients always start as free-tier operators; admin tooling
       // (which bypasses rules) grants mentor role / pro plan.
       //
-      // TEMPORARY — founding-batch access gate: the caller's email must also be
-      // on the approvedMembers allowlist. This is what stops a stranger who
-      // reached Firebase Auth by some other route from minting an account once
-      // the platform is live in production. It does NOT affect the mentor
-      // paths: both /api/mentor/redeem and /api/access/mentor-profile write
-      // through the Admin SDK, which bypasses rules entirely.
-      // Drop the isApprovedMember() clause when the batch ends.
+      // A verified email plus a redeemed invite or legacy staff approval is required.
       allow create: if isOwner(userId) && isValidProfile(request.resource.data) &&
                        request.resource.data.role == 'operator' &&
+                       !('staffTitle' in request.resource.data) &&
+                       !('hidden' in request.resource.data) &&
+                       validOperatorDomains(request.resource.data.domains) &&
                        request.resource.data.plan == 'free' &&
                        // A new account starts with at most a 1-day streak and
                        // nothing banked; every later change is server-written.
                        request.resource.data.streak <= 1 &&
                        request.resource.data.streakFreezes == 0 &&
                        request.resource.data.get('lastBuildLogDay', '') == '' &&
-                       isApprovedMember();
+                       canOnboard();
       // consentStatus + consentEmailSentAt are immutable on a self-update: a
-      // pending minor must NOT be able to grant their own consent. Consent is
+      // historical consent record must not be rewritten by its owner. Consent is
       // flipped only by a mentor (isConsentGrant) or the server (Admin SDK,
       // which bypasses rules) via the parent-approval link.
       // The STREAK is immutable on a self-update too: streak, streakFreezes,
       // lastActiveDay and lastBuildLogDay are written only by the server
-      // (/api/build-log, /api/submissions — app/lib/streakServer.ts).
+      // (/api/submissions — app/lib/streakServer.ts).
       allow update: if (isOwner(userId) && isValidProfile(request.resource.data) &&
-                        areImmutableFieldsUnchanged(['uid', 'createdAt', 'role', 'plan',
+                        (resource.data.role == 'mentor' || request.resource.data.domains == resource.data.domains ||
+                         validOperatorDomains(request.resource.data.domains)) &&
+                        areImmutableFieldsUnchanged(['uid', 'createdAt', 'role', 'plan', 'staffTitle', 'hidden',
                           'consentStatus', 'consentEmailSentAt',
                           'streak', 'streakFreezes', 'lastActiveDay', 'lastBuildLogDay'])) ||
                        isConsentGrant();
@@ -383,7 +404,7 @@ service cloud.firestore {
 
     match /privateProfiles/{userId} {
       allow read: if isOwner(userId);
-      allow create, update: if isOwner(userId) &&
+      allow create, update: if isOwner(userId) && (isMember() || canOnboard()) &&
         hasOnlyAllowedFields(['uid', 'firstName', 'lastName', 'dob', 'city', 'parentEmail', 'createdAt', 'updatedAt']) &&
         request.resource.data.uid == request.auth.uid &&
         validString(request.resource.data.firstName, 1, 60) &&
@@ -406,40 +427,25 @@ service cloud.firestore {
     // ===============================================================
 
     match /seasons/{seasonId} {
-      allow read: if isAuthenticated();
+      allow read: if isMentor();
       allow create, update, delete: if false;
 
       // Doc id is `{uid}__{milestoneId}`: one row per operator per milestone.
       //
-      // Read scope: the author always; any mentor (the review queue); and,
-      // when the milestone's verifier was 'open' AT SUBMIT TIME, every
-      // signed-in user. `verifier` is stamped server-side from the milestone,
-      // which is what makes it trustworthy here — and it's a snapshot, so a
-      // milestone later flipped mentor→open never exposes proof made
-      // privately. A LIST QUERY IS ALL-OR-NOTHING: the public wall must
-      // filter where('verifier','==','open'), your own rows where('uid',
-      // '==', you); an unfiltered list is denied for anyone but a mentor.
-      // isMentor() costs a get(), so it is evaluated last.
+      // Proof is private to its author and mentors, regardless of review mode.
       match /submissions/{subId} {
         allow read: if isAuthenticated() &&
                        (resource.data.uid == request.auth.uid ||
-                        resource.data.get('verifier', 'mentor') == 'open' ||
                         isMentor());
         allow create, update, delete: if false;
       }
     }
 
     // ===============================================================
-    // Build log — the season feed. Posting is SERVER-ONLY (POST
-    // /api/build-log): it is a streak action, and the streak is computed and
-    // written alongside it by the Admin SDK. Everyone reads; the author may
-    // delete their own line.
-    // ===============================================================
+    // Retired community feed — preserve data, disable every client path.
 
     match /buildLogs/{logId} {
-      allow read: if isAuthenticated();
-      allow create, update: if false;
-      allow delete: if isOwner(resource.data.uid);
+      allow read, write: if false;
     }
 
     // ===============================================================
@@ -451,7 +457,7 @@ service cloud.firestore {
     // ===============================================================
 
     match /workshops/{id} {
-      allow read: if isAuthenticated();
+      allow read: if isMember();
       allow create, update, delete: if false;
     }
 

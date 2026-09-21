@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import {
   getFirestore,
+  connectFirestoreEmulator,
   collection,
   doc,
   getDoc,
@@ -8,7 +9,7 @@ import {
   serverTimestamp,
   type Firestore,
 } from "firebase/firestore";
-import { getAuth, GoogleAuthProvider, type Auth } from "firebase/auth";
+import { getAuth, connectAuthEmulator, GoogleAuthProvider, type Auth } from "firebase/auth";
 import {
   REFERRALS_COLLECTION,
   REFERRAL_MAX,
@@ -19,7 +20,6 @@ import {
   type ReferralCounter,
 } from "./referral";
 import { marketingConsentFields } from "./marketingConsent";
-import { applicationsClosed, APPLICATIONS_CLOSED_MESSAGE } from "./applicationWindow";
 
 // Applicants notionally ahead of #1, so early queue numbers don't read
 // "#1, #2" while the founding batch fills. Set to 0 for a true raw count.
@@ -54,13 +54,19 @@ let auth: Auth | undefined;
 
 export function getDb(): Firestore {
   if (!app) app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  if (!db) db = getFirestore(app);
+  if (!db) {
+    db = getFirestore(app);
+    if (process.env.NEXT_PUBLIC_FIREBASE_EMULATORS === "true" && firebaseConfig.projectId.startsWith("demo-")) connectFirestoreEmulator(db, "127.0.0.1", 8088);
+  }
   return db;
 }
 
 export function getFirebaseAuth(): Auth {
   if (!app) app = getApps().length ? getApp() : initializeApp(firebaseConfig);
-  if (!auth) auth = getAuth(app);
+  if (!auth) {
+    auth = getAuth(app);
+    if (process.env.NEXT_PUBLIC_FIREBASE_EMULATORS === "true" && firebaseConfig.projectId.startsWith("demo-")) connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  }
   return auth;
 }
 
@@ -243,7 +249,6 @@ export async function submitApplication(
   /** Raw `?ref=` value; anything that isn't a well-formed code is ignored. */
   referredByRaw = ""
 ): Promise<ApplicationRecord> {
-  if (applicationsClosed()) throw new Error(APPLICATIONS_CLOSED_MESSAGE);
   const db = getDb();
   const referredBy = normalizeReferralCode(referredByRaw);
 
@@ -260,12 +265,11 @@ export async function submitApplication(
         ts: Date.now(),
       };
     } catch (err) {
-      if (applicationsClosed()) throw new Error(APPLICATIONS_CLOSED_MESSAGE);
       if (err instanceof CodeCollision && attempt < CODE_ATTEMPTS - 1) continue;
 
       // The referral collection is newer than the rest of this write path, so
       // a ruleset that predates it can reject the referral half. Retry without
-      // referrals; the application's deadline rule still applies.
+      // referrals; the application's validation rules still apply.
       if (isPermissionDenied(err)) {
         console.warn(
           "[waitlist] referral write denied — is firestore.rules deployed? " +

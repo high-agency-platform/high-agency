@@ -1,18 +1,3 @@
-/**
- * TEMPORARY — founding-batch access gate.
- *
- * POST /api/access/request — step 1 of the gate. Body: { email }.
- *
- * Unauthenticated by necessity (the caller has no account yet), so it is
- * deliberately narrow: it takes one email, and the ONLY thing it can cause is
- * a sign-in link being mailed to that same address. It never reveals anything
- * about an address it was not given, and never creates an account.
- *
- * Not on the allowlist → 200 { status: "not-approved" } (not 403: this is a
- * normal, expected answer the UI renders as a polite screen, not an error).
- *
- * Delete with the rest of the gate — see app/lib/accessGate.ts.
- */
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { adminAuth } from "../../../lib/firebaseAdmin";
@@ -20,7 +5,8 @@ import {
   callerIp,
   checkRateLimit,
   isValidEmail,
-  lookupApprovedMember,
+  lookupAccessMember,
+  checkSeasonInvite,
   normalizeEmail,
 } from "../../../lib/accessGate";
 import { sendAccessEmail } from "../../../lib/accessEmail";
@@ -30,7 +16,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
-  const body = (await req.json().catch(() => ({}))) as { email?: unknown };
+  const body = (await req.json().catch(() => ({}))) as { email?: unknown; invite?: unknown };
   const email = normalizeEmail(body.email);
 
   if (!isValidEmail(email)) {
@@ -40,46 +26,41 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // Budget is consumed by every well-formed request, approved or not, so the
-  // endpoint can't be used to probe the allowlist quickly either.
-  const limit = checkRateLimit([`email:${email}`, `ip:${callerIp(req.headers)}`]);
-  if (!limit.ok) {
-    return NextResponse.json(
-      {
-        status: "rate-limited",
-        message: "Too many attempts. Give it a few minutes, then try again.",
-        retryAfter: limit.retryAfter,
-      },
-      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
-    );
-  }
-
   try {
-    const member = await lookupApprovedMember(email);
-    if (!member) {
-      return NextResponse.json({ status: "not-approved" });
-    }
+    const limit = await checkRateLimit([`email:${email}`, `ip:${callerIp(req.headers)}`]);
+    if (!limit.ok) return NextResponse.json({ status: "rate-limited", message: "Too many attempts. Try again in a few minutes." }, { status: 429, headers: { "Retry-After": String(limit.retryAfter) } });
+    const member = await lookupAccessMember(email);
+    const invited = await checkSeasonInvite(body.invite);
+    if (!member && !invited) return NextResponse.json({ status: "not-approved" });
 
-    const origin = (process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin).replace(
+    const localOrigin = req.headers.get("origin") ?? req.nextUrl.origin;
+    const origin = (process.env.NODE_ENV === "development" && /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(localOrigin) ? localOrigin : process.env.NEXT_PUBLIC_APP_URL ?? "https://high-agency.io").replace(
       /\/$/,
       ""
     );
     const signInUrl = await adminAuth().generateSignInWithEmailLink(email, {
-      url: `${origin}/login/verify`,
+      url: `${origin}/login/verify${invited ? `?invite=${encodeURIComponent(String(body.invite))}` : ""}`,
       handleCodeInApp: true,
     });
 
     const delivery = await sendAccessEmail({
       to: email,
       signInUrl,
-      name: member.name,
+      name: member?.name,
     });
 
-    return NextResponse.json({ status: "sent", delivery });
+    let qaUrl: string | undefined;
+    if (process.env.NODE_ENV === "development" && process.env.FIREBASE_PROJECT_ID === "demo-highagency" && process.env.FIREBASE_AUTH_EMULATOR_HOST && process.env.FIRESTORE_EMULATOR_HOST) {
+      const generated = new URL(signInUrl);
+      const verify = new URL(generated.searchParams.get("continueUrl")!);
+      for (const key of ["apiKey", "oobCode", "mode"]) verify.searchParams.set(key, generated.searchParams.get(key) ?? "");
+      qaUrl = verify.pathname + verify.search;
+    }
+    return NextResponse.json({ status: "sent", delivery, ...(qaUrl ? { qaUrl } : {}) });
   } catch (err) {
     // Never leak internals (misconfigured Admin creds, Resend errors, the
     // fact that an address does or doesn't exist in Firebase Auth).
-    console.error("[access/request] failed:", err);
+    console.error("[access/request] failed", err instanceof Error ? err.name : "unknown");
     return NextResponse.json(
       { status: "error", message: "Couldn't send the link. Try again shortly." },
       { status: 500 }

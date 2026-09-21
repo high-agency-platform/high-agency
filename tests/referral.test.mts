@@ -20,7 +20,6 @@
  * same collection as the applicant ones.
  */
 import { readFileSync } from "node:fs";
-import { APPLICATION_DEADLINE_ISO } from "../app/lib/applicationWindow.ts";
 import { after, before, beforeEach, test } from "node:test";
 import {
   initializeTestEnvironment,
@@ -93,9 +92,7 @@ async function seed(code: string, fields: Record<string, unknown>) {
 before(async () => {
   testEnv = await initializeTestEnvironment({
     projectId: PROJECT_ID,
-    // Keep these attribution / consent checks in an open application window.
-    // applicationWindow.test.mts exercises the production cutoff separately.
-    firestore: { rules: readFileSync("firestore.rules", "utf8").replace(APPLICATION_DEADLINE_ISO, "2999-01-01T00:00:00.000Z") },
+    firestore: { rules: readFileSync("firestore.rules", "utf8") },
   });
 });
 

@@ -13,9 +13,7 @@ import {
   watchReviewQueue,
   watchAllSubmissions,
   watchOperators,
-  watchPendingConsent,
   REVIEW_QUEUE_LIMIT,
-  CONSENT_QUEUE_LIMIT,
 } from "../lib/db";
 import type { Profile, Season, Submission } from "../lib/types";
 
@@ -95,38 +93,4 @@ export function useRoster(seasonId: string | null): Roster {
     [snap, seasonId]
   );
   return { operators, submissions };
-}
-
-export interface ConsentQueue {
-  pending: Profile[] | null;
-  /** The queue is capped — there are likely more behind these. */
-  truncated: boolean;
-}
-
-/** Minors waiting on a parent's OK. Capped; see CONSENT_QUEUE_LIMIT. */
-export function useConsentQueue(enabled: boolean): ConsentQueue {
-  const [pending, setPending] = useState<Profile[] | null>(null);
-
-  useEffect(() => {
-    if (!enabled) return;
-    return watchPendingConsent(setPending);
-  }, [enabled]);
-
-  const sorted = useMemo(
-    () =>
-      pending
-        ? [...pending].sort((a, b) => {
-            // Longest-waiting first: never-emailed at the top, then oldest send.
-            const at = a.consentEmailSentAt?.toMillis() ?? 0;
-            const bt = b.consentEmailSentAt?.toMillis() ?? 0;
-            return at - bt || a.name.localeCompare(b.name);
-          })
-        : null,
-    [pending]
-  );
-
-  return {
-    pending: sorted,
-    truncated: (pending?.length ?? 0) >= CONSENT_QUEUE_LIMIT,
-  };
 }

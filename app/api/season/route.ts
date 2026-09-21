@@ -3,8 +3,8 @@
  *  edit that would orphan existing proof. */
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { requireMentor, errorResponse } from "../../lib/serverAuth";
-import { saveSeason } from "../../lib/seasonServer";
+import { requireMentor, requireUser, errorResponse } from "../../lib/serverAuth";
+import { saveSeason, readReleasedSeason } from "../../lib/seasonServer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,4 +17,11 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     return errorResponse(err, "season/save");
   }
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { uid } = await requireUser(req);
+    return NextResponse.json({ season: await readReleasedSeason(uid) }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (err) { return errorResponse(err, "season/read"); }
 }

@@ -35,6 +35,7 @@ export function ProfileDialog({ title, children, onClose }: { title: string; chi
 }
 
 export function ProfileDetails({ profile }: { profile: Profile }) {
+  if (profile.hidden) return <p className="empty">This profile is unavailable.</p>;
   const mentor = profile.role === "mentor";
   const links = [
     { label: "Website", url: profile.links?.site },
@@ -46,7 +47,7 @@ export function ProfileDetails({ profile }: { profile: Profile }) {
     <article className="member-profile">
       <header className="member-profile__header">
         <Avatar name={profile.name} photoUrl={profile.photoUrl} size="lg" />
-        <span className="micro">{mentor ? "Mentor" : "Operator"}{profile.country ? ` · ${profile.country}` : ""}</span>
+        <span className="micro">{mentor ? (profile.staffTitle === "advisor" ? "Advisor" : "Mentor") : "Operator"}{profile.country ? ` · ${profile.country}` : ""}</span>
         <h2>{profile.name}</h2>
         {profile.headline && <p className="member-profile__headline">{profile.headline}</p>}
       </header>
@@ -81,9 +82,10 @@ export function ProfileDetails({ profile }: { profile: Profile }) {
 }
 
 export function ProfileModal({ profile, onClose }: { profile: Profile | null | undefined; onClose: () => void }) {
+  const visibleProfile = profile?.hidden ? null : profile;
   return (
-    <ProfileDialog title={profile ? `${profile.name}'s profile` : "Member profile"} onClose={onClose}>
-      {profile ? <ProfileDetails profile={profile} /> : <p className="empty" role="status">{profile === undefined ? "Loading profile…" : "This profile is unavailable."}</p>}
+    <ProfileDialog title={visibleProfile ? `${visibleProfile.name}'s profile` : "Member profile"} onClose={onClose}>
+      {visibleProfile ? <ProfileDetails profile={visibleProfile} /> : <p className="empty" role="status">{visibleProfile === undefined ? "Loading profile…" : "This profile is unavailable."}</p>}
     </ProfileDialog>
   );
 }

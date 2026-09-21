@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { Timestamp } from "firebase/firestore";
-import { workshopCalendarUrl, type Workshop } from "../app/lib/types.ts";
+import { workshopCalendarUrl, workshopIsUpcoming, type Workshop } from "../app/lib/types.ts";
 
 const session: Workshop = {
   id: "local-calendar-test", title: "Build & learn / Ship #1", mentorName: "Test M.",
@@ -23,4 +23,14 @@ test("Google Calendar links safely encode the session and carry its meeting link
   assert.equal(url.searchParams.get("location"), session.meetLink);
   assert.equal(url.searchParams.get("details"), `${session.description}\n\nHosted by Test M.\n\n${session.meetLink}`);
   assert.equal(url.hash, "");
+});
+
+
+test("Sessions stay visible and enrollable throughout the scheduled meeting", () => {
+  const start = session.startsAt.toDate().getTime();
+  assert.equal(workshopIsUpcoming(session, start - 1), true);
+  assert.equal(workshopIsUpcoming(session, start), true);
+  assert.equal(workshopIsUpcoming(session, start + 45 * 60_000), true);
+  assert.equal(workshopIsUpcoming(session, start + 90 * 60_000 - 1), true);
+  assert.equal(workshopIsUpcoming(session, start + 90 * 60_000), false);
 });

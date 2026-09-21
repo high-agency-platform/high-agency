@@ -25,7 +25,7 @@
       "id": "ship-48h",
       "title": "Ship in 48 Hours",
       "why": "Done beats perfect. Make something small and put it on the public internet within 48 hours of starting: a one-page site, a short video, a post with a point of view, a tiny tool. The constraint is the lesson — scoping something shippable in 48 hours is the skill you will reuse on every track after this one.",
-      "proof": "Public URL anyone can open + a build log entry marking when you started (the 48-hour clock).",
+      "proof": "Public URL anyone can open + a dated note marking when you started (the 48-hour clock).",
       "effort": "3–5 hours",
       "verifier": "peer_lead",
       "sessions": [

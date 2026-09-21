@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: "The short set of rules for using the High Agency platform.",
 };
 
-const EFFECTIVE = "1 September 2026";
+const EFFECTIVE = "21 September 2026";
 const CONTACT = "info@high-agency.io";
 
 export default function TermsPage() {
@@ -29,9 +29,9 @@ export default function TermsPage() {
 
         <h2>Who can use it</h2>
         <p>
-          The program is for students aged 13 to 19. Members under 18 need a parent or
-          guardian&apos;s consent, which we collect before their account can take part.
-          Mentors are adults invited by High Agency.
+          The program is for students aged 13 to 19. Invited members verify their email
+          and complete a profile to take part; a parent approval email is not an access
+          requirement. Mentors are adults invited by High Agency.
         </p>
 
         <h2>Your account</h2>
@@ -42,7 +42,7 @@ export default function TermsPage() {
 
         <h2>How to behave</h2>
         <p>
-          Be honest about what you have built and what you have done. Treat your squad, your
+          Be honest about what you have built and what you have done. Treat other members, your
           mentor, and everyone in a session with respect. Do not post anything illegal,
           hateful, or intended to harm someone, and do not share other members&apos; personal
           details. We may remove content or close accounts that break these rules.

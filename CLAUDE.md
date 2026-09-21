@@ -2,6 +2,14 @@
 
 # High Agency Platform
 
+> **2026-09-21 onboarding revision:** [docs/season1-onboarding.md](docs/season1-onboarding.md)
+> supersedes the historical access/feed descriptions below. Students redeem capped,
+> expiring Season 1 invites after email verification (`seasonInvites` → `memberships`).
+> Existing approved mentors remain supported. Community/feed and peer proof browsing
+> are removed; Resources links to Slack. Proof is author/mentor-readable. Students read
+> only released milestones through `GET /api/season`; full season reads are mentor-only.
+> `npm run dev:qa` starts isolated emulators and separate mentor/student sessions on 3001.
+
 > Always-loaded project baseline. `@AGENTS.md` above is a hard rule, not a footnote:
 > this is **Next.js 16 with breaking changes** — read the relevant guide in
 > `node_modules/next/dist/docs/` before writing framework code.

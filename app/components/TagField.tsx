@@ -12,12 +12,14 @@ export function TagField({
   value,
   max,
   onChange,
+  maxLength = MAX_TAG_LEN,
 }: {
   label: string;
   presets: readonly string[];
   value: string[];
   max: number;
   onChange: (v: string[]) => void;
+  maxLength?: number;
 }) {
   const [draft, setDraft] = useState("");
   const atCap = value.length >= max;
@@ -38,7 +40,7 @@ export function TagField({
   function addCustom() {
     const t = normalizeFocusTag(draft);
     setDraft("");
-    if (!t || atCap) return;
+    if (!t || atCap || t.length > maxLength) return;
     const folded = presets.find((p) => p.toLowerCase() === t.toLowerCase()) ?? t;
     if (value.some((x) => x.toLowerCase() === folded.toLowerCase())) return;
     onChange([...value, folded]);
@@ -85,7 +87,7 @@ export function TagField({
             }
           }}
           placeholder="Add your own…"
-          maxLength={MAX_TAG_LEN}
+          maxLength={maxLength}
           disabled={atCap}
         />
         <button

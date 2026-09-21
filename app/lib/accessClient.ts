@@ -1,11 +1,3 @@
-/**
- * TEMPORARY — founding-batch access gate. Client-side.
- *
- * The browser half of the gate: thin fetch wrappers over app/api/access/**.
- * Kept out of db.ts on purpose — db.ts is the permanent data layer, and this
- * whole file goes away when the batch ends (see app/lib/accessGate.ts for the
- * removal checklist).
- */
 import { getFirebaseAuth } from "./firebase";
 import type { MentorSignupInput } from "./types";
 
@@ -24,21 +16,23 @@ export type AccessRequestStatus =
 
 /** Ask for a sign-in link. Never throws on a normal outcome — "not-approved"
  *  is an answer, not a failure. */
-export async function requestAccessLink(email: string): Promise<{
+export async function requestAccessLink(email: string, invite?: string): Promise<{
   status: AccessRequestStatus;
   message?: string;
+  qaUrl?: string;
 }> {
   try {
     const res = await fetch("/api/access/request", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email, invite }),
     });
     const data = (await res.json().catch(() => ({}))) as {
       status?: AccessRequestStatus;
       message?: string;
+      qaUrl?: string;
     };
-    return { status: data.status ?? "error", message: data.message };
+    return { status: data.status ?? "error", message: data.message, qaUrl: data.qaUrl };
   } catch {
     return { status: "error" };
   }
@@ -50,16 +44,16 @@ export interface AccessClaim {
   hasProfile: boolean;
 }
 
-/** Re-check the allowlist against the signed-in identity and find out where
- *  this person belongs. A false `ok` means sign them straight back out. */
-export async function claimAccess(): Promise<AccessClaim> {
+/** Claim invite membership using the verified Firebase identity. */
+export async function claimAccess(invite?: string | null): Promise<AccessClaim> {
   const user = getFirebaseAuth().currentUser;
   if (!user) throw new Error("not-signed-in");
   const idToken = await user.getIdToken();
 
   const res = await fetch("/api/access/claim", {
     method: "POST",
-    headers: { Authorization: `Bearer ${idToken}` },
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ invite }),
   });
   const data = (await res.json().catch(() => ({}))) as {
     status?: string;
@@ -67,6 +61,7 @@ export async function claimAccess(): Promise<AccessClaim> {
     hasProfile?: boolean;
   };
 
+  if (res.status >= 500) throw new Error("access-unavailable");
   return {
     ok: res.ok && data.status === "ok",
     role: data.role === "mentor" ? "mentor" : "operator",

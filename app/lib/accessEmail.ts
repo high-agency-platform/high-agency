@@ -1,14 +1,4 @@
-/**
- * TEMPORARY — founding-batch access gate. Server-only.
- *
- * Sign-in-link email transport. Modelled directly on consentEmail.ts: same
- * Resend client, same EmailDelivery contract, same escaping, same brand.
- *
- * When RESEND_API_KEY is absent (local dev) we DON'T fail — the fully-formed
- * sign-in URL is logged to the server console so the whole magic-link flow is
- * testable against a "dev inbox" (the terminal). Delete alongside the rest of
- * the gate; see app/lib/accessGate.ts for the removal checklist.
- */
+/** Email-link transport. Never log sign-in credentials. */
 import { Resend } from "resend";
 import type { EmailDelivery } from "./consentEmail";
 
@@ -36,7 +26,7 @@ function signInHtml(signInUrl: string, name?: string): string {
   <div style="font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;margin:0 auto;color:#211d18;line-height:1.55">
     <h1 style="font-size:22px;margin:0 0 16px">${greeting}</h1>
     <p style="margin:0 0 14px">
-      You're on the list for the <strong>High Agency</strong> founding batch — a live
+      Welcome to <strong>High Agency Season 1</strong> — a live
       cohort program where you work a mentor-written track, ship real proof, and learn
       from people who've done it. Use the button below to sign in.
     </p>
@@ -69,12 +59,8 @@ export async function sendAccessEmail(params: {
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
-    // Dev inbox: the flow is fully exercisable without a provider secret.
-    console.log(
-      `[access] No RESEND_API_KEY set — would email ${to} a sign-in link.\n` +
-        `[access] Sign-in link: ${signInUrl}`
-    );
-    return "logged";
+    if (process.env.FIREBASE_AUTH_EMULATOR_HOST) return "logged";
+    throw new Error("Email delivery is not configured");
   }
 
   const resend = new Resend(apiKey);

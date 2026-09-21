@@ -22,7 +22,7 @@ function consentHtml(childName: string, approveUrl: string): string {
       ${escapeHtml(childName)} signed up for <strong>High Agency</strong>, a live cohort
       program where ambitious young people (13–18) build real projects together, walking
       a mentor-written track. Because they're under 18, we need a parent or guardian to approve
-      before they can post work and take part in the community.
+      before they can submit proof of work.
     </p>
     <p style="margin:0 0 24px">
       What they'll do: work through a mentor-written track of real-world
@@ -67,12 +67,8 @@ export async function sendConsentEmail(params: {
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
-    // Dev inbox: the flow is fully exercisable without a provider secret.
-    console.log(
-      `[consent] No RESEND_API_KEY set — would email ${to} to approve "${childName}".\n` +
-        `[consent] Approval link: ${approveUrl}`
-    );
-    return "logged";
+    if (process.env.FIREBASE_AUTH_EMULATOR_HOST) return "logged";
+    throw new Error("Email delivery is not configured");
   }
 
   const resend = new Resend(apiKey);
