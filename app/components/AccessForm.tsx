@@ -23,6 +23,11 @@ export default function AccessForm({ invite = "" }: { invite?: string }) {
   // Already signed in → route past login. Unchanged from before the gate:
   // no profile means onboarding, and mentors get their own app.
   useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("mode") === "signIn" && url.searchParams.has("oobCode")) {
+      router.replace(`/login/verify${url.search}`);
+      return;
+    }
     if (user && profile) {
       router.replace(
         !profile ? "/onboarding" : profile.role === "mentor" ? "/mentor" : "/dashboard"

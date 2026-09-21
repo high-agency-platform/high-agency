@@ -8,6 +8,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { getFirebaseAuth } from "../../../lib/firebase";
+import { verificationInvite } from "../../../lib/accessLink";
 import {
   claimAccess,
   createApprovedMentorProfile,
@@ -79,7 +80,7 @@ export default function VerifyPage() {
       // Signing in proves the mailbox, not the entitlement. The allowlist is
       // re-read server-side against the verified token before anyone is let in.
       try {
-        const claim = await claimAccess(new URL(window.location.href).searchParams.get("invite"));
+        const claim = await claimAccess(verificationInvite(window.location.href));
         if (cancelled) return;
 
         if (!claim.ok) {
@@ -160,7 +161,7 @@ export default function VerifyPage() {
     }
 
     try {
-      const claim = await claimAccess(new URL(window.location.href).searchParams.get("invite"));
+      const claim = await claimAccess(verificationInvite(window.location.href));
       if (!claim.ok) {
         await signOut(auth);
         setPhase("not-approved");

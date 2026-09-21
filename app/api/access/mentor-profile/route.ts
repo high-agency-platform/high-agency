@@ -68,11 +68,15 @@ export async function POST(req: NextRequest) {
       const snap = await tx.get(profileRef);
 
       if (snap.exists) {
-        if (snap.data()?.role === "mentor") return "already-mentor" as const;
+        if (snap.data()?.role === "mentor") {
+          if (member.staffTitle === "advisor") tx.update(profileRef, { staffTitle: "advisor" });
+          return "already-mentor" as const;
+        }
         // An operator account whose email was later allowlisted as a mentor:
         // promote in place so profile and streak survive.
         tx.update(profileRef, {
           role: "mentor",
+          ...(member.staffTitle === "advisor" ? { staffTitle: "advisor" } : {}),
           updatedAt: FieldValue.serverTimestamp(),
         });
         return "promoted" as const;
@@ -80,7 +84,7 @@ export async function POST(req: NextRequest) {
 
       const profile = body.profile && buildMentorProfile(uid, body.profile);
       if (!profile) return "profile-required" as const;
-      tx.set(profileRef, profile);
+      tx.set(profileRef, { ...profile, ...(member.staffTitle === "advisor" ? { staffTitle: "advisor" } : {}) });
       return "created" as const;
     });
 

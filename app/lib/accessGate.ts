@@ -12,6 +12,8 @@ export interface ApprovedMember {
   /** Normalized (trimmed + lowercased) email — also the doc id. */
   email: string;
   role: ApprovedRole;
+  /** Staff label from the private mentor approval record only. */
+  staffTitle?: "advisor";
   /** Display only; never shown to other members. */
   name?: string;
   /** Epoch ms. OPTIONAL: absent on docs hand-created in the Console. */
@@ -60,6 +62,7 @@ export async function lookupApprovedMember(
   return {
     email,
     role,
+    ...(role === "mentor" && data.staffTitle === "advisor" ? { staffTitle: "advisor" as const } : {}),
     ...(typeof data.name === "string" ? { name: data.name } : {}),
     // Console-created docs often have no addedAt at all — that must not throw.
     ...(typeof data.addedAt === "number" ? { addedAt: data.addedAt } : {}),
@@ -118,6 +121,13 @@ export async function claimSeasonAccess(uid: string, email: string, verified: bo
     const profileRef = db.collection("profiles").doc(uid);
     const membershipRef = db.collection("memberships").doc(uid);
     const [profile, membership] = await Promise.all([tx.get(profileRef), tx.get(membershipRef)]);
+    if (profile.exists && approved?.role === "mentor") {
+      tx.update(profileRef, {
+        role: "mentor",
+        ...(approved.staffTitle === "advisor" ? { staffTitle: "advisor" } : {}),
+        updatedAt: Timestamp.now(),
+      });
+    }
     if (profile.exists || membership.exists || approved) return {
       role: profile.data()?.role === "mentor" ? "mentor" : approved?.role ?? "operator",
       hasProfile: profile.exists,
@@ -143,7 +153,7 @@ export async function checkRateLimit(keys: string[]): Promise<{ ok: boolean; ret
       const data = snap.data();
       return data && data.until > now ? { count: Number(data.count), until: Number(data.until) } : { count: 0, until: now + windowMs };
     });
-    const blocked = rows.find((row, index) => row.count >= (keys[index].startsWith("ip:") ? 100 : 5));
+    const blocked = rows.find((row, index) => row.count >= (keys[index].startsWith("ip:") ? 1000 : 50));
     if (blocked) return { ok: false, retryAfter: Math.ceil((blocked.until - now) / 1000) };
     rows.forEach((row, index) => tx.set(refs[index], { ...row, count: row.count + 1 }));
     return { ok: true, retryAfter: 0 };

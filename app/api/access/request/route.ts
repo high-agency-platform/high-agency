@@ -10,6 +10,7 @@ import {
   normalizeEmail,
 } from "../../../lib/accessGate";
 import { sendAccessEmail } from "../../../lib/accessEmail";
+import { accessVerificationUrl } from "../../../lib/accessLink";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -39,10 +40,12 @@ export async function POST(req: NextRequest) {
       /\/$/,
       ""
     );
-    const signInUrl = await adminAuth().generateSignInWithEmailLink(email, {
-      url: `${origin}/login/verify${invited ? `?invite=${encodeURIComponent(String(body.invite))}` : ""}`,
+    const continueUrl = `${origin}/login/verify${invited ? `?invite=${encodeURIComponent(String(body.invite))}` : ""}`;
+    const generatedLink = await adminAuth().generateSignInWithEmailLink(email, {
+      url: continueUrl,
       handleCodeInApp: true,
     });
+    const signInUrl = accessVerificationUrl(generatedLink, continueUrl);
 
     const delivery = await sendAccessEmail({
       to: email,
@@ -52,9 +55,7 @@ export async function POST(req: NextRequest) {
 
     let qaUrl: string | undefined;
     if (process.env.NODE_ENV === "development" && process.env.FIREBASE_PROJECT_ID === "demo-highagency" && process.env.FIREBASE_AUTH_EMULATOR_HOST && process.env.FIRESTORE_EMULATOR_HOST) {
-      const generated = new URL(signInUrl);
-      const verify = new URL(generated.searchParams.get("continueUrl")!);
-      for (const key of ["apiKey", "oobCode", "mode"]) verify.searchParams.set(key, generated.searchParams.get(key) ?? "");
+      const verify = new URL(signInUrl);
       qaUrl = verify.pathname + verify.search;
     }
     return NextResponse.json({ status: "sent", delivery, ...(qaUrl ? { qaUrl } : {}) });

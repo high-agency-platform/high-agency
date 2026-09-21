@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "../app/lib/firebaseAdmin.ts";
-import { createSeasonInvite, checkSeasonInvite, claimSeasonAccess, checkRateLimit } from "../app/lib/accessGate.ts";
+import { createSeasonInvite, checkSeasonInvite, claimSeasonAccess, checkRateLimit, lookupApprovedMember } from "../app/lib/accessGate.ts";
 import { readReleasedSeason, saveSeason, recordSubmission } from "../app/lib/seasonServer.ts";
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error("Emulator required");
@@ -45,7 +45,7 @@ test("Returning members and legacy mentors do not consume student invitations", 
 
 test("Per-email mail limits persist and do not block a 50-person shared IP", async () => {
   for (let i = 0; i < 50; i++) assert.equal((await checkRateLimit([`email:${i}@example.test`, "ip:shared"])).ok, true);
-  for (let i = 0; i < 4; i++) assert.equal((await checkRateLimit(["email:0@example.test", "ip:shared"])).ok, true);
+  for (let i = 0; i < 49; i++) assert.equal((await checkRateLimit(["email:0@example.test", "ip:shared"])).ok, true);
   assert.equal((await checkRateLimit(["email:0@example.test", "ip:shared"])).ok, false);
 });
 
@@ -110,4 +110,44 @@ test("Proof-enabled steps require a real link and keep existing reviews when pro
   await saveSeason("mentor", "Mentor", { seasonId: saved.id, expectedUpdatedAt: saved.updatedAt, name: "Season 1", state: "live", milestones: milestones.map(m => ({ ...m, proofRequired: false, verifier: "open" })) });
   await assert.rejects(recordSubmission("student", { seasonId: saved.id, milestoneId: "first", proofUrl: "" }), /proof-required/);
   assert.equal((await recordSubmission("student", { seasonId: saved.id, milestoneId: "first", proofUrl: "https://example.test/revised" })).status, "submitted");
+});
+
+
+test("Only an approved mentor can receive the advisor staff label", async () => {
+  const staff = db.collection("approvedMembers").doc("staff@example.test");
+  await staff.set({ role: "mentor", staffTitle: "advisor" });
+  assert.equal((await lookupApprovedMember("staff@example.test"))?.staffTitle, "advisor");
+  await staff.set({ role: "operator", staffTitle: "advisor" });
+  assert.equal((await lookupApprovedMember("staff@example.test"))?.staffTitle, undefined);
+  await staff.set({ role: "mentor", staffTitle: "arbitrary" });
+  assert.equal((await lookupApprovedMember("staff@example.test"))?.staffTitle, undefined);
+});
+
+test("Verified trusted mentor approval promotes an existing operator without losing their profile", async () => {
+  const profile = db.collection("profiles").doc("existing");
+  const approval = db.collection("approvedMembers").doc("existing@example.test");
+  await profile.set({ role: "operator", name: "Existing Member", headline: "Kept", enrolledWorkshops: ["session"] });
+  await claimSeasonAccess("existing", "existing@example.test", true, null);
+  assert.equal((await profile.get()).data()?.role, "operator", "No self-promotion without a trusted approval");
+  await approval.set({ role: "mentor", staffTitle: "advisor" });
+  await assert.rejects(claimSeasonAccess("existing", "existing@example.test", false, null), /email-unverified/);
+  assert.equal((await profile.get()).data()?.role, "operator");
+  assert.deepEqual(await claimSeasonAccess("existing", "existing@example.test", true, null), { role: "mentor", hasProfile: true });
+  const saved = (await profile.get()).data();
+  assert.equal(saved?.role, "mentor");
+  assert.equal(saved?.staffTitle, "advisor");
+  assert.equal(saved?.headline, "Kept");
+  assert.deepEqual(saved?.enrolledWorkshops, ["session"]);
+});
+
+
+test("Expanded login limits unblock old five-attempt counters and enforce 1000 attempts per shared IP", async () => {
+  const ref = (key: string) => db.collection("accessRateLimits").doc(createHash("sha256").update(key).digest("hex"));
+  const until = Date.now() + 15 * 60_000;
+  await ref("email:retry@example.test").set({ count: 5, until });
+  await ref("ip:near-capacity").set({ count: 999, until });
+  assert.equal((await checkRateLimit(["email:retry@example.test", "ip:near-capacity"])).ok, true);
+  const blocked = await checkRateLimit(["email:another@example.test", "ip:near-capacity"]);
+  assert.equal(blocked.ok, false);
+  assert.ok(blocked.retryAfter > 0 && blocked.retryAfter <= 900);
 });
