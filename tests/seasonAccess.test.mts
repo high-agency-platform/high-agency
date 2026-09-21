@@ -50,7 +50,7 @@ test("Per-email mail limits persist and do not block a 50-person shared IP", asy
 });
 
 const milestones = [
-  { id: "first", title: "First", why: "", proof: "Post a link", effort: "", verifier: "mentor", sessions: [] },
+  { id: "first", title: "First", why: "", proofRequired: true, proof: "Post a link", effort: "", verifier: "mentor", sessions: [] },
   { id: "second", title: "Secret later lesson", why: "Hidden teaching", proof: "Hidden proof instructions", effort: "", verifier: "open", sessions: [] },
 ];
 async function seedSeason() {
@@ -85,4 +85,29 @@ test("Stale saves and drafts stay blocked; parent email never gates proof", asyn
   await db.collection("seasons").doc(saved.id).update({ state: "draft" });
   assert.equal(await readReleasedSeason("student"), null);
   await assert.rejects(recordSubmission("student", { seasonId: saved.id, milestoneId: "first", proofUrl: "https://example.test/proof" }), /season-closed/);
+});
+
+
+test("Proof is optional by default; self-completion stores no fake link and is idempotent", async () => {
+  await db.collection("profiles").doc("student").set({ name: "Test S.", role: "operator", timezone: "UTC", streak: 0, streakFreezes: 0, lastActiveDay: "" });
+  const saved = await saveSeason("mentor", "Mentor", { name: "Season 1", state: "live", milestones: [{ ...milestones[0], proofRequired: undefined }] });
+  assert.equal((await readReleasedSeason("student"))?.milestones[0].proofRequired, false);
+  const result = await recordSubmission("student", { seasonId: saved.id, milestoneId: "first", proofUrl: "" });
+  assert.equal(result.status, "approved");
+  const rows = await db.collection("seasons").doc(saved.id).collection("submissions").get();
+  assert.equal(rows.docs[0].data().proofUrl, "");
+  assert.equal(rows.docs[0].data().verifier, "open");
+  assert.deepEqual(await recordSubmission("student", { seasonId: saved.id, milestoneId: "first" }), result);
+  await saveSeason("mentor", "Mentor", { seasonId: saved.id, expectedUpdatedAt: saved.updatedAt, name: "Season 1", state: "live", milestones: [milestones[0]] });
+  assert.deepEqual(await recordSubmission("student", { seasonId: saved.id, milestoneId: "first" }), result, "Requiring proof later does not revoke an existing completion");
+});
+
+test("Proof-enabled steps require a real link and keep existing reviews when proof is disabled", async () => {
+  const saved = await seedSeason();
+  await assert.rejects(recordSubmission("student", { seasonId: saved.id, milestoneId: "first", proofUrl: "" }), /proof-required/);
+  await assert.rejects(recordSubmission("student", { seasonId: saved.id, milestoneId: "second", proofUrl: "" }), /milestone-locked/);
+  assert.equal((await recordSubmission("student", { seasonId: saved.id, milestoneId: "first", proofUrl: "https://example.test/proof" })).status, "submitted");
+  await saveSeason("mentor", "Mentor", { seasonId: saved.id, expectedUpdatedAt: saved.updatedAt, name: "Season 1", state: "live", milestones: milestones.map(m => ({ ...m, proofRequired: false, verifier: "open" })) });
+  await assert.rejects(recordSubmission("student", { seasonId: saved.id, milestoneId: "first", proofUrl: "" }), /proof-required/);
+  assert.equal((await recordSubmission("student", { seasonId: saved.id, milestoneId: "first", proofUrl: "https://example.test/revised" })).status, "submitted");
 });

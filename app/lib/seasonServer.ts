@@ -45,6 +45,7 @@ import {
 
 export interface MilestoneWire {
   released?: boolean;
+  proofRequired?: boolean;
   /** Absent on a brand-new row; the server mints one. Present rows keep theirs. */
   id?: string;
   title: string;
@@ -123,6 +124,7 @@ function cleanMilestones(raw: unknown): SeasonMilestone[] {
       title,
       why: str(r.why, MILESTONE_WHY_MAX),
       proof: str(r.proof, MILESTONE_PROOF_MAX),
+      proofRequired: r.proofRequired === true,
       effort: str(r.effort, MILESTONE_EFFORT_MAX),
       verifier: normalizeVerifier(r.verifier),
       released: milestoneReleased(r, out.length),
@@ -220,7 +222,6 @@ export async function recordSubmission(
   const mid = str(input.milestoneId, 80);
   if (!seasonId || !mid) throw new HttpError(400, "bad-request");
   const proofUrl = urlish(input.proofUrl, SUBMISSION_URL_MAX);
-  if (!proofUrl) throw new HttpError(400, "proof-required");
   const note = str(input.note, SUBMISSION_NOTE_MAX);
 
   const db = adminDb();
@@ -249,8 +250,14 @@ export async function recordSubmission(
     // The whole reason this runs on the server: the verifier decides whether
     // the row is born approved, and it comes from the season doc, never the
     // request.
-    const verifier = normalizeVerifier(milestone.verifier);
     const prev = subSnap.data();
+    const hasExistingProof = typeof prev?.proofUrl === "string" && !!prev.proofUrl;
+    const requiresProof = milestone.proofRequired === true || hasExistingProof;
+    if (!hasExistingProof && prev?.status === "approved") {
+      return { status: "approved", attempt: Number(prev.attempt ?? 1), streak: Number(profile.streak ?? 0) };
+    }
+    if (requiresProof && !proofUrl) throw new HttpError(400, "proof-required");
+    const verifier = requiresProof ? normalizeVerifier(hasExistingProof ? prev.verifier : milestone.verifier) : "open";
     // Proof a mentor has signed off on can't be quietly swapped afterwards.
     if (prev && prev.status === "approved" && prev.verifier === "mentor") {
       throw new HttpError(409, "already-approved");
@@ -264,8 +271,8 @@ export async function recordSubmission(
       milestoneTitle: str(milestone.title, MILESTONE_TITLE_MAX),
       uid,
       name: String(profile.name ?? "?"),
-      proofUrl,
-      note,
+      proofUrl: requiresProof ? proofUrl : "",
+      note: requiresProof ? note : "",
       verifier,
       status,
       attempt: prev && typeof prev.attempt === "number" ? prev.attempt + 1 : 1,

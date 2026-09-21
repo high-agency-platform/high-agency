@@ -169,6 +169,7 @@ function normalizeMilestone(raw: unknown): SeasonMilestone {
     title: String(m.title ?? ""),
     why: String(m.why ?? ""),
     proof: String(m.proof ?? ""),
+    proofRequired: m.proofRequired === true,
     effort: String(m.effort ?? ""),
     verifier: normalizeVerifier(m.verifier),
     ...(typeof m.released === "boolean" ? { released: m.released } : {}),

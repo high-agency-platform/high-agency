@@ -61,8 +61,8 @@ export function SeasonPath({
       const r = await submitProof({
         seasonId: season.id,
         milestoneId: m.id,
-        proofUrl: url.trim(),
-        note: note.trim(),
+        proofUrl: m.proofRequired === true || subs[m.id]?.proofUrl ? url.trim() : "",
+        note: m.proofRequired === true || subs[m.id]?.proofUrl ? note.trim() : "",
       });
       setFormFor(null);
       setUrl("");
@@ -100,6 +100,7 @@ export function SeasonPath({
       {season.milestones.filter((m) => m.id === openId).map((m) => {
         const sub = subs[m.id];
         const done = sub?.status === "approved";
+        const requiresProof = m.proofRequired === true || !!sub?.proofUrl;
         return (
           <section key={m.id} className={`milestone-focus${popId === m.id ? " pop" : ""}`} aria-label={m.title}>
             <header className="milestone-focus__head">
@@ -107,7 +108,7 @@ export function SeasonPath({
               {sub && <span className={`path__state ${done ? "path__state--ok" : sub.status === "returned" ? "path__state--warn" : ""}`}>{done ? "Complete" : sub.status === "submitted" ? "In review" : "Needs revision"}</span>}
             </header>
             <div className="path__detail">
-              {m.proof && (
+              {requiresProof && m.proof && (
                 <div className="path__requirement">
                   <span className="micro">To complete</span>
                   <p>{m.proof}</p>
@@ -115,16 +116,15 @@ export function SeasonPath({
                 </div>
               )}
 
+              {!requiresProof && m.id === WELCOME_MILESTONE.id && <a className="link-btn" href={SLACK_URL} target="_blank" rel="noreferrer">Introduce yourself in Slack ↗</a>}
               {/* ---- your own state ---- */}
               {done && sub && (
                 <div className="path__meta">
-                  {m.verifier === "mentor" && sub.reviewedByName && (
+                  {sub.verifier === "mentor" && sub.reviewedByName && (
                     <span className="path__state path__state--ok">Reviewed by <MemberButton uid={sub.reviewedByUid} name={sub.reviewedByName} /></span>
                   )}
-                  <a href={sub.proofUrl} target="_blank" rel="noreferrer" className="link-btn">
-                    View proof
-                  </a>
-                  {m.verifier === "open" && formFor !== m.id && (
+                  {sub.proofUrl && <a href={sub.proofUrl} target="_blank" rel="noreferrer" className="link-btn">View proof</a>}
+                  {sub.proofUrl && sub.verifier === "open" && formFor !== m.id && (
                     <button type="button" className="btn btn--ghost btn--sm" onClick={() => startForm(m, sub)}>
                       Update
                     </button>
@@ -154,13 +154,15 @@ export function SeasonPath({
                 <button
                   type="button"
                   className="btn btn--primary btn--sm"
-                  onClick={() => startForm(m)}
+                  disabled={busy}
+                  onClick={() => requiresProof ? startForm(m) : send(m)}
                 >
-                  Post proof
+                  {requiresProof ? "Post proof" : busy ? "Completing…" : "Complete"}
                 </button>
               )}
 
-              {formFor === m.id && (
+              {!requiresProof && err && <p className="form-err" role="alert">{err}</p>}
+              {requiresProof && formFor === m.id && (
                 <div className="path__form">
                   <p className="path__visibility">
                     Visible only to you and mentors.

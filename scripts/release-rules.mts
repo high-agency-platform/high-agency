@@ -1,5 +1,5 @@
 import nextEnv from "@next/env";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { getApps } from "firebase-admin/app";
 nextEnv.loadEnvConfig(process.cwd(),true,{info(){},error(){}});
 if(!process.argv.includes("--production")||process.env.FIRESTORE_EMULATOR_HOST)throw Error("Explicit production required");
@@ -19,4 +19,5 @@ const live=await call("/releases/cloud.firestore");
 const r=await fetch(`https://firebaserules.googleapis.com/v1/${live.rulesetName}`,{headers:{Authorization:`Bearer ${access_token}`}});
 if(!r.ok)throw Error(`Rules read ${r.status}`);
 const source=await r.json();
+if(process.argv.includes("--inspect"))writeFileSync("/tmp/ha-live-firestore.rules",source.source.files.find((f:{name:string})=>f.name==="firestore.rules")?.content??source.source.files[0].content);
 console.log(JSON.stringify({rulesMatch:source.source.files.some((f:{content:string})=>f.content===content),ruleset:live.rulesetName}));

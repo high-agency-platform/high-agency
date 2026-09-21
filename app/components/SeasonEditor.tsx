@@ -26,7 +26,7 @@ import {
   milestoneReleased,
 } from "../lib/types";
 import { saveSeason } from "../lib/api";
-import { PlusIcon } from "./ui";
+import { PlusIcon, CheckIcon } from "./ui";
 
 interface Draft {
   name: string;
@@ -110,6 +110,7 @@ export function SeasonEditor({
       title: "",
       why: "",
       proof: "",
+      proofRequired: false,
       effort: "",
       verifier: "mentor",
       released: false,
@@ -275,7 +276,7 @@ export function SeasonEditor({
                       onFocus={() => setOpen(m.id)}
                     />
                     <span className="chip chip--mute">
-                      {m.verifier === "mentor" ? "mentor" : "open"}
+                      {m.proofRequired !== true ? "self-complete" : m.verifier === "mentor" ? "mentor" : "open"}
                     </span>
                   </div>
                   <div className="track-row__tools" style={{ marginTop: 12 }}>
@@ -294,6 +295,12 @@ export function SeasonEditor({
                         rows={4}
                         onChange={(e) => patch(m.id, { why: e.target.value })}
                       />
+                      <label className="optin">
+                        <input type="checkbox" checked={m.proofRequired === true} onChange={e => patch(m.id, { proofRequired: e.target.checked })} />
+                        <span className="optin__box" aria-hidden="true"><CheckIcon size={12} /></span>
+                        <span className="optin__text">Require proof</span>
+                      </label>
+                      {m.proofRequired === true && <>
                       <textarea
                         className="input"
                         value={m.proof}
@@ -320,6 +327,7 @@ export function SeasonEditor({
                           ))}
                         </div>
                       </div>
+                      </>}
                       <textarea
                         className="input"
                         value={m.sessions.join("\n")}
@@ -369,7 +377,7 @@ export function SeasonEditor({
                   )}
                   {!isOpen && (m.why || m.proof) && (
                     <button type="button" className="track-row__peek" onClick={() => setOpen(m.id)}>
-                      {m.proof || m.why}
+                      {m.proofRequired === true ? m.proof || m.why : m.why}
                     </button>
                   )}
                 </div>

@@ -36,7 +36,7 @@ The two hostnames keep Firebase sessions separate. Both reflect current working-
 
 At `/mentor/track`, choose **Release**, then **Save track**. Students see each milestone title in the horizontal track row, with a lock on unreleased steps. Only released steps include details and deliverables, refreshed within 10 seconds; direct reads of the full season document are mentor-only. Submission routes also reject unreleased/draft work. Existing tracks with no flags expose only the first milestone until mentors save release choices. Milestone IDs and proof remain stable. Steps with proof cannot be removed or hidden by a save.
 
-Community posting, the feed, and peer proof browsing are removed. Old feed documents are retained but client-inaccessible. Proof is visible to its author and mentors; `open` verifier still means auto-complete. Resources links to `https://slack.com/signin` and the branded Season 1 guide PDF, which opens in the browser. The Slack destination remains a placeholder: replace it with the workspace invite before cohort onboarding. No temporary-link badge is shown.
+Community posting, the feed, and peer proof browsing are removed. Old feed documents are retained but client-inaccessible. Steps default to a direct **Complete** action. Mentors can enable **Require proof** per step; proof is then visible to its author and mentors, and the selected review mode applies. Existing submissions retain their review history when the setting changes. Resources links to `https://high-agency-group.slack.com/archives/C0C26UD8RRB` and the one-page `high-agency-structure.pdf`, which opens in the browser. No temporary-link badge is shown.
 
 ## Profile and member experience
 

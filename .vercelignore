@@ -1,0 +1,8 @@
+.next
+.next-qa
+node_modules
+.env*
+*.log
+.git
+.claude
+.agents

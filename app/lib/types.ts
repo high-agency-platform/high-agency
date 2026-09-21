@@ -453,6 +453,8 @@ export type Verifier = "open" | "mentor";
 
 export interface SeasonMilestone {
   released?: boolean;
+  /** Only explicit true requires proof; ordinary milestones complete with one click. */
+  proofRequired?: boolean;
   /** Stable for the life of the season and NEVER regenerated on edit —
    *  submission doc ids are built from it (see submissionKey). */
   id: string;
