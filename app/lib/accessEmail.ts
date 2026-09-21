@@ -45,7 +45,7 @@ function signInHtml(signInUrl: string, name?: string): string {
       ${signInUrl}
     </p>
     <p style="margin:0;font-size:13px;color:#6b645b">
-      This link is single-use and expires shortly. If you didn't ask to sign in,
+      Use the newest sign-in email. Each link can be used once. If you didn't ask to sign in,
       you can ignore this email — nothing happens until the link is opened.
     </p>
   </div>`;

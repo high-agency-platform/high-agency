@@ -1,16 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  isSignInWithEmailLink,
-  signInWithEmailLink,
-  signOut,
-} from "firebase/auth";
+import { isSignInWithEmailLink, signOut } from "firebase/auth";
 import { getFirebaseAuth } from "../../../lib/firebase";
 import { verificationInvite } from "../../../lib/accessLink";
 import {
   claimAccess,
+  completeEmailLink,
+  restoredLinkUser,
   createApprovedMentorProfile,
   ACCESS_EMAIL_KEY,
 } from "../../../lib/accessClient";
@@ -24,7 +22,7 @@ type Phase =
   | "need-email"
   /** Allowlisted mentor with no profile: run mentor onboarding here. */
   | "mentor-onboarding"
-  /** Signed in fine, but not on the list — already signed back out. */
+  /** Signed in, but the supplied invite is unavailable. */
   | "not-approved"
   /** Link expired, already used, or isn't a sign-in link at all. */
   | "bad-link"
@@ -54,134 +52,84 @@ export default function VerifyPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const submitting = useRef(false);
+
+  const finishAccess = useCallback(async () => {
+    const claim = await claimAccess(verificationInvite(window.location.href));
+    if (!claim.ok) {
+      await signOut(getFirebaseAuth());
+      setPhase("not-approved");
+    } else if (claim.hasProfile) {
+      router.replace(claim.role === "mentor" ? "/mentor" : "/dashboard");
+    } else if (claim.role === "mentor") {
+      setDisplayName(getFirebaseAuth().currentUser?.displayName ?? null);
+      setPhase("mentor-onboarding");
+    } else {
+      router.replace("/onboarding");
+    }
+  }, [router]);
+
+  const complete = useCallback(async (email: string) => {
+    try {
+      const user = await completeEmailLink(email, window.location.href);
+      clearStoredEmail();
+      setDisplayName(user.displayName);
+    } catch (err) {
+      const code = (err as { code?: string }).code;
+      if (code === "auth/expired-action-code") {
+        setPhase("bad-link");
+      } else if (code === "auth/invalid-email" || code === "auth/invalid-action-code") {
+        setError("Enter the email this link was sent to. If you requested another link, open the newest email.");
+        setPhase("need-email");
+      } else {
+        setError("We couldn't connect. Please try again.");
+        setPhase("error");
+      }
+      return;
+    }
+    try { await finishAccess(); }
+    catch { setPhase("error"); }
+  }, [finishAccess]);
+
   useEffect(() => {
     let cancelled = false;
-
-    /** Finish sign-in with `email`, then decide where this person goes. */
-    async function complete(email: string): Promise<void> {
+    async function run() {
       const auth = getFirebaseAuth();
-      try {
-        const cred = await signInWithEmailLink(auth, email, window.location.href);
-        if (cancelled) return;
-        clearStoredEmail();
-        setDisplayName(cred.user.displayName);
-      } catch (e) {
-        if (cancelled) return;
-        const code = (e as { code?: string }).code ?? "";
-        if (code === "auth/invalid-email") {
-          setError("That email doesn't match the one the link was sent to.");
-          setPhase("need-email");
-        } else {
-          setPhase("bad-link");
-        }
-        return;
-      }
-
-      // Signing in proves the mailbox, not the entitlement. The allowlist is
-      // re-read server-side against the verified token before anyone is let in.
-      try {
-        const claim = await claimAccess(verificationInvite(window.location.href));
-        if (cancelled) return;
-
-        if (!claim.ok) {
-          await signOut(auth);
-          if (!cancelled) setPhase("not-approved");
-          return;
-        }
-        if (claim.hasProfile) {
-          router.replace(claim.role === "mentor" ? "/mentor" : "/dashboard");
-          return;
-        }
-        if (claim.role === "mentor") {
-          setPhase("mentor-onboarding");
-          return;
-        }
-        // Operators finish their profile before entering the season.
-        router.replace("/onboarding");
-      } catch {
-        if (!cancelled) setPhase("error");
-      }
-    }
-
-    async function run(): Promise<void> {
-      const auth = getFirebaseAuth();
-      // Await first so no setState below runs synchronously inside the effect,
-      // and so Firebase has restored any persisted session before we act.
       await auth.authStateReady();
       if (cancelled) return;
-
-      if (!isSignInWithEmailLink(auth, window.location.href)) {
-        setPhase("bad-link");
+      const link = window.location.href;
+      const isLink = isSignInWithEmailLink(auth, link);
+      // A verified member may return before completing their profile.
+      if ((!isLink && auth.currentUser?.emailVerified) || await restoredLinkUser(link)) {
+        if (!cancelled) await finishAccess();
         return;
       }
-      const stored = readStoredEmail();
-      if (!stored) {
-        // Link opened on a different device/browser than it was requested
-        // from. This is a real Firebase requirement, not an edge case we can
-        // skip: the email is half of the credential.
-        setPhase("need-email");
-        return;
-      }
-      await complete(stored);
+      if (cancelled) return;
+      if (!isLink) { setPhase("bad-link"); return; }
+      const email = readStoredEmail();
+      if (!email) { setPhase("need-email"); return; }
+      await complete(email);
     }
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  }, [router]);
+    void run().catch(() => { if (!cancelled) setPhase("error"); });
+    return () => { cancelled = true; };
+  }, [complete, finishAccess]);
 
   async function submitEmail(e: React.FormEvent) {
     e.preventDefault();
-    if (busy) return;
-    const trimmed = promptEmail.trim();
-    if (!trimmed) {
-      setError("Enter the email the link was sent to.");
-      return;
-    }
+    if (submitting.current) return;
+    const email = promptEmail.trim();
+    if (!email) { setError("Enter the email the link was sent to."); return; }
+    submitting.current = true;
     setBusy(true);
     setError("");
     setPhase("working");
+    try { await complete(email); }
+    finally { submitting.current = false; setBusy(false); }
+  }
 
-    const auth = getFirebaseAuth();
-    try {
-      const cred = await signInWithEmailLink(auth, trimmed, window.location.href);
-      clearStoredEmail();
-      setDisplayName(cred.user.displayName);
-    } catch (err) {
-      const code = (err as { code?: string }).code ?? "";
-      setPhase("need-email");
-      setError(
-        code === "auth/invalid-email"
-          ? "That email doesn't match the one the link was sent to."
-          : "That link is no longer valid. Request a fresh one."
-      );
-      setBusy(false);
-      return;
-    }
-
-    try {
-      const claim = await claimAccess(verificationInvite(window.location.href));
-      if (!claim.ok) {
-        await signOut(auth);
-        setPhase("not-approved");
-        setBusy(false);
-        return;
-      }
-      if (claim.hasProfile) {
-        router.replace(claim.role === "mentor" ? "/mentor" : "/dashboard");
-        return;
-      }
-      if (claim.role === "mentor") {
-        setPhase("mentor-onboarding");
-        setBusy(false);
-        return;
-      }
-      router.replace("/onboarding");
-    } catch {
-      setPhase("error");
-      setBusy(false);
-    }
+  function requestNewLink() {
+    const invite = verificationInvite(window.location.href);
+    router.push(invite ? `/join?invite=${encodeURIComponent(invite)}` : "/login");
   }
 
   /** Mentor onboarding submit — the allowlist twin of redeeming an invite. */
@@ -251,14 +199,14 @@ export default function VerifyPage() {
           </h1>
           <p className="gate__sub">
             {phase === "bad-link"
-              ? "Sign-in links are single-use and don't last long. Request a fresh one — it only takes a second."
-              : "We couldn't finish signing you in. Try requesting a new link."}
+              ? "Open the newest sign-in email, or request a new link."
+              : "We couldn't finish signing you in. Please try again."}
           </p>
           <button
             className="btn btn--primary btn--block"
-            onClick={() => router.push("/login")}
+            onClick={phase === "error" ? () => window.location.reload() : requestNewLink}
           >
-            Get a new link
+            {phase === "error" ? "Try again" : "Get a new link"}
           </button>
         </div>
       </section>
@@ -302,6 +250,7 @@ export default function VerifyPage() {
             </button>
           </form>
           {error && <p className="form-err">{error}</p>}
+          <button type="button" className="link-btn" onClick={requestNewLink}>Get a new link</button>
         </div>
       </section>
     );

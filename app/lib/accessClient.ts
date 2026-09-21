@@ -1,3 +1,4 @@
+import { signInWithEmailLink, type User } from "firebase/auth";
 import { getFirebaseAuth } from "./firebase";
 import type { MentorSignupInput } from "./types";
 
@@ -6,6 +7,47 @@ import type { MentorSignupInput } from "./types";
  *  absent when the link is opened on a different device, which the verify
  *  page handles by asking. */
 export const ACCESS_EMAIL_KEY = "ha:accessEmail";
+
+let redemption: { email: string; link: string; result: Promise<User>; uid?: string } | undefined;
+
+async function verificationKey(link: string): Promise<string> {
+  const code = new URL(link).searchParams.get("oobCode") ?? "";
+  const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(code));
+  return "ha:verified:" + Array.from(new Uint8Array(hash), n => n.toString(16).padStart(2, "0")).join("");
+}
+
+/** Resume only the verified session that redeemed this exact link. */
+export async function restoredLinkUser(link: string): Promise<User | null> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user?.emailVerified) return null;
+  try {
+    return sessionStorage.getItem(await verificationKey(link)) === user.uid ? user : null;
+  } catch { return null; }
+}
+
+/** Effects and form submissions share one redemption of a single-use credential. */
+export function completeEmailLink(email: string, link: string): Promise<User> {
+  email = email.trim().toLowerCase();
+  if (redemption?.email === email && redemption.link === link &&
+      (!redemption.uid || redemption.uid === getFirebaseAuth().currentUser?.uid)) return redemption.result;
+  const result = (async () => {
+    const restored = await restoredLinkUser(link);
+    const user = restored?.email?.toLowerCase() === email
+      ? restored
+      : (await signInWithEmailLink(getFirebaseAuth(), email, link)).user;
+    try { sessionStorage.setItem(await verificationKey(link), user.uid); } catch { /* storage is optional */ }
+    return user;
+  })().then(user => {
+    attempt.uid = user.uid;
+    return user;
+  }).catch(error => {
+    if (redemption === attempt) redemption = undefined;
+    throw error;
+  });
+  const attempt: NonNullable<typeof redemption> = { email, link, result };
+  redemption = attempt;
+  return result;
+}
 
 export type AccessRequestStatus =
   | "sent"

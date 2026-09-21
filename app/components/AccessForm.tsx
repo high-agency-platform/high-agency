@@ -28,12 +28,16 @@ export default function AccessForm({ invite = "" }: { invite?: string }) {
       router.replace(`/login/verify${url.search}`);
       return;
     }
+    if (user?.emailVerified && profile === null) {
+      router.replace(`/login/verify${invite ? `?invite=${encodeURIComponent(invite)}` : ""}`);
+      return;
+    }
     if (user && profile) {
       router.replace(
-        !profile ? "/onboarding" : profile.role === "mentor" ? "/mentor" : "/dashboard"
+        profile.role === "mentor" ? "/mentor" : "/dashboard"
       );
     }
-  }, [user, profile, router]);
+  }, [user, profile, router, invite]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,8 +123,7 @@ export default function AccessForm({ invite = "" }: { invite?: string }) {
           </span>
           <h1 className="h1">{qaUrl ? "Your QA inbox." : "Check your inbox."}</h1>
           <p className="gate__sub">
-            {qaUrl ? "A test verification link is ready for" : "We sent a sign-in link to"} <strong>{sentTo}</strong>. It&apos;s
-            single-use and expires shortly — open it on this device if you can.
+            {qaUrl ? "A test verification link is ready for" : "We sent a sign-in link to"} <strong>{sentTo}</strong>. Open the newest email to continue.
           </p>
           {qaUrl && <a href={qaUrl} className="btn btn--primary btn--block">Verify test email</a>}
           <p className="auth-switch">
