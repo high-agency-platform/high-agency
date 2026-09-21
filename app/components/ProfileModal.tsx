@@ -35,7 +35,6 @@ export function ProfileDialog({ title, children, onClose }: { title: string; chi
 }
 
 export function ProfileDetails({ profile }: { profile: Profile }) {
-  if (profile.hidden) return <p className="empty">This profile is unavailable.</p>;
   const mentor = profile.role === "mentor";
   const links = [
     { label: "Website", url: profile.links?.site },
