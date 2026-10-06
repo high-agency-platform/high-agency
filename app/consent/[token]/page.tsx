@@ -149,7 +149,7 @@ function ConsentBody({
         <ul className="consent__list">
           <li>Submit proof of work privately to their mentors.</li>
           <li>Work through real-world milestones — ship a project, get first users.</li>
-          <li>Attend live expert workshops. Free for the founding batch.</li>
+          <li>Attend live expert workshops.</li>
         </ul>
         <button
           className="btn btn--primary consent__btn"

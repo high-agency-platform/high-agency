@@ -8,10 +8,6 @@ const ITEMS: { q: string; a: string }[] = [
     a: "Ambitious 13–19 year-olds who'd rather build than wait. No technical background needed — just drive.",
   },
   {
-    q: "Is it free?",
-    a: "Yes. Batch 02 is free, like the founding batch.",
-  },
-  {
     q: "How selective is it?",
     a: "By application, intentionally small. We weigh drive over résumé.",
   },

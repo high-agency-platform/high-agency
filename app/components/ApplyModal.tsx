@@ -338,7 +338,7 @@ export default function ApplyModal({
         {displayStep === 1 && (
           <div className="modal__step active">
             <h3 id="modalTitle">Apply for Batch 02.</h3>
-            <p className="modal__sub">Starts November. Free to join. Takes five minutes.</p>
+            <p className="modal__sub">Starts November. Takes five minutes.</p>
             <div className="field">
               <label htmlFor="m-name">Full name</label>
               <input

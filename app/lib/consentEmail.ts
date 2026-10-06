@@ -27,7 +27,6 @@ function consentHtml(childName: string, approveUrl: string): string {
     <p style="margin:0 0 24px">
       What they'll do: work through a mentor-written track of real-world
       milestones (ship a project, get first users), and attend live expert workshops.
-      There is no cost for the founding batch.
     </p>
     <p style="margin:0 0 28px">
       <a href="${approveUrl}"

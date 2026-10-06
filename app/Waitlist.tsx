@@ -244,7 +244,7 @@ export default function Waitlist() {
                 <CaptureForm label="Apply for Batch 02" onApply={openModal} {...captureStatus} />
               </Reveal>
               <Reveal className="capture__note" d={3}>
-                <span><b>By application</b> · Free · Ages 13–19</span>
+                <span><b>By application</b> · Ages 13–19</span>
               </Reveal>
               <ReferralBanner {...incoming} />
             </div>
@@ -435,7 +435,7 @@ export default function Waitlist() {
                   <CaptureForm label="Apply now" onApply={openModal} {...captureStatus} />
                 </Reveal>
                 <Reveal className="capture__note" d={3}>
-                  <span><b>By application</b> · Free</span>
+                  <span><b>By application</b></span>
                 </Reveal>
               </div>
               <div className="final__pad" aria-hidden="true">
