@@ -5,7 +5,7 @@
 
 import { getFirebaseAuth } from "./firebase";
 import type { WorkshopWire } from "./workshopServer";
-import type { SeasonWire, SubmitWire, ReviewWire } from "./seasonServer";
+import type { SeasonWire, SubmitWire, ReviewWire, MilestoneReleaseWire } from "./seasonServer";
 import type { SubmissionStatus } from "./types";
 
 export type { WorkshopWire, SeasonWire, SubmitWire, ReviewWire };
@@ -78,6 +78,15 @@ export async function leaveWorkshop(id: string): Promise<SeatResult> {
 export async function saveSeason(input: SeasonWire): Promise<{ id: string; updatedAt: number }> {
   const r = await authed<{ id: string; updatedAt: number; error?: string }>("/api/season", {
     method: "POST",
+    body: JSON.stringify(input),
+  });
+  if (!r.ok) throw new Error(r.data.error ?? "failed");
+  return r.data;
+}
+
+export async function setMilestoneRelease(input: MilestoneReleaseWire): Promise<{ id: string; updatedAt: number }> {
+  const r = await authed<{ id: string; updatedAt: number; error?: string }>("/api/season", {
+    method: "PATCH",
     body: JSON.stringify(input),
   });
   if (!r.ok) throw new Error(r.data.error ?? "failed");

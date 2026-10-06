@@ -25,7 +25,7 @@ import {
   milestoneId,
   milestoneReleased,
 } from "../lib/types";
-import { saveSeason } from "../lib/api";
+import { saveSeason, setMilestoneRelease } from "../lib/api";
 import { PlusIcon, CheckIcon } from "./ui";
 
 interface Draft {
@@ -59,7 +59,7 @@ function fromSeason(s: Season | null): Draft {
 
 const ERRORS: Record<string, string> = {
   "stale-write": "Someone else saved the track first. Reload to see it, then redo your change.",
-  "milestone-has-submissions": "A step you removed or hid already has proof. Keep it released.",
+  "milestone-has-submissions": "This step has student progress and cannot be removed or hidden.",
   "name-required": "Give the season a name.",
   "too-many-milestones": `That's more than ${SEASON_MAX_MILESTONES} steps.`,
 };
@@ -79,15 +79,21 @@ export function SeasonEditor({
   submittedIds: Set<string>;
 }) {
   const [edits, setEdits] = useState<Draft | null>(null);
-  const draft = edits ?? fromSeason(season);
+  const [saved, setSaved] = useState<Draft | null>(null);
+  const live = fromSeason(season);
+  const baseline = saved && (saved.base ?? 0) > (live.base ?? 0) ? saved : live;
+  const draft = edits ?? baseline;
   const dirty = edits !== null;
 
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [releasing, setReleasing] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
 
   function edit(p: Partial<Draft>) {
+    setFlash("");
+    setError("");
     setEdits({ ...draft, ...p });
   }
 
@@ -120,11 +126,33 @@ export function SeasonEditor({
     setOpen(m.id);
   }
 
+  async function release(id: string, released: boolean) {
+    if (!season || busy) return;
+    setBusy(true);
+    setReleasing(id);
+    setError("");
+    setFlash("");
+    try {
+      const result = await setMilestoneRelease({ seasonId: season.id, milestoneId: id, released, expectedUpdatedAt: draft.base });
+      const update = (d: Draft): Draft => ({ ...d, base: result.updatedAt, milestones: d.milestones.map(m => m.id === id ? { ...m, released } : m) });
+      setSaved(update(baseline));
+      if (edits) setEdits(update(draft));
+      setFlash(released ? "Milestone released. Students can access it when the season is live." : "Milestone hidden from students.");
+    } catch (e) {
+      setError(ERRORS[(e as Error).message] ?? "Couldn't update the release. Try again.");
+    } finally {
+      setReleasing(null);
+      setBusy(false);
+    }
+  }
+
   async function persist() {
     setBusy(true);
     setError("");
+    setFlash("");
     try {
-      await saveSeason({
+      const milestones = draft.milestones.map(m => ({ ...m, title: m.title.trim(), sessions: m.sessions.map(s => s.trim()).filter(Boolean) })).filter(m => m.title);
+      const result = await saveSeason({
         seasonId: season?.id,
         expectedUpdatedAt: draft.base,
         name: draft.name,
@@ -135,14 +163,9 @@ export function SeasonEditor({
         overview: draft.overview,
         outcome: draft.outcome,
         state: draft.state,
-        milestones: draft.milestones
-          .map((m) => ({
-            ...m,
-            title: m.title.trim(),
-            sessions: m.sessions.map((s) => s.trim()).filter(Boolean),
-          }))
-          .filter((m) => m.title),
+        milestones,
       });
+      setSaved({ ...draft, milestones, base: result.updatedAt });
       setEdits(null);
       setFlash("Saved — released milestones are visible to students.");
       setTimeout(() => setFlash(""), 3500);
@@ -154,17 +177,18 @@ export function SeasonEditor({
   }
 
   return (
-    <div className="stack">
+    <fieldset className="stack track-editor" disabled={busy}>
       {/* ---- The season itself ---- */}
       <section className="tile">
         <div className="tile__head">
-          <h2 className="h3">The season</h2>
+          <h2 className="h3">Season details</h2>
           <span className="micro">
             {season
               ? `last saved${season.updatedByName ? ` by ${season.updatedByName}` : ""}`
               : "nothing saved yet"}
           </span>
         </div>
+        <p className="field__hint">The introduction students see above their milestones.</p>
         <div className="field">
           <label htmlFor="se-name">Name</label>
           <input
@@ -252,6 +276,8 @@ export function SeasonEditor({
           </span>
         </div>
 
+        <p className="field__hint">Release saves immediately. Text, order, and completion settings use Save track.</p>
+
         {draft.milestones.length === 0 ? (
           <p className="muted" style={{ marginBottom: 12 }}>
             No steps yet. Add the first one — you can change anything later.
@@ -269,6 +295,7 @@ export function SeasonEditor({
                     </span>
                     <input
                       className="track-row__title"
+                      aria-label={`Milestone ${i + 1} title`}
                       value={m.title}
                       placeholder="Milestone"
                       maxLength={MILESTONE_TITLE_MAX}
@@ -276,18 +303,23 @@ export function SeasonEditor({
                       onFocus={() => setOpen(m.id)}
                     />
                     <span className="chip chip--mute">
-                      {m.proofRequired !== true ? "self-complete" : m.verifier === "mentor" ? "mentor" : "open"}
+                      {m.proofRequired !== true ? "self-complete" : m.verifier === "mentor" ? "mentor review" : "auto-complete"}
                     </span>
                   </div>
                   <div className="track-row__tools" style={{ marginTop: 12 }}>
                     <span className="micro">{milestoneReleased(m, i) ? "Released to students" : "Locked for students"}</span>
-                    <button type="button" className={`btn btn--sm ${milestoneReleased(m, i) ? "btn--ghost" : "btn--primary"}`} disabled={busy || (hasProof && milestoneReleased(m, i))} onClick={() => patch(m.id, { released: !milestoneReleased(m, i) })}>
-                      {milestoneReleased(m, i) ? "Unrelease" : "Release"}
+                    <button type="button" className={`btn btn--sm ${milestoneReleased(m, i) ? "btn--ghost" : "btn--primary"}`} disabled={busy || !baseline.milestones.some(saved => saved.id === m.id) || (hasProof && milestoneReleased(m, i))} onClick={() => release(m.id, !milestoneReleased(m, i))}>
+                      {releasing === m.id ? "Saving…" : milestoneReleased(m, i) ? "Unrelease" : "Release"}
                     </button>
                   </div>
+                  {!baseline.milestones.some(saved => saved.id === m.id) && <p className="field__hint">Save this new step before releasing it.</p>}
                   {isOpen && (
                     <div className="track-row__body">
+                      <div className="field">
+                      <label htmlFor={`why-${m.id}`}>Student brief</label>
+                      <span className="field__hint">What to do and why it matters.</span>
                       <textarea
+                        id={`why-${m.id}`}
                         className="input"
                         value={m.why}
                         placeholder="Why it matters — your words."
@@ -295,19 +327,34 @@ export function SeasonEditor({
                         rows={4}
                         onChange={(e) => patch(m.id, { why: e.target.value })}
                       />
+                      </div>
+                      <div className="field">
+                        <label htmlFor={`guidance-${m.id}`}>Related guidance</label>
+                        <span className="field__hint">Optional topics shown in the student brief, one per line.</span>
+                        <textarea id={`guidance-${m.id}`} value={m.sessions.join("\n")} rows={2}
+                          onChange={e => patch(m.id, { sessions: e.target.value.split("\n").slice(0, MILESTONE_SESSIONS_MAX) })} />
+                      </div>
+                      <div className="track-row__completion">
+                      <h3 className="h3">Completion</h3>
+                      <p className="field__hint">{m.proofRequired ? "Students submit a link to complete this step." : "Students mark this step complete themselves."}</p>
                       <label className="optin">
                         <input type="checkbox" checked={m.proofRequired === true} onChange={e => patch(m.id, { proofRequired: e.target.checked })} />
                         <span className="optin__box" aria-hidden="true"><CheckIcon size={12} /></span>
                         <span className="optin__text">Require proof</span>
                       </label>
                       {m.proofRequired === true && <>
+                      <div className="field">
+                      <label htmlFor={`proof-${m.id}`}>Proof instructions</label>
+                      <span className="field__hint">Tell students which link or evidence to submit.</span>
                       <textarea
+                        id={`proof-${m.id}`}
                         className="input"
                         value={m.proof}
                         placeholder="Exactly what to submit."
                         maxLength={MILESTONE_PROOF_MAX}
                         onChange={(e) => patch(m.id, { proof: e.target.value })}
                       />
+                      </div>
                       <div className="track-row__tools">
                         <div className="chip-row">
                           {(["open", "mentor"] as Verifier[]).map((v) => (
@@ -328,18 +375,10 @@ export function SeasonEditor({
                         </div>
                       </div>
                       </>}
-                      <textarea
-                        className="input"
-                        value={m.sessions.join("\n")}
-                        placeholder="Suggested sessions — one per line"
-                        rows={2}
-                        onChange={(e) =>
-                          patch(m.id, { sessions: e.target.value.split("\n").slice(0, MILESTONE_SESSIONS_MAX) })
-                        }
-                      />
+                      </div>
                       {hasProof && (
-                        <span className="micro" style={{ color: "var(--warn)" }}>
-                          has proof · can&apos;t be removed; changing who reviews won&apos;t move existing proof
+                        <span className="field__hint">
+                          Student progress is saved. This step cannot be removed or hidden once released. Existing proof keeps its review setting.
                         </span>
                       )}
                       <div className="track-row__tools">
@@ -386,8 +425,8 @@ export function SeasonEditor({
           </div>
         )}
 
-        {error && <p className="form-err">{error}</p>}
-        {flash && <p className="micro signal" style={{ marginTop: 10 }}>{flash}</p>}
+        {error && <p className="form-err" role="alert">{error}</p>}
+        {flash && <p className="field__hint signal" role="status">{flash}</p>}
         <div className="row-actions">
           <button type="button" className="btn btn--ghost" onClick={add} disabled={draft.milestones.length >= SEASON_MAX_MILESTONES}>
             <PlusIcon /> Add a step
@@ -404,6 +443,6 @@ export function SeasonEditor({
           )}
         </div>
       </section>
-    </div>
+    </fieldset>
   );
 }

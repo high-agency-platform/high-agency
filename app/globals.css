@@ -1557,6 +1557,8 @@ button.member-button:hover span:last-child { color: var(--accent); text-decorati
 }
 
 /* ---- The track editor (mentor) ---- */
+.track-editor { border: 0; padding: 0; margin: 0; min-width: 0; }
+.track-row__completion { display: grid; gap: 10px; padding-top: 16px; border-top: 1px solid var(--border-strong); }
 .track-row { padding: 12px 14px; }
 .track-row__head { display: flex; align-items: center; gap: 10px; }
 .track-row__title {
@@ -1568,6 +1570,11 @@ button.member-button:hover span:last-child { color: var(--accent); text-decorati
 .track-row__title::placeholder { color: var(--text-faint); font-weight: 500; }
 .track-row__body { display: grid; gap: 10px; margin-top: 10px; padding-left: 38px; }
 .track-row__tools { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .track-row__head { display: grid; grid-template-columns: 44px minmax(0, 1fr); }
+  .track-row__head .chip { grid-column: 2; justify-self: start; }
+  .track-row__body { padding-left: 0; }
+}
 .track-row__tools input[type="date"] { margin-left: 6px; font: inherit; }
 .track-row__peek {
   display: block; width: 100%; text-align: left; margin-top: 6px; padding: 0 0 0 38px;

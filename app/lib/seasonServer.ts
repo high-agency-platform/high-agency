@@ -79,6 +79,13 @@ export interface SubmitWire {
   note: string;
 }
 
+export interface MilestoneReleaseWire {
+  seasonId: string;
+  milestoneId: string;
+  released: boolean;
+  expectedUpdatedAt: number | null;
+}
+
 export interface ReviewWire {
   seasonId: string;
   submissionId: string;
@@ -160,9 +167,7 @@ export async function saveSeason(
   const db = adminDb();
   const seasons = db.collection("seasons");
   const seasonId = typeof input.seasonId === "string" && input.seasonId ? input.seasonId : null;
-  const now = Timestamp.now();
-
-  const id = await db.runTransaction(async (tx) => {
+  return db.runTransaction(async (tx) => {
     const ref = seasonId ? seasons.doc(seasonId) : seasons.doc();
 
     // ---- reads ----
@@ -177,10 +182,12 @@ export async function saveSeason(
 
     // A milestone that already has proof against it can't be removed —
     // its submissions would be orphaned with no error anywhere.
-    const keep = new Set(milestones.map((m) => m.id));
     const removed = (Array.isArray(stored?.milestones) ? stored.milestones : [])
-      .map((m: unknown) => String((m as { id?: unknown })?.id ?? ""))
-      .filter((mid: string) => mid && (!keep.has(mid) || milestones.find(m => m.id === mid)?.released === false));
+      .filter((m: SeasonMilestone, i: number) => {
+        const next = milestones.find(next => next.id === m.id);
+        return !next || (milestoneReleased(m, i) && !next.released);
+      })
+      .map((m: SeasonMilestone) => m.id);
     const blocked: string[] = [];
     for (const mid of removed) {
       const q = await tx.get(ref.collection("submissions").where("milestoneId", "==", mid).limit(1));
@@ -193,6 +200,9 @@ export async function saveSeason(
       const live = await tx.get(seasons.where("state", "==", "live"));
       others = live.docs.filter((d) => d.id !== ref.id);
     }
+
+    const storedAt = stored?.updatedAt instanceof Timestamp ? stored.updatedAt.toMillis() : 0;
+    const now = Timestamp.fromMillis(Math.max(Date.now(), Math.floor(storedAt) + 1));
 
     // ---- writes ----
     for (const d of others) tx.update(d.ref, { state: "archived", updatedAt: now });
@@ -207,10 +217,39 @@ export async function saveSeason(
       },
       { merge: true }
     );
-    return ref.id;
+    return { id: ref.id, updatedAt: now.toMillis() };
   });
+}
 
-  return { id, updatedAt: now.toMillis() };
+/** Change visibility without publishing unrelated editor drafts. */
+export async function setMilestoneRelease(
+  mentorUid: string,
+  mentorName: string,
+  input: Partial<MilestoneReleaseWire>
+): Promise<{ id: string; updatedAt: number }> {
+  const seasonId = str(input.seasonId, 80);
+  const mid = str(input.milestoneId, 80);
+  if (!seasonId || !mid || typeof input.released !== "boolean") throw new HttpError(400, "bad-request");
+  const ref = adminDb().collection("seasons").doc(seasonId);
+  return adminDb().runTransaction(async tx => {
+    const stored = (await tx.get(ref)).data();
+    if (!stored) throw new HttpError(404, "not-found");
+    const storedAt = stored.updatedAt instanceof Timestamp ? stored.updatedAt.toMillis() : 0;
+    if (storedAt && input.expectedUpdatedAt !== storedAt) throw new HttpError(409, "stale-write");
+    const milestones: SeasonMilestone[] = (stored.milestones ?? []).map((m: SeasonMilestone, i: number) => ({ ...m, released: milestoneReleased(m, i) }));
+    const milestone = milestones.find(m => m.id === mid);
+    if (!milestone) throw new HttpError(404, "unknown-milestone");
+    if (milestone.released && !input.released) {
+      const submissions = await tx.get(ref.collection("submissions").where("milestoneId", "==", mid).limit(1));
+      if (!submissions.empty) throw new HttpError(409, "milestone-has-submissions");
+    }
+    const now = Timestamp.fromMillis(Math.max(Date.now(), Math.floor(storedAt) + 1));
+    tx.update(ref, {
+      milestones: milestones.map(m => m.id === mid ? { ...m, released: input.released } : m),
+      updatedAt: now, updatedByUid: mentorUid, updatedByName: mentorName,
+    });
+    return { id: ref.id, updatedAt: now.toMillis() };
+  });
 }
 
 /** Submit (or resubmit) proof for one milestone, and count the day. */

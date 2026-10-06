@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "../app/lib/firebaseAdmin.ts";
 import { createSeasonInvite, checkSeasonInvite, claimSeasonAccess, checkRateLimit, lookupApprovedMember } from "../app/lib/accessGate.ts";
-import { readReleasedSeason, saveSeason, recordSubmission } from "../app/lib/seasonServer.ts";
+import { readReleasedSeason, saveSeason, recordSubmission, setMilestoneRelease } from "../app/lib/seasonServer.ts";
 
 if (!process.env.FIRESTORE_EMULATOR_HOST) throw new Error("Emulator required");
 const db = adminDb();
@@ -150,4 +150,51 @@ test("Expanded login limits unblock old five-attempt counters and enforce 1000 a
   const blocked = await checkRateLimit(["email:another@example.test", "ip:near-capacity"]);
   assert.equal(blocked.ok, false);
   assert.ok(blocked.retryAfter > 0 && blocked.retryAfter <= 900);
+});
+
+
+test("Legacy proof on locked steps does not block saving or releasing another step", async () => {
+  const saved = await seedSeason();
+  const ref = db.collection("seasons").doc(saved.id);
+  const third = { ...milestones[1], id: "third", title: "Another locked step", released: false };
+  await ref.update({ milestones: [...milestones, third] });
+  for (const milestoneId of ["second", "third"]) {
+    await ref.collection("submissions").doc(`legacy__${milestoneId}`).set({ milestoneId, status: "approved" });
+  }
+  const edited = await saveSeason("mentor", "Mentor", { seasonId: saved.id, expectedUpdatedAt: saved.updatedAt, name: "Edited title", state: "live", milestones: [...milestones, third] });
+  const released = await setMilestoneRelease("mentor", "Mentor", { seasonId: saved.id, milestoneId: "second", released: true, expectedUpdatedAt: edited.updatedAt });
+  const stored = (await ref.get()).data()!;
+  assert.equal(stored.name, "Edited title");
+  assert.equal(stored.milestones[1].released, true);
+  assert.equal(stored.milestones[2].released, false);
+  assert.equal((await readReleasedSeason("student"))?.milestones.length, 2);
+  await assert.rejects(setMilestoneRelease("mentor", "Mentor", { seasonId: saved.id, milestoneId: "second", released: false, expectedUpdatedAt: released.updatedAt }), /milestone-has-submissions/);
+  await assert.rejects(saveSeason("mentor", "Mentor", { seasonId: saved.id, expectedUpdatedAt: released.updatedAt, name: "Edited title", state: "live", milestones }), /milestone-has-submissions/, "Removing a locked step with legacy proof must still fail");
+});
+
+test("Release preserves content, rejects stale writes, and can hide an unused step", async () => {
+  const saved = await seedSeason();
+  const input = { seasonId: saved.id, milestoneId: "second", released: true, expectedUpdatedAt: saved.updatedAt };
+  const released = await setMilestoneRelease("mentor", "Mentor", input);
+  assert.ok(released.updatedAt > saved.updatedAt);
+  await assert.rejects(setMilestoneRelease("mentor", "Mentor", { ...input, released: false }), /stale-write/);
+  await assert.rejects(saveSeason("mentor", "Mentor", { seasonId: saved.id, expectedUpdatedAt: saved.updatedAt, name: "Stale edit", milestones }), /stale-write/);
+  const hidden = await setMilestoneRelease("mentor", "Mentor", { ...input, released: false, expectedUpdatedAt: released.updatedAt });
+  assert.ok(hidden.updatedAt > released.updatedAt);
+  const stored = (await db.collection("seasons").doc(saved.id).get()).data()!;
+  assert.equal(stored.name, "Season 1");
+  assert.equal(stored.milestones[0].released, true, "Legacy first-step visibility must be preserved");
+  assert.equal(stored.milestones[1].why, milestones[1].why);
+  assert.equal(stored.milestones[1].released, false);
+  await assert.rejects(setMilestoneRelease("mentor", "Mentor", { ...input, milestoneId: "missing", expectedUpdatedAt: hidden.updatedAt }), /unknown-milestone/);
+});
+
+
+test("Full saves advance the concurrency token even when the stored clock is ahead", async () => {
+  const saved = await seedSeason();
+  const future = Date.now() + 60_000;
+  await db.collection("seasons").doc(saved.id).update({ updatedAt: Timestamp.fromMillis(future) });
+  const edited = await saveSeason("mentor", "Mentor", { seasonId: saved.id, expectedUpdatedAt: future, name: "Clock-safe edit", state: "live", milestones });
+  assert.ok(edited.updatedAt > future);
+  await assert.rejects(saveSeason("mentor", "Mentor", { seasonId: saved.id, expectedUpdatedAt: future, name: "Stale", milestones }), /stale-write/);
 });
